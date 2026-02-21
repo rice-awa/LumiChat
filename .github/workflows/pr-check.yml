@@ -29,8 +29,8 @@ jobs:
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Run Checks
+      - name: Run Checks (Active Version)
         run: ./gradlew check --stacktrace
 
-      - name: Test Build
+      - name: Build (Active Version)
         run: ./gradlew build --stacktrace

@@ -8,6 +8,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MOD_VERSION: 2.0.0
+
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
@@ -36,13 +39,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
-          path: build/libs/${{ github.event.release.tag_name }}/*
+          path: build/libs/${{ env.MOD_VERSION }}/*
           if-no-files-found: error
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/${{ github.event.release.tag_name }}/*
+          files: build/libs/${{ env.MOD_VERSION }}/*
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
