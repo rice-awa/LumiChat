@@ -12,16 +12,16 @@
 
 **构建特定版本：**
 ```bash
-./gradlew :1.21.11:build
-./gradlew :1.21.10:build
-./gradlew :1.21.1:build
-./gradlew :1.20.1:build
+./gradlew: 1.21.11:build
+./gradlew: 1.21.10:build
+./gradlew: 1.21.1:build
+./gradlew: 1.20.1:build
 ```
 
 **运行特定版本：**
 ```bash
-./gradlew :1.21.11:runClient
-./gradlew :1.21.11:runServer
+./gradlew: 1.21.11:runClient
+./gradlew: 1.21.11:runServer
 ```
 
 **清理构建缓存：**
