@@ -398,7 +398,7 @@ public class PromptTemplate {
         }
 
         // 游戏版本信息
-        contextVariables.put("game_version", "Minecraft 1.21.7");
+        contextVariables.put("game_version", "Minecraft Java");
 
         // 模组版本信息
         try {
