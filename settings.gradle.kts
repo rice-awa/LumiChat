@@ -20,4 +20,4 @@ stonecutter {
     }
 }
 
-rootProject.name = "Template"
+rootProject.name = "LumiChat"
