@@ -21,9 +21,7 @@ stonecutter parameters {
     constants["release"] = property("mod.id") != "template"
     dependencies["fapi"] = node.project.property("deps.fabric_api") as String
 
-    replacements {
-        string(current.parsed >= "1.21.11") {
-            replace("ResourceLocation", "Identifier")
-        }
-    }
+    // Note: Identifier/ResourceLocation differences are handled via //? condition blocks
+    // in source files, not via string replacements to avoid interfering with conditionals
+
 }
