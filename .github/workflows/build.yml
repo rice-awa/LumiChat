@@ -20,6 +20,9 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  MOD_VERSION: 2.0.0
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -46,5 +49,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: build/libs/${{ github.event.repository.name }}-*
+          path: build/libs/${{ env.MOD_VERSION }}/*
           if-no-files-found: error
