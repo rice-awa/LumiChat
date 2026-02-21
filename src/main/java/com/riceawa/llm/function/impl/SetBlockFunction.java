@@ -112,7 +112,7 @@ public class SetBlockFunction implements LLMFunction {
             }
             
             // 获取方块类型
-            //? >=1.21.11 {
+            //? >=1.21.10 {
             Identifier blockId = Identifier.tryParse(blockType);
             if (blockId == null) {
                 blockId = Identifier.of("minecraft", blockType);
