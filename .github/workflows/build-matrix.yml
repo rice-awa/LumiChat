@@ -35,8 +35,8 @@ jobs:
       - name: Detect Minecraft Versions and Mod Version
         id: versions
         run: |
-          # Parse versions from settings.gradle.kts
-          VERSIONS=$(grep -oP 'versions\("\K[^"]+' settings.gradle.kts | sed 's/", "/,/g' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
+          # Extract versions from versions(...) call and parse all quoted strings
+          VERSIONS=$(grep -oP 'versions\([^)]+\)' settings.gradle.kts | grep -oP '"[^"]+"' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
           echo "Detected versions: $VERSIONS"
           # Format as JSON array for matrix
           VERSIONS_JSON=$(echo "$VERSIONS" | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
