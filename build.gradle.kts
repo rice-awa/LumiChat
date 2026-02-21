@@ -1,5 +1,5 @@
 plugins {
-    id("net.fabricmc.fabric-loom-remap")
+    id("net.fabricmc.fabric-loom-remap") version "1.14-SNAPSHOT"
 
     // `maven-publish`
     // id("me.modmuss50.mod-publish-plugin")
@@ -42,11 +42,27 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 
     fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0")
+
+    // HTTP client for LLM API calls
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    include("com.squareup.okhttp3:okhttp:4.12.0")
+
+    // Okio dependency (required by OkHttp)
+    implementation("com.squareup.okio:okio:3.6.0")
+    include("com.squareup.okio:okio:3.6.0")
+
+    // JSON processing
+    implementation("com.google.code.gson:gson:2.10.1")
+    include("com.google.code.gson:gson:2.10.1")
+
+    // Configuration management
+    implementation("com.typesafe:config:1.4.3")
+    include("com.typesafe:config:1.4.3")
 }
 
 loom {
     fabricModJsonPath = rootProject.file("src/main/resources/fabric.mod.json") // Useful for interface injection
-    accessWidenerPath = rootProject.file("src/main/resources/template.accesswidener")
+    accessWidenerPath = rootProject.file("src/main/resources/lumichat.accesswidener")
 
     decompilerOptions.named("vineflower") {
         options.put("mark-corresponding-synthetics", "1") // Adds names to lambdas - useful for mixins

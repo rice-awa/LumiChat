@@ -1,30 +1,43 @@
 {
-  "schemaVersion": 1,
-  "id": "${id}",
+	"schemaVersion": 1,
+	"id": "${id}",
   "version": "${version}",
   "name": "${name}",
-  "description": "This is an example description! Tell everyone what your mod is about!",
-  "authors": [
-    "Me!"
-  ],
-  "contact": {
-    "homepage": "https://stonecutter.kikugie.dev/",
-    "sources": "https://codeberg.org/stonecutter/template-fabric"
-  },
-  "license": "CC0-1.0",
-  "icon": "assets/template/icon.png",
-  "environment": "*",
-  "entrypoints": {
-    "main": [
-      "com.example.TemplateMod"
-    ]
-  },
-  "mixins": [
-    "template.mixins.json"
-  ],
-  "accessWidener": "template.accesswidener",
-  "depends": {
-    "fabricloader": ">=0.17",
-    "minecraft": "${minecraft}"
-  }
+	"description": "一个让人眼前一亮LLMchat模组，集成了LLM（大语言模型）聊天功能，支持多种AI服务和自定义功能。",
+	"authors": [
+		"rice-awa"
+	],
+	"contact": {
+		"homepage": "https://rice-awa.top",
+		"sources": "https://github.com/rice-awa/Luminous-llmchat"
+	},
+	"license": "MIT",
+	"icon": "assets/lumichat/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.riceawa.Lllmchat"
+		],
+		"client": [
+			"com.riceawa.LllmchatClient"
+		],
+		"fabric-datagen": [
+			"com.riceawa.LllmchatDataGenerator"
+		]
+	},
+	"mixins": [
+		"lumichat.mixins.json",
+		{
+			"config": "lumichat.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.17",
+		"minecraft": "${minecraft}",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"another-mod": "*"
+	}
 }
