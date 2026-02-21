@@ -117,21 +117,20 @@ public class SummonEntityFunction implements LLMFunction {
             }
             
             // 获取实体类型
-            //? >=1.21.10 {
             Identifier entityId;
+            //? >=1.21.10 {
             if (entityType.contains(":")) {
                 entityId = Identifier.of(entityType);
             } else {
                 entityId = Identifier.of("minecraft", entityType);
             }
-            //? } else {
-            Identifier entityId;
-            if (entityType.contains(":")) {
+            //?} else {
+            /*if (entityType.contains(":")) {
                 entityId = new Identifier(entityType);
             } else {
                 entityId = new Identifier("minecraft", entityType);
             }
-            //? }
+            *//*?}*/
             
             EntityType<?> type = Registries.ENTITY_TYPE.get(entityId);
             if (type == null) {

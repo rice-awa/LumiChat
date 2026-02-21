@@ -3,7 +3,9 @@ package com.riceawa.llm.util;
 import com.riceawa.mixin.ServerPlayerEntityAccessor;
 //? >=1.21.11 {
 import net.minecraft.command.permission.PermissionCheck;
-//? }
+//?} else {
+/*
+*//*?}*/
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
@@ -122,10 +124,10 @@ public final class EntityHelper {
             default -> CommandManager.GAMEMASTERS_CHECK;
         };
         return CommandManager.requirePermissionLevel(check).test(source);
-        //? } else {
-        // In older versions, use the simple permission level check
+        //?} else {
+        /*// In older versions, use the simple permission level check
         return source.hasPermissionLevel(level);
-        //? }
+        *//*?}*/
     }
     
     /**
