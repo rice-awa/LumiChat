@@ -20,15 +20,19 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  MOD_VERSION: 2.0.0
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Read Mod Version
+        id: version
+        run: |
+          MOD_VERSION=$(grep "^mod.version=" gradle.properties | cut -d'=' -f2)
+          echo "version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "Mod version: $MOD_VERSION"
 
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v4
@@ -49,5 +53,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: build/libs/${{ env.MOD_VERSION }}/*
+          path: build/libs/${{ steps.version.outputs.version }}/*
           if-no-files-found: error

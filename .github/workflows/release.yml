@@ -8,9 +8,6 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  MOD_VERSION: 2.0.0
-
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
@@ -19,6 +16,13 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Read Mod Version
+        id: version
+        run: |
+          MOD_VERSION=$(grep "^mod.version=" gradle.properties | cut -d'=' -f2)
+          echo "version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "Mod version: $MOD_VERSION"
 
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v4
@@ -39,13 +43,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-artifacts
-          path: build/libs/${{ env.MOD_VERSION }}/*
+          path: build/libs/${{ steps.version.outputs.version }}/*
           if-no-files-found: error
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/${{ env.MOD_VERSION }}/*
+          files: build/libs/${{ steps.version.outputs.version }}/*
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
