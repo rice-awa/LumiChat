@@ -21,20 +21,18 @@ concurrency:
   group: build-matrix-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  MOD_VERSION: 2.0.0
-
 jobs:
   # Dynamically detect available versions from settings.gradle.kts
   detect-versions:
     runs-on: ubuntu-latest
     outputs:
       versions: ${{ steps.versions.outputs.versions }}
+      mod_version: ${{ steps.versions.outputs.mod_version }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Detect Minecraft Versions
+      - name: Detect Minecraft Versions and Mod Version
         id: versions
         run: |
           # Parse versions from settings.gradle.kts
@@ -43,6 +41,11 @@ jobs:
           # Format as JSON array for matrix
           VERSIONS_JSON=$(echo "$VERSIONS" | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
           echo "versions=$VERSIONS_JSON" >> $GITHUB_OUTPUT
+          
+          # Parse mod version from gradle.properties
+          MOD_VERSION=$(grep "^mod.version=" gradle.properties | cut -d'=' -f2)
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "Mod version: $MOD_VERSION"
 
   # Build each version independently
   build-version:
