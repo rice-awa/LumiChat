@@ -117,7 +117,7 @@ public class SummonEntityFunction implements LLMFunction {
             }
             
             // 获取实体类型
-            //? >=1.21.11 {
+            //? >=1.21.10 {
             Identifier entityId;
             if (entityType.contains(":")) {
                 entityId = Identifier.of(entityType);
