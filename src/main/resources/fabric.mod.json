@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "id": "${id}",
+  "version": "${version}",
+  "name": "${name}",
+  "description": "This is an example description! Tell everyone what your mod is about!",
+  "authors": [
+    "Me!"
+  ],
+  "contact": {
+    "homepage": "https://stonecutter.kikugie.dev/",
+    "sources": "https://codeberg.org/stonecutter/template-fabric"
+  },
+  "license": "CC0-1.0",
+  "icon": "assets/template/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.example.TemplateMod"
+    ]
+  },
+  "mixins": [
+    "template.mixins.json"
+  ],
+  "accessWidener": "template.accesswidener",
+  "depends": {
+    "fabricloader": ">=0.17",
+    "minecraft": "${minecraft}"
+  }
+}
