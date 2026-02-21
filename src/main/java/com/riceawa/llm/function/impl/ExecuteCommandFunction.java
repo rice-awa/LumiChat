@@ -126,11 +126,17 @@ public class ExecuteCommandFunction implements LLMFunction {
                     resultCode = server.getCommandManager().getDispatcher().execute(command, captureSource);
                     System.out.println("[ExecuteCommandFunction] 命令执行完成，返回码: " + resultCode + ", 捕获到 " + outputMessages.size() + " 条消息");
                 } catch (Exception e) {
-                    // 如果直接执行失败，尝试使用parseAndExecute
+                    // 如果直接执行失败，尝试使用parseAndExecute（仅1.21.11+）
+                    //? >=1.21.11 {
                     System.out.println("[ExecuteCommandFunction] 直接执行失败，尝试parseAndExecute: " + e.getMessage());
                     server.getCommandManager().parseAndExecute(captureSource, command);
                     resultCode = 1; // 如果没有异常，认为成功
                     System.out.println("[ExecuteCommandFunction] parseAndExecute完成，捕获到 " + outputMessages.size() + " 条消息");
+                    //? } else {
+                    // 旧版本没有parseAndExecute，重新抛出异常
+                    System.out.println("[ExecuteCommandFunction] 直接执行失败: " + e.getMessage());
+                    throw e;
+                    //? }
                 }
 
                 // 收集输出信息

@@ -117,12 +117,21 @@ public class SummonEntityFunction implements LLMFunction {
             }
             
             // 获取实体类型
+            //? >=1.21.11 {
             Identifier entityId;
             if (entityType.contains(":")) {
-                entityId = Identifier.of(entityType); // 1.19+ 推荐方式
+                entityId = Identifier.of(entityType);
             } else {
-                entityId = Identifier.of("minecraft", entityType); // 默认命名空间为 minecraft
+                entityId = Identifier.of("minecraft", entityType);
             }
+            //? } else {
+            Identifier entityId;
+            if (entityType.contains(":")) {
+                entityId = new Identifier(entityType);
+            } else {
+                entityId = new Identifier("minecraft", entityType);
+            }
+            //? }
             
             EntityType<?> type = Registries.ENTITY_TYPE.get(entityId);
             if (type == null) {
