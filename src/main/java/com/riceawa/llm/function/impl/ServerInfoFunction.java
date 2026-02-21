@@ -9,9 +9,9 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 //? >=1.21.11 {
 import net.minecraft.world.rule.GameRules;
-//? } else {
-import net.minecraft.world.GameRules;
-//? }
+//?} else {
+/*import net.minecraft.world.GameRules;
+*//*?}*/
 
 /**
  * 获取服务器信息的函数
@@ -65,9 +65,9 @@ public class ServerInfoFunction implements LLMFunction {
             boolean isPvp;
             //? >=1.21.11 {
             isPvp = server.getOverworld().getGameRules().getValue(GameRules.PVP);
-            //? } else {
-            isPvp = server.getOverworld().getGameRules().getBoolean(GameRules.PVP);
-            //? }
+            //?} else {
+            /*isPvp = server.getOverworld().getGameRules().getBoolean(GameRules.PVP);
+            *//*?}*/
             info.append("是否允许PvP: ").append(isPvp ? "是" : "否").append("\n");
             
             // 玩家信息

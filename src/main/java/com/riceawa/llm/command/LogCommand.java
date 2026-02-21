@@ -22,9 +22,9 @@ public class LogCommand {
         dispatcher.register(CommandManager.literal("llmlog")
                 //? >=1.21.11 {
                 .requires(CommandManager.requirePermissionLevel(CommandManager.GAMEMASTERS_CHECK)) // 需要管理员权限
-                //? } else {
-                .requires(source -> source.hasPermissionLevel(2)) // 需要管理员权限
-                //? }
+                //?} else {
+                /*.requires(source -> source.hasPermissionLevel(2)) // 需要管理员权限
+                *//*?}*/
                 .then(CommandManager.literal("level")
                         .then(CommandManager.argument("level", StringArgumentType.string())
                                 .suggests((context, builder) -> {
