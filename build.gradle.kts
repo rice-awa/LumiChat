@@ -1,5 +1,5 @@
 plugins {
-    id("net.fabricmc.fabric-loom-remap") version "1.14-SNAPSHOT"
+    id("net.fabricmc.fabric-loom-remap")
 
     // `maven-publish`
     // id("me.modmuss50.mod-publish-plugin")
@@ -38,10 +38,10 @@ dependencies {
     }
 
     minecraft("com.mojang:minecraft:${sc.current.version}")
-    mappings(loom.officialMojangMappings())
+    mappings("net.fabricmc:yarn:${property("deps.yarn_mappings")}:v2")
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 
-    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0")
+    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-command-api-v2")
 
     // HTTP client for LLM API calls
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
