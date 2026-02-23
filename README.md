@@ -208,12 +208,11 @@
 6. **重要**: 请将 `maxContextCharacters` 设置为比模型默认上下文长度低的值，为压缩和处理预留空间
 7. 使用 `/llmchat provider check` 定期检查Provider连接状态
 8. 热编辑模板时使用 `{{变量名}}` 格式引用内置和自定义变量
-9. 建议运行测试验证功能正确性：`./gradlew test`
 
 ## 📝 更新日志
 
 ### v2.0.0 (2026-02-21) - 最新版本
-- 🔥 **Stonecutter 多版本支持** - 使用 Stonecutter 框架支持 1.20.1、1.21.1、1.21.10、1.21.11 多版本构建
+- 🔥 **Stonecutter 多版本支持** - 使用 Stonecutter 框架支持 1.21.10、1.21.11 多版本构建
 - 🔥 **项目重构** - 模组ID从 `lllmchat` 统一为 `lumichat`，项目名统一为 `LumiChat`
 - 📚 **构建指南** - 新增多版本构建完整文档
 - ⚡ **架构升级** - 全面迁移至 Kotlin DSL 和 Stonecutter 多版本架构
