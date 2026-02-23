@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.riceawa.llm.compat.PermissionCompat;
 import com.riceawa.llm.history.ChatHistory;
 import com.riceawa.llm.history.HistoryExporter;
 import com.riceawa.llm.history.HistoryStatistics;
@@ -25,11 +26,7 @@ public class HistoryCommand {
     
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
         dispatcher.register(CommandManager.literal("llmhistory")
-                //? >=1.21.11 {
-                .requires(CommandManager.requirePermissionLevel(CommandManager.GAMEMASTERS_CHECK)) // 需要管理员权限
-                //?} else {
-                /*.requires(source -> source.hasPermissionLevel(2)) // 需要管理员权限
-                *//*?}*/
+                .requires(PermissionCompat.requireGamemasters()) // 需要管理员权限
                 .then(CommandManager.literal("stats")
                         .executes(context -> showPlayerStats(context, null))
                         .then(CommandManager.argument("player", EntityArgumentType.player())

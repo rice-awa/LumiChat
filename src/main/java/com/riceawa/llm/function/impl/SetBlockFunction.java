@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.IdentifierCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
@@ -111,14 +112,10 @@ public class SetBlockFunction implements LLMFunction {
                     "目标位置距离过远（%.1f方块），最大允许距离为%d方块", distance, MAX_DISTANCE));
             }
             
-            // 获取方块类型
-            Identifier blockId = Identifier.tryParse(blockType);
+            // 获取方块类型 - 使用兼容层
+            Identifier blockId = IdentifierCompat.parse(blockType);
             if (blockId == null) {
-                //? >=1.21.10 {
-                blockId = Identifier.of("minecraft", blockType);
-                //?} else {
-                /*blockId = new Identifier("minecraft", blockType);
-                *//*?}*/
+                blockId = IdentifierCompat.forBlockType(blockType);
             }
             
             Block block = Registries.BLOCK.get(blockId);
