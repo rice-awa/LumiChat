@@ -9,7 +9,7 @@
 	],
 	"contact": {
 		"homepage": "https://rice-awa.top",
-		"sources": "https://github.com/rice-awa/Luminous-llmchat"
+		"sources": "https://github.com/rice-awa/lumichat"
 	},
 	"license": "MIT",
 	"icon": "assets/lumichat/icon.png",
