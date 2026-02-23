@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.IdentifierCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
@@ -116,21 +117,8 @@ public class SummonEntityFunction implements LLMFunction {
                     "目标位置距离过远（%.1f方块），最大允许距离为%d方块", distance, MAX_DISTANCE));
             }
             
-            // 获取实体类型
-            Identifier entityId;
-            //? >=1.21.10 {
-            if (entityType.contains(":")) {
-                entityId = Identifier.of(entityType);
-            } else {
-                entityId = Identifier.of("minecraft", entityType);
-            }
-            //?} else {
-            /*if (entityType.contains(":")) {
-                entityId = new Identifier(entityType);
-            } else {
-                entityId = new Identifier("minecraft", entityType);
-            }
-            *//*?}*/
+            // 获取实体类型 - 使用兼容层
+            Identifier entityId = IdentifierCompat.forEntityType(entityType);
             
             EntityType<?> type = Registries.ENTITY_TYPE.get(entityId);
             if (type == null) {

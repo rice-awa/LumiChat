@@ -15,24 +15,50 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
+  workflow_dispatch:
 
 concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
+  # Dynamically detect available versions from settings.gradle.kts
+  detect-versions:
     runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.versions.outputs.versions }}
+      mod_version: ${{ steps.versions.outputs.mod_version }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Read Mod Version
-        id: version
+      - name: Detect Minecraft Versions and Mod Version
+        id: versions
         run: |
+          # Extract versions from versions(...) call and parse all quoted strings
+          VERSIONS=$(grep -oP 'versions\([^)]+\)' settings.gradle.kts | grep -oP '"[^"]+"' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
+          echo "Detected versions: $VERSIONS"
+          # Format as JSON array for matrix
+          VERSIONS_JSON=$(echo "$VERSIONS" | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "versions=$VERSIONS_JSON" >> $GITHUB_OUTPUT
+          
+          # Parse mod version from gradle.properties
           MOD_VERSION=$(grep "^mod.version=" gradle.properties | cut -d'=' -f2)
-          echo "version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
           echo "Mod version: $MOD_VERSION"
+
+  # Build each version independently
+  build-version:
+    needs: detect-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.detect-versions.outputs.versions) }}
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v4
@@ -46,12 +72,36 @@ jobs:
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Build with Gradle
-        run: ./gradlew buildAndCollect --stacktrace
+      - name: Build Version ${{ matrix.version }}
+        run: ./gradlew :${{ matrix.version }}:build --stacktrace
 
-      - name: Upload Build Artifacts
+      - name: Upload Build Artifacts for ${{ matrix.version }}
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts
-          path: build/libs/${{ steps.version.outputs.version }}/*
-          if-no-files-found: error
+          name: lumichat-${{ needs.detect-versions.outputs.mod_version }}-mc${{ matrix.version }}
+          path: versions/${{ matrix.version }}/build/libs/*.jar
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Summary job to report overall status
+  build-summary:
+    needs: [detect-versions, build-version]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check Build Results
+        run: |
+          echo "## Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Mod Version: ${{ needs.detect-versions.outputs.mod_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Minecraft Version | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------------|--------|" >> $GITHUB_STEP_SUMMARY
+          
+          for version in ${{ join(fromJson(needs.detect-versions.outputs.versions), ' ') }}; do
+            echo "| $version | See build-version ($version) |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: Fail if any build failed
+        if: contains(needs.*.result, 'failure')
+        run: exit 1

@@ -1,17 +1,13 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.GameRulesCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-//? >=1.21.11 {
-import net.minecraft.world.rule.GameRules;
-//?} else {
-/*import net.minecraft.world.GameRules;
-*//*?}*/
 
 /**
  * 获取服务器信息的函数
@@ -61,13 +57,8 @@ public class ServerInfoFunction implements LLMFunction {
             info.append("是否硬核模式: ").append(server.isHardcore() ? "是" : "否").append("\n");
             info.append("默认游戏模式: ").append(server.getDefaultGameMode().getTranslatableName().getString()).append("\n");
             info.append("难度: ").append(server.getOverworld().getDifficulty().getName()).append("\n");
-            // PvP状态获取 - 使用版本适配的API
-            boolean isPvp;
-            //? >=1.21.11 {
-            isPvp = server.getOverworld().getGameRules().getValue(GameRules.PVP);
-            //?} else {
-            /*isPvp = server.getOverworld().getGameRules().getBoolean(GameRules.PVP);
-            *//*?}*/
+            // PvP状态获取 - 使用兼容层
+            boolean isPvp = GameRulesCompat.isPvpEnabled(server.getOverworld());
             info.append("是否允许PvP: ").append(isPvp ? "是" : "否").append("\n");
             
             // 玩家信息

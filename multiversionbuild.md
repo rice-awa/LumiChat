@@ -1,6 +1,6 @@
 # 多版本构建指南
 
-本项目使用 Stonecutter 框架支持多个 Minecraft 版本（1.20.1、1.21.1、1.21.10、1.21.11）的并行开发。
+本项目使用 Stonecutter 框架支持多个 Minecraft 版本（1.21.10、1.21.11）的并行开发。
 
 ## 常用 Gradle 命令
 
@@ -12,16 +12,14 @@
 
 **构建特定版本：**
 ```bash
-./gradlew: 1.21.11:build
-./gradlew: 1.21.10:build
-./gradlew: 1.21.1:build
-./gradlew: 1.20.1:build
+./gradlew :1.21.11:build
+./gradlew :1.21.10:build
 ```
 
 **运行特定版本：**
 ```bash
-./gradlew: 1.21.11:runClient
-./gradlew: 1.21.11:runServer
+./gradlew :1.21.11:runClient
+./gradlew :1.21.11:runServer
 ```
 
 **清理构建缓存：**
@@ -60,8 +58,6 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 .
 ├── src/                    # 共享源代码（由 Stonecutter 管理）
 ├── versions/               # 各版本子项目
-│   ├── 1.20.1/
-│   ├── 1.21.1/
 │   ├── 1.21.10/
 │   └── 1.21.11/
 ├── build.gradle.kts        # 构建模板（应用于所有版本）
@@ -75,6 +71,97 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 - 所有代码修改应该在 `src/` 目录中进行
 - 使用条件注释 `/*? ... */` 来编写版本特定的代码
 - 提交前务必运行 `stonecutterReset` 重置到 VCS 版本
+
+## 推荐开发流程
+
+### 日常开发流程
+
+1. **切换到目标版本**
+   ```bash
+   ./gradlew setActiveVersion -Pversion=1.21.11
+   ```
+   这将更新 `src/` 目录中的条件代码，使其匹配目标版本。
+
+2. **进行代码修改**
+   - 在 `src/` 目录中修改共享代码
+   - 使用 Stonecutter 条件注释处理版本差异
+   - 运行测试验证功能
+
+3. **验证所有版本**
+   ```bash
+   # 构建所有支持版本
+   ./gradlew :1.21.10:build
+   ./gradlew :1.21.11:build
+   ```
+
+4. **提交前检查**
+   ```bash
+   # 执行重置，避免提交临时代码
+   ./gradlew stonecutterReset
+   
+   # 检查工作区状态
+   git status
+   ```
+
+5. **提交代码**
+   ```bash
+   git add .
+   git commit -m "feat: 新增xxx功能"
+   ```
+
+### 使用提交前检查脚本
+
+项目提供了自动化检查脚本，可一键完成提交前验证：
+
+```powershell
+# 完整检查（包含构建）
+./scripts/check-before-commit.ps1
+
+# 跳过构建检查（快速验证）
+./scripts/check-before-commit.ps1 -SkipBuild
+```
+
+脚本将执行以下检查：
+1. 工作区状态检查
+2. 全版本构建验证（1.21.10 和 1.21.11）
+3. stonecutterReset 执行
+4. Stonecutter 状态验证
+
+### 版本差异处理最佳实践
+
+**使用兼容层（推荐）：**
+```java
+// 使用 compat 包中的兼容工具类
+import com.riceawa.llm.compat.PermissionCompat;
+import com.riceawa.llm.compat.IdentifierCompat;
+
+// 而不是直接使用 Stonecutter 条件
+// PermissionCompat.hasPermission(player, "permission.node")
+```
+
+**使用 Stonecutter 条件注释：**
+```java
+// 块条件
+//? if >=1.21 {
+    versionSpecificCode();
+//?}
+
+// 行条件
+//? if >=1.21
+methodCall();
+
+// 内联条件
+method(/*? if >=1.20 {*/ param /*?}*/)
+```
+
+### CI/CD 集成
+
+项目使用 GitHub Actions 进行自动化构建：
+- PR 提交时自动构建所有版本
+- 推送到 main 分支时构建并收集产物
+- 发布时自动上传到 Modrinth 和 CurseForge
+
+详见 `.github/workflows/` 目录。
 
 ## 发布模组
 

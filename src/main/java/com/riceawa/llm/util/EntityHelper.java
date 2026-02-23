@@ -1,15 +1,10 @@
 package com.riceawa.llm.util;
 
+import com.riceawa.llm.compat.PermissionCompat;
 import com.riceawa.mixin.ServerPlayerEntityAccessor;
-//? >=1.21.11 {
-import net.minecraft.command.permission.PermissionCheck;
-//?} else {
-/*
-*//*?}*/
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
@@ -110,24 +105,10 @@ public final class EntityHelper {
     
     /**
      * Check if a ServerCommandSource has a specific permission level.
-     * In 1.21.11, hasPermissionLevel(int) was removed.
-     * Uses the new PermissionPredicate API.
+     * Delegates to PermissionCompat for version compatibility.
      */
     public static boolean hasPermissionLevel(ServerCommandSource source, int level) {
-        //? >=1.21.11 {
-        // Map permission levels to the new PermissionCheck constants
-        PermissionCheck check = switch (level) {
-            case 1 -> CommandManager.MODERATORS_CHECK;
-            case 2 -> CommandManager.GAMEMASTERS_CHECK;
-            case 3 -> CommandManager.ADMINS_CHECK;
-            case 4 -> CommandManager.OWNERS_CHECK;
-            default -> CommandManager.GAMEMASTERS_CHECK;
-        };
-        return CommandManager.requirePermissionLevel(check).test(source);
-        //?} else {
-        /*// In older versions, use the simple permission level check
-        return source.hasPermissionLevel(level);
-        *//*?}*/
+        return PermissionCompat.hasPermissionLevel(source, level);
     }
     
     /**

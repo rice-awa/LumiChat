@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.CommandCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import net.minecraft.entity.player.PlayerEntity;
@@ -121,22 +122,15 @@ public class ExecuteCommandFunction implements LLMFunction {
                 // 通过自定义CommandSource执行命令
                 System.out.println("[ExecuteCommandFunction] 开始执行命令: " + command);
 
-                // 尝试使用CommandDispatcher直接执行命令并获取返回值
+                // 使用兼容层执行命令
                 try {
                     resultCode = server.getCommandManager().getDispatcher().execute(command, captureSource);
                     System.out.println("[ExecuteCommandFunction] 命令执行完成，返回码: " + resultCode + ", 捕获到 " + outputMessages.size() + " 条消息");
                 } catch (Exception e) {
-                    // 如果直接执行失败，尝试使用parseAndExecute（仅1.21.11+）
-                    //? >=1.21.11 {
-                    System.out.println("[ExecuteCommandFunction] 直接执行失败，尝试parseAndExecute: " + e.getMessage());
-                    server.getCommandManager().parseAndExecute(captureSource, command);
-                    resultCode = 1; // 如果没有异常，认为成功
-                    System.out.println("[ExecuteCommandFunction] parseAndExecute完成，捕获到 " + outputMessages.size() + " 条消息");
-                    //? } else {
-                    // 旧版本没有parseAndExecute，重新抛出异常
-                    System.out.println("[ExecuteCommandFunction] 直接执行失败: " + e.getMessage());
-                    throw e;
-                    //? }
+                    // 如果直接执行失败，使用兼容层的备用方法
+                    System.out.println("[ExecuteCommandFunction] 直接执行失败，尝试备用方法: " + e.getMessage());
+                    resultCode = CommandCompat.executeCommand(server, captureSource, command);
+                    System.out.println("[ExecuteCommandFunction] 备用方法完成，返回码: " + resultCode + ", 捕获到 " + outputMessages.size() + " 条消息");
                 }
 
                 // 收集输出信息

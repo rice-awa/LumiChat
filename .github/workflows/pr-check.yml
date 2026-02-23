@@ -11,8 +11,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  # Dynamically detect available versions from settings.gradle.kts
+  detect-versions:
     runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.versions.outputs.versions }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Detect Minecraft Versions
+        id: versions
+        run: |
+          # Extract versions from versions(...) call and parse all quoted strings
+          VERSIONS=$(grep -oP 'versions\([^)]+\)' settings.gradle.kts | grep -oP '"[^"]+"' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
+          echo "Detected versions: $VERSIONS"
+          # Format as JSON array for matrix
+          VERSIONS_JSON=$(echo "$VERSIONS" | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "versions=$VERSIONS_JSON" >> $GITHUB_OUTPUT
+
+  # Check each version independently
+  check-version:
+    needs: detect-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.detect-versions.outputs.versions) }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -29,8 +55,31 @@ jobs:
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Run Checks (Active Version)
-        run: ./gradlew check --stacktrace
+      - name: Run Checks for Version ${{ matrix.version }}
+        run: ./gradlew :${{ matrix.version }}:check --stacktrace
 
-      - name: Build (Active Version)
-        run: ./gradlew build --stacktrace
+      - name: Build Version ${{ matrix.version }}
+        run: ./gradlew :${{ matrix.version }}:build --stacktrace
+
+  # Summary job to report overall PR status
+  pr-summary:
+    needs: [detect-versions, check-version]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Generate PR Check Summary
+        run: |
+          echo "## PR Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All supported Minecraft versions have been checked." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Minecraft Version | Check | Build |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------------------|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          
+          for version in ${{ join(fromJson(needs.detect-versions.outputs.versions), ' ') }}; do
+            echo "| $version | See job logs | See job logs |" >> $GITHUB_STEP_SUMMARY
+          done
+
+      - name: Fail if any check failed
+        if: contains(needs.*.result, 'failure')
+        run: exit 1
