@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-LumiChat is a Fabric mod with Stonecutter multi-version support. Main shared code lives in `src/main/java/com/riceawa` and client-only code in `src/client/java`. Resources are under `src/main/resources` and `src/client/resources`. Version-specific Gradle properties are in `versions/<mc-version>/`. Architecture and feature docs are kept in `docs/`.
+LumiChat is a Fabric mod using Stonecutter for multi-version builds. Shared logic is in `src/main/java/com/riceawa`, client-only code in `src/client/java`, and resources in `src/main/resources` and `src/client/resources`. Version nodes live in `versions/<mc-version>/`. Design and feature docs are in `docs/`.
 
 ## Build, Test, and Development Commands
 - `./gradlew build`: Build the active Stonecutter target.
@@ -10,20 +10,35 @@ LumiChat is a Fabric mod with Stonecutter multi-version support. Main shared cod
 - `./gradlew test jacocoTestReport`: Run tests and generate coverage reports.
 - `./gradlew setActiveVersion -Pversion=1.21.11`: Switch active Minecraft version.
 - `./gradlew stonecutterReset`: Reset generated Stonecutter state before committing.
+- `./gradlew :1.21.11:build`: Build one version node to verify compatibility.
 
 ## Coding Style & Naming Conventions
-Use Java with 4-space indentation and UTF-8 source files. Keep packages under `com.riceawa.llm.<domain>`. Class names use `PascalCase`, methods/fields use `camelCase`, constants use `UPPER_SNAKE_CASE`. Prefer clear domain names like `ProviderHealthChecker` and `FunctionRegistry`. Follow existing Gradle Kotlin DSL style in `*.gradle.kts`.
+Use Java, 4-space indentation, and UTF-8. Keep package layout under `com.riceawa.llm.<domain>`. Use `PascalCase` for classes, `camelCase` for methods/fields, and `UPPER_SNAKE_CASE` for constants. Follow existing Kotlin DSL style in `*.gradle.kts`.
 
 ## Testing Guidelines
-Tests are expected under `src/test/java/com/riceawa/llm`. Use JUnit 5, Mockito, and MockWebServer where applicable. Name test classes `*Test` and keep test methods descriptive (for example, `testErrorHandling`). Run `./gradlew test` before pushing. If behavior changes in function-calling, add or update integration tests.
+Tests belong in `src/test/java/com/riceawa/llm`. Use JUnit 5, Mockito, and MockWebServer. Name classes `*Test` and methods descriptively (for example, `testErrorHandling`). Run `./gradlew test` before pushing; update integration tests for function-calling behavior changes.
 
 ## Commit & Pull Request Guidelines
-Use Conventional Commits, typically in Chinese, consistent with project history:
+Use Conventional Commits, typically in Chinese:
 - `feat: 新增xxx功能`
 - `fix(functions): 修复xxx问题`
 - `docs(build): 更新构建说明`
 
-Keep each commit focused on one logical change. For PRs, include: change summary, motivation, affected Minecraft versions, verification steps/commands, and screenshots or logs for user-visible behavior. Link related issues when available.
+Keep each commit focused on one logical change. PRs should include summary, motivation, affected Minecraft versions, verification commands, and screenshots/logs for user-visible changes.
+
+## Documentation-First Workflow (Context7/MCP)
+Before adding features or fixing bugs, check docs with Context7/MCP first, then implement from verified behavior.
+- Baseline flow: `resolve-library-id` -> `query-docs` -> apply findings to code.
+- Prioritize official docs for Fabric API/Loom, Minecraft mappings, and Stonecutter.
+- Add a short "References checked" section in each PR.
+
+## Stonecutter Multi-Version Best Practices
+- Keep shared logic in `src/`; treat `versions/<mc-version>/` as version metadata/config.
+- Use semantic version conditions (`>=`, `<`) in preprocessing/build logic, not ad-hoc string checks.
+- Switch active version before coding and verify impacted versions, not only the active one.
+- Run `stonecutterReset` before commit to avoid generated temporary state.
+- Keep one shared `build.gradle.kts` unless plugin/toolchain differences require a split.
+- Validate each supported version node with targeted builds before release.
 
 ## Security & Configuration Tips
-Never commit API keys or local secrets. Store runtime credentials in config files under the game `config/` directory, not in source. Validate permission-sensitive command/function changes carefully (OP checks, command execution boundaries, and provider error handling).
+Never commit API keys or secrets. Keep runtime credentials in the game `config/` directory, not source. Review permission-sensitive changes carefully (OP checks, command boundaries, and provider error handling).
