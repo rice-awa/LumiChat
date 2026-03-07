@@ -34,10 +34,11 @@ public final class GameRulesCompat {
      * @return PvP 是否启用
      */
     public static boolean isPvpEnabled(ServerWorld world) {
+        // `pvp` 在旧版本中由服务器级配置控制，不是 GameRules 常量。
         //? >=1.21.11 {
         return world.getGameRules().getValue(GameRules.PVP);
         //?} else {
-        /*return world.getGameRules().getBoolean(GameRules.PVP);
+        /*return world.getServer().isPvpEnabled();
         *//*?}*/
     }
     
