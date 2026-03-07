@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.registry.entry.RegistryEntry;
 
@@ -105,7 +106,11 @@ public class WorldInfoFunction implements LLMFunction {
                     .append(spawnPos.getZ()).append("\n");
                 info.append("海平面高度: ").append(world.getSeaLevel()).append("\n");
                 info.append("最低建筑高度: ").append(world.getBottomY()).append("\n");
+                //? >=1.21.9 {
                 info.append("最高建筑高度: ").append(world.getTopY(null, pos)).append("\n");
+                //?} else {
+                /*info.append("最高建筑高度: ").append(world.getTopY(Heightmap.Type.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
+                *//*?}*/
             }
             
             return FunctionResult.success(info.toString());
