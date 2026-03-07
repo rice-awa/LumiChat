@@ -12,7 +12,7 @@
 1. 版本矩阵在配置、目录、CI、文档中保持一致。
 2. PR 检查覆盖所有支持的 Minecraft 版本，而非仅活动版本。
 3. 版本差异逻辑集中到兼容层，业务代码中条件编译显著减少。
-4. 提交流程包含 `stonecutterReset` 校验，避免提交活动版本噪音。
+4. 提交流程包含 `resetActiveVersion` 校验，避免提交活动版本噪音。
 5. 文档命令可直接执行，无无效命令。
 
 ## 2. 执行约定
@@ -67,7 +67,7 @@ git status --short --branch
 
 目标：只保留一套“支持版本”的事实来源，消除配置/文档不一致。
 
-- [ ] `P1-1` 选择并确认目标支持版本集合（建议：`1.21.10`、`1.21.11`）
+- [ ] `P1-1` 选择并确认目标支持版本集合（建议按“长期支持组 + 最新组”组织，例如 `1.16.5`、`1.17`、`1.18`、`1.19`、`1.20.x`、`1.21.x`）
 - [ ] `P1-2` 对齐 `settings.gradle.kts` 中 `versions(...)` 与 `vcsVersion`
 - [ ] `P1-3` 清理不再支持版本的 `versions/<mc-version>/gradle.properties`（如不再支持）
 - [ ] `P1-4` 修正文档中版本描述（`mulitversionbuild.md`、`README.md`）
@@ -172,7 +172,7 @@ rg -n "name:|on:|matrix|Build Version|Run Checks|branches|buildAndCollect|:${{ m
 目标：避免 Stonecutter 活动版本造成的提交噪音。
 
 - [ ] `P5-1` 新增脚本：`scripts/check-stonecutter.sh`
-- [ ] `P5-2` 脚本内固定执行：全版本构建 + `stonecutterReset` + `git diff --exit-code`
+- [ ] `P5-2` 脚本内固定执行：全版本构建 + `resetActiveVersion` + `git diff --exit-code`
 - [ ] `P5-3` 在 `README.md` 或开发文档增加“提交前检查”步骤
 
 建议脚本最小内容：
@@ -181,16 +181,20 @@ rg -n "name:|on:|matrix|Build Version|Run Checks|branches|buildAndCollect|:${{ m
 #!/usr/bin/env bash
 set -euo pipefail
 
-./gradlew :1.21.10:build
+./gradlew :1.16.5:build
+./gradlew :1.17:build
+./gradlew :1.18:build
+./gradlew :1.19:build
+./gradlew :1.20.6:build
 ./gradlew :1.21.11:build
-./gradlew stonecutterReset
+./gradlew resetActiveVersion
 git diff --exit-code
 ```
 
 阶段通过标准：
 
 1. 一条命令可完成提交前核心校验。
-2. `stonecutterReset` 后无多余脏变更。
+2. `resetActiveVersion` 后无多余脏变更。
 
 ---
 
@@ -200,13 +204,13 @@ git diff --exit-code
 
 - [ ] `P6-1` 修正 `mulitversionbuild.md` 中错误命令格式（去除错误冒号）
 - [ ] `P6-2` 文档内版本矩阵与配置完全一致
-- [ ] `P6-3` 补充“推荐开发流”：`setActiveVersion -> 开发 -> 全版本构建 -> stonecutterReset -> 提交`
+- [ ] `P6-3` 补充“推荐开发流”：`setActiveVersion -> 开发 -> 全版本构建 -> resetActiveVersion -> 提交`
 - [ ] `P6-4` 检查 `README.md` 链接与文件命名一致性（可选：修正 `mulitversionbuild.md` 命名拼写）
 
 阶段验收命令：
 
 ```bash
-rg -n "./gradlew:|setActiveVersion|stonecutterReset|1\\.20\\.1|1\\.21\\.1|1\\.21\\.10|1\\.21\\.11" README.md mulitversionbuild.md docs/*.md
+rg -n "./gradlew:|setActiveVersion|resetActiveVersion|1\\.20\\.1|1\\.21\\.1|1\\.21\\.10|1\\.21\\.11" README.md mulitversionbuild.md docs/*.md
 ```
 
 阶段通过标准：
@@ -222,17 +226,21 @@ rg -n "./gradlew:|setActiveVersion|stonecutterReset|1\\.20\\.1|1\\.21\\.1|1\\.21
 
 - [ ] `P7-1` 执行全版本构建
 - [ ] `P7-2` 执行 `buildAndCollect` 验证产物归集
-- [ ] `P7-3` 执行 `stonecutterReset` 后检查工作区
+- [ ] `P7-3` 执行 `resetActiveVersion` 后检查工作区
 - [ ] `P7-4` 游戏内做最小冒烟（命令注册、基础对话、关键函数调用）
 - [ ] `P7-5` 输出最终“优化完成报告”
 
 阶段验收命令：
 
 ```bash
-./gradlew :1.21.10:build
+./gradlew :1.16.5:build
+./gradlew :1.17:build
+./gradlew :1.18:build
+./gradlew :1.19:build
+./gradlew :1.20.6:build
 ./gradlew :1.21.11:build
 ./gradlew buildAndCollect
-./gradlew stonecutterReset
+./gradlew resetActiveVersion
 git status --short
 ```
 
@@ -248,7 +256,7 @@ git status --short
 |---|---|---|
 | 版本矩阵切换导致功能回归 | 某版本编译失败或运行异常 | 先恢复 `settings.gradle.kts` 版本定义，再按兼容层逐步迁移 |
 | CI 改造引入误报 | PR 全红但本地可构建 | 拆分为“构建矩阵变更”和“业务重构变更”两个提交排查 |
-| `stonecutterReset` 流程不稳定 | 提交前反复出现噪音 diff | 固化脚本并在 PR 模板中强制勾选 |
+| `resetActiveVersion` 流程不稳定 | 提交前反复出现噪音 diff | 固化脚本并在 PR 模板中强制勾选 |
 
 ## 6. 进度记录
 

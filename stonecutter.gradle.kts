@@ -13,12 +13,12 @@ plugins {
 //   - 切换命令: ./gradlew setActiveVersion -Pversion=1.21.11
 //
 // `vcsVersion = "1.21.11"` (在 settings.gradle.kts 中) - VCS 版本
-//   - stonecutterReset 任务的重置目标版本
-//   - 提交前应运行 stonecutterReset 重置到此版本，避免生成临时状态
+//   - resetActiveVersion 任务的重置目标版本
+//   - 提交前应运行 resetActiveVersion 重置到此版本，避免生成临时状态
 //   - 应与 active 版本保持一致以减少混淆
 //
 // 两者关系: active 用于开发，vcsVersion 用于版本控制重置
-// 最佳实践: 提交前运行 `./gradlew stonecutterReset` 重置到 vcsVersion
+// 最佳实践: 提交前运行 `./gradlew resetActiveVersion` 重置到 vcsVersion
 // ============================================================================
 stonecutter active "1.21.11"
 
