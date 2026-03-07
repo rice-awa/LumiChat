@@ -120,8 +120,13 @@ public class TeleportPlayerFunction implements LLMFunction {
                     return FunctionResult.error("无法获取目标玩家所在世界信息");
                 }
 
+                //? >=1.21.2 {
                 targetPlayer.teleport(targetWorld, targetPos.x, targetPos.y, targetPos.z,
                                     java.util.Set.of(), targetPlayer.getYaw(), targetPlayer.getPitch(), false);
+                //?} else {
+                /*targetPlayer.teleport(targetWorld, targetPos.x, targetPos.y, targetPos.z,
+                                    java.util.Set.of(), targetPlayer.getYaw(), targetPlayer.getPitch());
+                *//*?}*/
                 
                 // 发送消息
                 String message = String.format("已将 %s 传送到 %s 身边", 
@@ -171,8 +176,13 @@ public class TeleportPlayerFunction implements LLMFunction {
                 }
                 
                 // 执行传送
+                //? >=1.21.2 {
                 targetPlayer.teleport(targetWorld, x, y, z, java.util.Set.of(),
                                      targetPlayer.getYaw(), targetPlayer.getPitch(), false);
+                //?} else {
+                /*targetPlayer.teleport(targetWorld, x, y, z, java.util.Set.of(),
+                                     targetPlayer.getYaw(), targetPlayer.getPitch());
+                *//*?}*/
                 
                 // 发送消息
                 String dimensionName = getDimensionName(targetWorld);

@@ -8,7 +8,7 @@ import org.jetbrains.annotations.Nullable;
  * Identifier 兼容层
  * 统一处理不同 Minecraft 版本的 Identifier 构造 API 差异
  * 
- * <p>在 1.21.10+ 中，Identifier 构造方法被废弃，推荐使用：
+ * <p>在 1.21+ 中，Identifier 构造方法被移除，推荐使用：
  * <ul>
  *   <li>Identifier.of(String namespace, String path)</li>
  *   <li>Identifier.of(String id)</li>
@@ -20,7 +20,7 @@ import org.jetbrains.annotations.Nullable;
  *   <li>new Identifier(String id)</li>
  * </ul>
  * 
- * <p>注意：当前支持的版本 1.21.10 和 1.21.11 都支持 Identifier.of()，
+ * <p>注意：当前支持的版本 1.21 及以上都支持 Identifier.of()，
  * 此兼容层保留以便未来可能的版本扩展。
  */
 public final class IdentifierCompat {
@@ -53,7 +53,7 @@ public final class IdentifierCompat {
             return parsed;
         }
         // 如果无法解析，尝试作为 minecraft 命名空间的路径
-        //? >=1.21.10 {
+        //? >=1.21 {
         return Identifier.of("minecraft", id);
         //?} else {
         /*return new Identifier("minecraft", id);
@@ -69,7 +69,7 @@ public final class IdentifierCompat {
      */
     @NotNull
     public static Identifier of(String namespace, String path) {
-        //? >=1.21.10 {
+        //? >=1.21 {
         return Identifier.of(namespace, path);
         //?} else {
         /*return new Identifier(namespace, path);
@@ -85,7 +85,7 @@ public final class IdentifierCompat {
      */
     @NotNull
     public static Identifier of(String id) {
-        //? >=1.21.10 {
+        //? >=1.21 {
         return Identifier.of(id);
         //?} else {
         /*return new Identifier(id);
@@ -101,7 +101,7 @@ public final class IdentifierCompat {
      */
     @NotNull
     public static Identifier forEntityType(String entityType) {
-        //? >=1.21.10 {
+        //? >=1.21 {
         if (entityType.contains(":")) {
             return Identifier.of(entityType);
         } else {
