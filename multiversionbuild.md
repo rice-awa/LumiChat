@@ -1,6 +1,6 @@
 # 多版本构建指南
 
-本项目使用 Stonecutter 框架支持多个 Minecraft 版本（1.20-1.20.6 与 1.21-1.21.11）的并行开发。
+本项目使用 Stonecutter 框架支持跨大版本 Minecraft 并行开发，当前矩阵覆盖 1.19-1.19.4、1.20-1.20.6 与 1.21-1.21.11，并采用版本组减少历史分支产物数量。
 
 ## 常用 Gradle 命令
 
@@ -12,9 +12,8 @@
 
 **构建特定版本：**
 ```bash
-./gradlew :1.20:build
+./gradlew :1.19:build
 ./gradlew :1.20.6:build
-./gradlew :1.21:build
 ./gradlew :1.21.11:build
 ```
 
@@ -50,7 +49,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 3. **VCS 重置（提交前必须执行）：**
    ```bash
-   ./gradlew stonecutterReset
+   ./gradlew resetActiveVersion
    ```
    在提交代码到 Git 之前运行此命令，避免提交 Stonecutter 生成的临时代码。
 
@@ -60,15 +59,8 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 .
 ├── src/                    # 共享源代码（由 Stonecutter 管理）
 ├── versions/               # 各版本子项目
+│   ├── 1.19/            # 版本组: 实际构建版本 1.19.4
 │   ├── 1.20/
-│   ├── 1.20.1/
-│   ├── ...
-│   ├── 1.20.6/
-│   ├── 1.21/
-│   ├── 1.21.1/
-│   ├── 1.21.2/
-│   ├── 1.21.3/
-│   ├── 1.21.4/
 │   ├── ...
 │   └── 1.21.11/
 ├── build.gradle.kts        # 构建模板（应用于所有版本）
@@ -83,19 +75,20 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 - 在 `settings.gradle.kts` 中统一声明版本矩阵，并通过 `vcsVersion` 固定提交流程重置版本。
 - 保持单一共享 `build.gradle.kts`，将版本差异收敛到 `versions/<mc-version>/gradle.properties`。
-- 继续使用 `setActiveVersion` + `stonecutterReset` 的开发与提交闭环，减少临时状态进入 Git。
+- 继续使用 `setActiveVersion` + `resetActiveVersion` 的开发与提交闭环，减少临时状态进入 Git。
 
-关于版本组（`vers`）的说明：
+关于版本组（`version(project=..., version=...)`）的说明：
 
-- 本次先保持逐版本节点（`1.20` 到 `1.20.6`）以降低回归风险。
-- 若后续确认多个小版本在依赖与元数据上完全一致，可再将这些节点折叠到同一版本组。
+- 当前已对历史版本启用版本组：`1.19 -> 1.19.4`。
+- Stonecutter 中 `project` 用于 Gradle 子项目名（产物维度），`version` 用于实际编译的 Minecraft 版本（依赖维度）。
+- 新增版本时，优先按“API 差异 + 发布策略”判断是否分组；若同一小版本段 API 与依赖一致，可复用一个版本组节点。
 
 ## 注意事项
 
 - 不要直接修改 `versions/` 目录下的文件，这些是由 Stonecutter 自动生成的
 - 所有代码修改应该在 `src/` 目录中进行
 - 使用条件注释 `/*? ... */` 来编写版本特定的代码
-- 提交前务必运行 `stonecutterReset` 重置到 VCS 版本
+- 提交前务必运行 `resetActiveVersion` 重置到 VCS 版本
 
 ## 推荐开发流程
 
@@ -115,16 +108,15 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 3. **验证所有版本**
    ```bash
    # 构建所有支持版本（建议至少覆盖每个大版本分组）
-   ./gradlew :1.20:build
+   ./gradlew :1.19:build
    ./gradlew :1.20.6:build
-   ./gradlew :1.21:build
    ./gradlew :1.21.11:build
    ```
 
 4. **提交前检查**
    ```bash
    # 执行重置，避免提交临时代码
-   ./gradlew stonecutterReset
+   ./gradlew resetActiveVersion
    
    # 检查工作区状态
    git status
@@ -150,8 +142,8 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 脚本将执行以下检查：
 1. 工作区状态检查
-2. 全版本构建验证（1.20-1.20.6 与 1.21-1.21.11）
-3. stonecutterReset 执行
+2. 全版本构建验证（覆盖每个版本组与最新小版本）
+3. resetActiveVersion 执行
 4. Stonecutter 状态验证
 
 ### 版本差异处理最佳实践

@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.riceawa.llm.compat.CommandSourceCompat;
 import com.riceawa.llm.compat.PermissionCompat;
 import com.riceawa.llm.history.ChatHistory;
 import com.riceawa.llm.history.HistoryExporter;
@@ -64,8 +65,7 @@ public class HistoryCommand {
             try {
                 player = context.getSource().getPlayerOrThrow();
             } catch (Exception e) {
-                context.getSource().sendFeedback(() -> 
-                        Text.literal("必须指定玩家或由玩家执行此命令").formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("必须指定玩家或由玩家执行此命令").formatted(Formatting.RED), false);
                 return 0;
             }
         }
@@ -86,8 +86,7 @@ public class HistoryCommand {
                         "target_player_id", playerId.toString()
                 ));
         
-        context.getSource().sendFeedback(() -> 
-                Text.literal(report).formatted(Formatting.AQUA), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(report).formatted(Formatting.AQUA), false);
         
         return 1;
     }
@@ -107,8 +106,7 @@ public class HistoryCommand {
         try {
             format = HistoryExporter.ExportFormat.valueOf(formatStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            context.getSource().sendFeedback(() -> 
-                    Text.literal("不支持的导出格式: " + formatStr).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("不支持的导出格式: " + formatStr).formatted(Formatting.RED), false);
             return 0;
         }
         
@@ -126,18 +124,15 @@ public class HistoryCommand {
                 ));
         
             if (result.isSuccess()) {
-                context.getSource().sendFeedback(() ->
-                        Text.literal("历史记录导出成功: " + result.getExportFile().getFileName())
+                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("历史记录导出成功: " + result.getExportFile().getFileName())
                                 .formatted(Formatting.GREEN), true);
             } else {
-                context.getSource().sendFeedback(() ->
-                        Text.literal("导出失败: " + result.getMessage()).formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("导出失败: " + result.getMessage()).formatted(Formatting.RED), false);
             }
 
             return result.isSuccess() ? 1 : 0;
         } catch (CommandSyntaxException e) {
-            context.getSource().sendFeedback(() ->
-                    Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
             return 0;
         }
     }
@@ -166,8 +161,7 @@ public class HistoryCommand {
                 ));
         
         if (sessions.isEmpty()) {
-            context.getSource().sendFeedback(() -> 
-                    Text.literal("没有找到包含关键词 \"" + keyword + "\" 的历史记录")
+            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("没有找到包含关键词 \"" + keyword + "\" 的历史记录")
                             .formatted(Formatting.YELLOW), false);
             return 0;
         }
@@ -194,13 +188,11 @@ public class HistoryCommand {
             count++;
         }
         
-            context.getSource().sendFeedback(() ->
-                    Text.literal(result.toString()).formatted(Formatting.AQUA), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(result.toString()).formatted(Formatting.AQUA), false);
 
             return 1;
         } catch (CommandSyntaxException e) {
-            context.getSource().sendFeedback(() ->
-                    Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
             return 0;
         }
     }
@@ -225,14 +217,12 @@ public class HistoryCommand {
         
             ChatHistory.getInstance().clearPlayerHistory(playerId);
 
-            context.getSource().sendFeedback(() ->
-                    Text.literal("已清除玩家 " + playerName + " 的所有历史记录")
+            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("已清除玩家 " + playerName + " 的所有历史记录")
                             .formatted(Formatting.GREEN), true);
 
             return 1;
         } catch (CommandSyntaxException e) {
-            context.getSource().sendFeedback(() ->
-                    Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
             return 0;
         }
     }
