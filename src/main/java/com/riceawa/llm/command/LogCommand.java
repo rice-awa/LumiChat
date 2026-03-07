@@ -3,6 +3,7 @@ package com.riceawa.llm.command;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.riceawa.llm.compat.CommandSourceCompat;
 import com.riceawa.llm.compat.PermissionCompat;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.logging.LogConfig;
@@ -80,8 +81,7 @@ public class LogCommand {
         LogManager.getInstance().system("Log level changed to " + level.getName() + " by " + 
                 context.getSource().getName());
         
-        context.getSource().sendFeedback(() -> 
-                Text.literal("日志级别已设置为: " + level.getName()).formatted(Formatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("日志级别已设置为: " + level.getName()).formatted(Formatting.GREEN), true);
         
         return 1;
     }
@@ -110,8 +110,7 @@ public class LogCommand {
         status.append("性能日志: ").append(logConfig.isEnablePerformanceLog() ? "启用" : "禁用").append("\n");
         status.append("审计日志: ").append(logConfig.isEnableAuditLog() ? "启用" : "禁用").append("\n");
         
-        context.getSource().sendFeedback(() -> 
-                Text.literal(status.toString()).formatted(Formatting.AQUA), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(status.toString()).formatted(Formatting.AQUA), false);
         
         return 1;
     }
@@ -157,8 +156,7 @@ public class LogCommand {
                 message = "控制台日志已启用";
                 break;
             default:
-                context.getSource().sendFeedback(() ->
-                        Text.literal("未知的日志类别: " + category).formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("未知的日志类别: " + category).formatted(Formatting.RED), false);
                 return 0;
         }
 
@@ -167,8 +165,7 @@ public class LogCommand {
                 context.getSource().getName());
 
         final String finalMessage = message;
-        context.getSource().sendFeedback(() ->
-                Text.literal(finalMessage).formatted(Formatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(finalMessage).formatted(Formatting.GREEN), true);
         
         return 1;
     }
@@ -214,8 +211,7 @@ public class LogCommand {
                 message = "控制台日志已禁用";
                 break;
             default:
-                context.getSource().sendFeedback(() ->
-                        Text.literal("未知的日志类别: " + category).formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("未知的日志类别: " + category).formatted(Formatting.RED), false);
                 return 0;
         }
 
@@ -224,8 +220,7 @@ public class LogCommand {
                 context.getSource().getName());
 
         final String finalMessage = message;
-        context.getSource().sendFeedback(() ->
-                Text.literal(finalMessage).formatted(Formatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(finalMessage).formatted(Formatting.GREEN), true);
         
         return 1;
     }
@@ -243,8 +238,7 @@ public class LogCommand {
         logManager.performance("Test log message from " + executor + " - Performance", null);
         logManager.audit("Test log message from " + executor + " - Audit", null);
         
-        context.getSource().sendFeedback(() -> 
-                Text.literal("测试日志已记录，请检查日志文件").formatted(Formatting.GREEN), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("测试日志已记录，请检查日志文件").formatted(Formatting.GREEN), false);
         
         return 1;
     }
