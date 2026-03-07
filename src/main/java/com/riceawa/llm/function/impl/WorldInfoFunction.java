@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
+import net.minecraft.world.Heightmap;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.registry.entry.RegistryEntry;
 
@@ -95,13 +96,21 @@ public class WorldInfoFunction implements LLMFunction {
                 info.append("\n=== 详细信息 ===\n");
                 info.append("世界种子: ").append(world.getSeed()).append("\n");
                 info.append("世界边界大小: ").append((int)world.getWorldBorder().getSize()).append("\n");
+                //? >=1.21.9 {
                 BlockPos spawnPos = world.getSpawnPoint().getPos();
+                //?} else {
+                /*BlockPos spawnPos = world.getSpawnPos();
+                *//*?}*/
                 info.append("出生点: ").append(spawnPos.getX()).append(", ")
                     .append(spawnPos.getY()).append(", ")
                     .append(spawnPos.getZ()).append("\n");
                 info.append("海平面高度: ").append(world.getSeaLevel()).append("\n");
                 info.append("最低建筑高度: ").append(world.getBottomY()).append("\n");
+                //? >=1.21.9 {
                 info.append("最高建筑高度: ").append(world.getTopY(null, pos)).append("\n");
+                //?} else {
+                /*info.append("最高建筑高度: ").append(world.getTopY(Heightmap.Type.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
+                *//*?}*/
             }
             
             return FunctionResult.success(info.toString());

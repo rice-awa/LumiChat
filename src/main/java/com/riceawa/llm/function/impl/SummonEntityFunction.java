@@ -138,7 +138,11 @@ public class SummonEntityFunction implements LLMFunction {
                     double offsetX = x + (Math.random() - 0.5) * 2;
                     double offsetZ = z + (Math.random() - 0.5) * 2;
                     
+                    //? >=1.21.2 {
                     Entity entity = type.create(world, net.minecraft.entity.SpawnReason.COMMAND);
+                    //?} else {
+                    /*Entity entity = type.create(world);
+                    *//*?}*/
                     if (entity != null) {
                         entity.refreshPositionAndAngles(offsetX, y, offsetZ, 0.0F, 0.0F);
 
