@@ -97,7 +97,7 @@ public class PlayerEffectsFunction implements LLMFunction {
                     }
                     
                     // 显示效果类型
-                    if (effect.getEffectType().value().isBeneficial()) {
+                    if (isBeneficialEffect(effect)) {
                         effects.append(" [有益]");
                     } else {
                         effects.append(" [有害]");
@@ -118,7 +118,7 @@ public class PlayerEffectsFunction implements LLMFunction {
                 
                 // 统计信息
                 long beneficialCount = statusEffects.stream()
-                    .mapToLong(effect -> effect.getEffectType().value().isBeneficial() ? 1 : 0)
+                    .mapToLong(effect -> isBeneficialEffect(effect) ? 1 : 0)
                     .sum();
                 long harmfulCount = statusEffects.size() - beneficialCount;
                 
@@ -139,12 +139,28 @@ public class PlayerEffectsFunction implements LLMFunction {
         
         // 尝试获取本地化名称
         try {
-            String translationKey = effect.getEffectType().value().getTranslationKey();
+            String translationKey = getEffectTranslationKey(effect);
             // 这里可以添加中文翻译映射
             return getChineseEffectName(effectId);
         } catch (Exception e) {
             return effectId;
         }
+    }
+
+    private boolean isBeneficialEffect(StatusEffectInstance effect) {
+        //? if >=1.20.5 {
+        return effect.getEffectType().value().isBeneficial();
+        //?} else {
+        /*return effect.getEffectType().isBeneficial();*/
+        //?}
+    }
+
+    private String getEffectTranslationKey(StatusEffectInstance effect) {
+        //? if >=1.20.5 {
+        return effect.getEffectType().value().getTranslationKey();
+        //?} else {
+        /*return effect.getEffectType().getTranslationKey();*/
+        //?}
     }
     
     private String getChineseEffectName(String effectId) {
