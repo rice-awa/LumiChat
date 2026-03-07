@@ -34,7 +34,11 @@ public final class EntityHelper {
     public static ServerWorld getServerWorld(ServerPlayerEntity player) {
         MinecraftServer server = getServer(player);
         // Get the world from the player's command source
+        //? >=1.21.2 {
         return player.getCommandSource(server.getOverworld()).getWorld();
+        //?} else {
+        /*return player.getCommandSource().getWorld();
+        *//*?}*/
     }
     
     /**
@@ -96,7 +100,11 @@ public final class EntityHelper {
         if (player instanceof ServerPlayerEntity serverPlayer) {
             MinecraftServer server = getServer(serverPlayer);
             ServerWorld world = server.getOverworld();
+            //? >=1.21.2 {
             ServerCommandSource source = player.getCommandSource(world);
+            //?} else {
+            /*ServerCommandSource source = player.getCommandSource();
+            *//*?}*/
             // Check if player has any elevated permissions
             return hasPermissionLevel(source, 2);
         }
