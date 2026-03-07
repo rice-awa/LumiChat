@@ -1,6 +1,6 @@
 # 多版本构建指南
 
-本项目使用 Stonecutter 框架支持多个 Minecraft 版本（1.21.10、1.21.11）的并行开发。
+本项目使用 Stonecutter 框架支持多个 Minecraft 版本（1.21-1.21.11）的并行开发。
 
 ## 常用 Gradle 命令
 
@@ -14,6 +14,8 @@
 ```bash
 ./gradlew :1.21.11:build
 ./gradlew :1.21.10:build
+./gradlew :1.21.4:build
+./gradlew :1.21:build
 ```
 
 **运行特定版本：**
@@ -58,7 +60,12 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 .
 ├── src/                    # 共享源代码（由 Stonecutter 管理）
 ├── versions/               # 各版本子项目
-│   ├── 1.21.10/
+│   ├── 1.21/
+│   ├── 1.21.1/
+│   ├── 1.21.2/
+│   ├── 1.21.3/
+│   ├── 1.21.4/
+│   ├── ...
 │   └── 1.21.11/
 ├── build.gradle.kts        # 构建模板（应用于所有版本）
 ├── stonecutter.gradle.kts  # Stonecutter 控制器配置
@@ -90,6 +97,8 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 3. **验证所有版本**
    ```bash
    # 构建所有支持版本
+   ./gradlew :1.21:build
+   ./gradlew :1.21.4:build
    ./gradlew :1.21.10:build
    ./gradlew :1.21.11:build
    ```
@@ -123,7 +132,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 脚本将执行以下检查：
 1. 工作区状态检查
-2. 全版本构建验证（1.21.10 和 1.21.11）
+2. 全版本构建验证（1.21-1.21.11）
 3. stonecutterReset 执行
 4. Stonecutter 状态验证
 

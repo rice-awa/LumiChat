@@ -49,7 +49,11 @@ public class PermissionHelper {
         if (player instanceof ServerPlayerEntity serverPlayer) {
             MinecraftServer server = EntityHelper.getServer(serverPlayer);
             ServerWorld world = server.getOverworld();
+            //? >=1.21.2 {
             ServerCommandSource source = player.getCommandSource(world);
+            //?} else {
+            /*ServerCommandSource source = player.getCommandSource();
+            *//*?}*/
             return EntityHelper.hasPermissionLevel(source, 2);
         }
         return false;
@@ -62,7 +66,11 @@ public class PermissionHelper {
         if (player instanceof ServerPlayerEntity serverPlayer) {
             MinecraftServer server = EntityHelper.getServer(serverPlayer);
             ServerWorld world = server.getOverworld();
+            //? >=1.21.2 {
             ServerCommandSource source = player.getCommandSource(world);
+            //?} else {
+            /*ServerCommandSource source = player.getCommandSource();
+            *//*?}*/
             return EntityHelper.hasPermissionLevel(source, level);
         }
         return false;
