@@ -41,7 +41,7 @@ dependencies {
     mappings("net.fabricmc:yarn:${property("deps.yarn_mappings")}:v2")
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 
-    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-command-api-v2")
+    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-command-api-v2", "fabric-data-generation-api-v1")
 
     // HTTP client for LLM API calls
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -61,6 +61,15 @@ dependencies {
 }
 
 loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        create(property("mod.id") as String) {
+            sourceSet(sourceSets.main.get())
+            sourceSet(sourceSets.getByName("client"))
+        }
+    }
+
     fabricModJsonPath = rootProject.file("src/main/resources/fabric.mod.json") // Useful for interface injection
     accessWidenerPath = rootProject.file("src/main/resources/lumichat.accesswidener")
 
