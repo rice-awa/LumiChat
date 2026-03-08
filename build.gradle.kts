@@ -62,6 +62,15 @@ dependencies {
 }
 
 loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        register("lumichat") {
+            sourceSet(sourceSets.main.get())
+            sourceSet(sourceSets.getByName("client"))
+        }
+    }
+
     fabricModJsonPath = rootProject.file("src/main/resources/fabric.mod.json") // Useful for interface injection
     accessWidenerPath = rootProject.file("src/main/resources/lumichat.accesswidener")
 
