@@ -92,11 +92,14 @@ java {
 }
 
 tasks {
+    val mixinJava = "JAVA_${requiredJava.majorVersion}"
+
     processResources {
         inputs.property("id", project.property("mod.id"))
         inputs.property("name", project.property("mod.name"))
         inputs.property("version", project.property("mod.version"))
         inputs.property("minecraft", project.property("mod.mc_dep"))
+        inputs.property("java", mixinJava)
 
         val props = mapOf(
             "id" to project.property("mod.id"),
@@ -107,7 +110,11 @@ tasks {
 
         filesMatching("fabric.mod.json") { expand(props) }
 
-        val mixinJava = "JAVA_${requiredJava.majorVersion}"
+        filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+    }
+
+    named<ProcessResources>("processClientResources") {
+        inputs.property("java", mixinJava)
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
