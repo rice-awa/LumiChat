@@ -81,7 +81,7 @@ jobs:
           name: lumichat-${{ needs.detect-versions.outputs.mod_version }}-mc${{ matrix.version }}
           path: versions/${{ matrix.version }}/build/libs/*.jar
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 120
 
   # Summary job to report overall status
   build-summary:
@@ -105,3 +105,42 @@ jobs:
       - name: Fail if any build failed
         if: contains(needs.*.result, 'failure')
         run: exit 1
+
+  # Collect and package all successful builds into a single ZIP
+  package-artifacts:
+    needs: [detect-versions, build-version]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download All Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: lumichat-*
+          merge-multiple: false
+
+      - name: Organize Artifacts
+        run: |
+          mkdir -p packaged-artifacts
+          echo "Organizing artifacts..."
+          find artifacts -name "*.jar" -type f -exec cp {} packaged-artifacts/ \;
+          ls -la packaged-artifacts/
+
+      - name: Create ZIP Archive
+        run: |
+          cd packaged-artifacts
+          zip -r ../lumichat-${{ needs.detect-versions.outputs.mod_version }}-all-builds.zip .
+          cd ..
+          echo "Created ZIP archive:"
+          ls -lh lumichat-*.zip
+
+      - name: Upload Combined ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumichat-${{ needs.detect-versions.outputs.mod_version }}-complete-package
+          path: lumichat-${{ needs.detect-versions.outputs.mod_version }}-all-builds.zip
+          retention-days: 120
+          if-no-files-found: error
