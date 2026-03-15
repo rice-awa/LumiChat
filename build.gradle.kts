@@ -59,6 +59,10 @@ dependencies {
     // Configuration management
     implementation("com.typesafe:config:1.4.3")
     include("com.typesafe:config:1.4.3")
+
+    // Test
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 loom {
@@ -119,6 +123,10 @@ tasks {
     }
 
     // Builds the version into a shared folder in `build/libs/${mod version}/`
+    withType<Test> {
+        useJUnitPlatform()
+    }
+
     register<Copy>("buildAndCollect") {
         group = "build"
         from(remapJar.map { it.archiveFile }, remapSourcesJar.map { it.archiveFile })

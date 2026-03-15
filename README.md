@@ -12,7 +12,7 @@
 - 📊 **完善日志系统** - 多级别分类日志，异步处理，文件轮转
 - 📢 **AI聊天广播** - OP可控的全服广播功能
 - ⚙️ **配置管理** - 热重载，游戏内切换Provider和模型，健康状态监控
-- 🧪 **测试框架** - 全面单元测试，质量保证
+- 🧪 **测试策略** - 基础单元测试保障核心逻辑，复杂场景以游戏内实测为准
 
 ## 🚀 快速开始
 
@@ -90,7 +90,7 @@
 - 📢 [广播功能](docs/BROADCAST_FEATURE.md) - AI聊天广播功能详解
 - 🧠 [上下文管理](docs/CONTEXT_MANAGEMENT.md) - 智能上下文管理和压缩
 - 📊 [日志和历史](docs/LOGGING_AND_HISTORY.md) - 日志系统和历史记录管理
-- 🧪 [测试指南](docs/TESTING_GUIDE.md) - 测试框架和质量保证
+- 🧪 [测试指南](docs/TESTING_GUIDE.md) - 基础单元测试与游戏内验证流程
 - 🎯 [使用演示](docs/DEMO_USAGE.md) - 实际使用场景和示例
 
 ## 🔧 Function Calling 功能概览
