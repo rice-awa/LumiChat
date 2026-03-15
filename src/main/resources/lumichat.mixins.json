@@ -1,7 +1,7 @@
 {
 	"required": true,
 	"package": "com.riceawa.mixin",
-	"compatibilityLevel": "JAVA_21",
+	"compatibilityLevel": "${java}",
 	"mixins": [
 		"ExampleMixin",
 		"ServerPlayerEntityAccessor"

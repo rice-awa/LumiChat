@@ -42,7 +42,7 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 
     val commandApiModule = if (sc.current.parsed >= "1.19") "fabric-command-api-v2" else "fabric-command-api-v1"
-    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", commandApiModule)
+    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-data-generation-api-v1", commandApiModule)
 
     // HTTP client for LLM API calls
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -62,6 +62,15 @@ dependencies {
 }
 
 loom {
+    splitEnvironmentSourceSets()
+
+    mods {
+        register("lumichat") {
+            sourceSet(sourceSets.main.get())
+            sourceSet(sourceSets.getByName("client"))
+        }
+    }
+
     fabricModJsonPath = rootProject.file("src/main/resources/fabric.mod.json") // Useful for interface injection
     accessWidenerPath = rootProject.file("src/main/resources/lumichat.accesswidener")
 
@@ -83,11 +92,14 @@ java {
 }
 
 tasks {
+    val mixinJava = "JAVA_${requiredJava.majorVersion}"
+
     processResources {
         inputs.property("id", project.property("mod.id"))
         inputs.property("name", project.property("mod.name"))
         inputs.property("version", project.property("mod.version"))
         inputs.property("minecraft", project.property("mod.mc_dep"))
+        inputs.property("java", mixinJava)
 
         val props = mapOf(
             "id" to project.property("mod.id"),
@@ -98,7 +110,11 @@ tasks {
 
         filesMatching("fabric.mod.json") { expand(props) }
 
-        val mixinJava = "JAVA_${requiredJava.majorVersion}"
+        filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+    }
+
+    named<ProcessResources>("processClientResources") {
+        inputs.property("java", mixinJava)
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
