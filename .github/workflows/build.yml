@@ -156,20 +156,28 @@ jobs:
           echo "Filtered out sources JARs, keeping only main JARs:"
           ls -la packaged-artifacts/
 
-      - name: Create ZIP Archive
+      - name: Create Combined ZIP Archive
         shell: bash
         run: |
           set -euo pipefail
           cd packaged-artifacts
           zip -r ../lumichat-${{ needs.detect-versions.outputs.mod_version }}-all-builds.zip .
           cd ..
-          echo "Created ZIP archive:"
+          echo "Created combined ZIP archive:"
           ls -lh lumichat-*.zip
 
-      - name: Upload Combined ZIP
+      - name: Upload Combined Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: lumichat-${{ needs.detect-versions.outputs.mod_version }}-all-builds
+          path: packaged-artifacts/
+          retention-days: 120
+          if-no-files-found: error
+
+      - name: Upload Combined ZIP Artifact (Legacy)
+        uses: actions/upload-artifact@v4
+        with:
+          name: lumichat-${{ needs.detect-versions.outputs.mod_version }}-all-builds-zip
           path: lumichat-${{ needs.detect-versions.outputs.mod_version }}-all-builds.zip
           retention-days: 90
           if-no-files-found: error
