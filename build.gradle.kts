@@ -65,7 +65,7 @@ loom {
     splitEnvironmentSourceSets()
 
     mods {
-        register("lumichat") {
+        create(property("mod.id") as String) {
             sourceSet(sourceSets.main.get())
             sourceSet(sourceSets.getByName("client"))
         }
