@@ -68,22 +68,28 @@ public class PromptTemplate {
      * 渲染带全局上下文的系统提示词
      */
     public String renderSystemPromptWithContext(ServerPlayerEntity player, LLMChatConfig config) {
+        String originalPrompt = renderTemplate(systemPrompt, player);
+        String globalContext = null;
+
+        // 如果启用了全局上下文，添加全局上下文信息
+        if (config.isEnableGlobalContext() && config.getGlobalContextPrompt() != null && !config.getGlobalContextPrompt().trim().isEmpty()) {
+            globalContext = generateGlobalContext(player, config.getGlobalContextPrompt());
+        }
+
+        return mergeSystemPromptWithGlobalContext(originalPrompt, globalContext);
+    }
+
+    static String mergeSystemPromptWithGlobalContext(String originalPrompt, String globalContext) {
         StringBuilder result = new StringBuilder();
 
-        // 添加原始系统提示词
-        String originalPrompt = renderTemplate(systemPrompt, player);
         if (originalPrompt != null && !originalPrompt.trim().isEmpty()) {
             result.append(originalPrompt);
         }
 
-        // 如果启用了全局上下文，添加全局上下文信息
-        if (config.isEnableGlobalContext() && config.getGlobalContextPrompt() != null && !config.getGlobalContextPrompt().trim().isEmpty()) {
+        if (globalContext != null && !globalContext.trim().isEmpty()) {
             if (result.length() > 0) {
                 result.append("\n\n");
             }
-
-            // 生成全局上下文信息
-            String globalContext = generateGlobalContext(player, config.getGlobalContextPrompt());
             result.append(globalContext);
         }
 
@@ -368,7 +374,8 @@ public class PromptTemplate {
         Map<String, String> contextVariables = new HashMap<>();
 
         // 玩家信息
-        contextVariables.put("player_name", player.getName().getString());
+        String playerName = player != null ? player.getName().getString() : "Unknown";
+        contextVariables.put("player_name", playerName);
 
         // 当前时间
         LocalDateTime now = LocalDateTime.now();
@@ -394,7 +401,7 @@ public class PromptTemplate {
             contextVariables.put("online_players", onlinePlayers);
         } else {
             contextVariables.put("player_count", "1");
-            contextVariables.put("online_players", player.getName().getString());
+            contextVariables.put("online_players", playerName);
         }
 
         // 游戏版本信息
