@@ -21,18 +21,40 @@ jobs:
 
       - name: Detect Minecraft Versions and Mod Version
         id: versions
+        shell: bash
         run: |
-          # Extract versions from both version(...) and versions(...) calls
-          # Match project names from version(project = "...") and versions("...")
-          VERSIONS=$(grep -oE 'version\s*\([^)]+project\s*=\s*"[^"]+"' settings.gradle.kts | grep -oE 'project\s*=\s*"[^"]+"' | cut -d'"' -f2 | tr '\n' ',' ; grep -oE 'versions\([^)]+\)' settings.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | tr '\n' ',') | sed 's/,$//' | sed 's/^,//')
+          set -euo pipefail
+
+          VERSIONS=$(
+            (
+              grep -oE 'version\s*\([^)]*project\s*=\s*"[^"]+"' settings.gradle.kts \
+                | grep -oE 'project\s*=\s*"[^"]+"' \
+                | cut -d'"' -f2
+
+              grep -oE 'versions\s*\([^)]+\)' settings.gradle.kts \
+                | grep -oE '"[^"]+"' \
+                | tr -d '"'
+            ) | awk 'NF && !seen[$0]++' | paste -sd ',' -
+          )
+
           echo "Detected versions: $VERSIONS"
-          # Format as JSON array for matrix
-          VERSIONS_JSON=$(echo "$VERSIONS" | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          echo "versions=$VERSIONS_JSON" >> $GITHUB_OUTPUT
-          
-          # Parse mod version from gradle.properties
-          MOD_VERSION=$(grep "^mod.version=" gradle.properties | cut -d'=' -f2)
-          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+
+          VERSIONS_JSON=$(
+            echo "$VERSIONS" \
+              | tr ',' '\n' \
+              | jq -R -s -c 'split("\n") | map(select(length > 0))'
+          )
+
+          echo "versions=$VERSIONS_JSON" >> "$GITHUB_OUTPUT"
+
+          MOD_VERSION=$(
+            grep -E '^mod\.version\s*=' gradle.properties \
+              | head -n1 \
+              | cut -d'=' -f2- \
+              | xargs
+          )
+
+          echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
           echo "Mod version: $MOD_VERSION"
 
   # Build each version independently
