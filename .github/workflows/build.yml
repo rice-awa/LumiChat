@@ -30,13 +30,14 @@ jobs:
       mod_version: ${{ steps.versions.outputs.mod_version }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Detect Minecraft Versions and Mod Version
         id: versions
         run: |
-          # Extract versions from versions(...) call and parse all quoted strings
-          VERSIONS=$(grep -oP 'versions\([^)]+\)' settings.gradle.kts | grep -oP '"[^"]+"' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
+          # Extract versions from both version(...) and versions(...) calls
+          # Match project names from version(project = "...") and versions("...")
+          VERSIONS=$(grep -oP 'version\s*\([^)]+project\s*=\s*"[^"]+"' settings.gradle.kts | grep -oP 'project\s*=\s*"\K[^"]+' ; grep -oP 'versions\([^)]+\)' settings.gradle.kts | grep -oP '"[^"]+"' | tr -d '"') | tr '\n' ',' | sed 's/,$//')
           echo "Detected versions: $VERSIONS"
           # Format as JSON array for matrix
           VERSIONS_JSON=$(echo "$VERSIONS" | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
@@ -58,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v4
@@ -113,7 +114,7 @@ jobs:
     if: success()
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download All Build Artifacts
         uses: actions/download-artifact@v4
