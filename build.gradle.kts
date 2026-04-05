@@ -68,6 +68,17 @@ dependencies {
     // Configuration management
     implementation("com.typesafe:config:1.4.3")
     include("com.typesafe:config:1.4.3")
+
+    // Loom's include is non-transitive, so Kotlin runtime required by OkHttp must be bundled explicitly.
+    val kotlinVersion = "1.9.10"
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+    include("org.jetbrains.kotlin:kotlin-stdlib:$kotlinVersion")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion")
+    include("org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion")
+    include("org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinVersion")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-common:$kotlinVersion")
+    include("org.jetbrains.kotlin:kotlin-stdlib-common:$kotlinVersion")
 }
 
 loom {
