@@ -14,6 +14,7 @@ val requiredJava = when {
     sc.current.parsed >= "1.17" -> JavaVersion.VERSION_16
     else -> JavaVersion.VERSION_1_8
 }
+val supportsSplitJar = sc.current.parsed >= "1.17"
 
 repositories {
     /**
@@ -42,7 +43,11 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 
     val commandApiModule = if (sc.current.parsed >= "1.19") "fabric-command-api-v2" else "fabric-command-api-v1"
-    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-data-generation-api-v1", commandApiModule)
+    val fabricApiModules = mutableListOf("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", commandApiModule)
+    if (sc.current.parsed >= "1.17") {
+        fabricApiModules += listOf("fabric-content-registries-v0", "fabric-data-generation-api-v1")
+    }
+    fapi(*fabricApiModules.toTypedArray())
 
     // HTTP client for LLM API calls
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -62,12 +67,16 @@ dependencies {
 }
 
 loom {
-    splitEnvironmentSourceSets()
+    if (supportsSplitJar) {
+        splitEnvironmentSourceSets()
+    }
 
     mods {
         create(property("mod.id") as String) {
             sourceSet(sourceSets.main.get())
-            sourceSet(sourceSets.getByName("client"))
+            if (supportsSplitJar) {
+                sourceSet(sourceSets.getByName("client"))
+            }
         }
     }
 
@@ -113,9 +122,11 @@ tasks {
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
-    named<ProcessResources>("processClientResources") {
-        inputs.property("java", mixinJava)
-        filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+    if (supportsSplitJar) {
+        named<ProcessResources>("processClientResources") {
+            inputs.property("java", mixinJava)
+            filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+        }
     }
 
     // Builds the version into a shared folder in `build/libs/${mod version}/`
