@@ -42,7 +42,16 @@ dependencies {
     modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
 
     val commandApiModule = if (sc.current.parsed >= "1.19") "fabric-command-api-v2" else "fabric-command-api-v1"
-    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-data-generation-api-v1", commandApiModule)
+    val baseFabricModules = mutableListOf(
+        "fabric-lifecycle-events-v1",
+        "fabric-resource-loader-v0",
+        "fabric-content-registries-v0",
+        commandApiModule
+    )
+    if (sc.current.parsed >= "1.19") {
+        baseFabricModules += "fabric-data-generation-api-v1"
+    }
+    fapi(*baseFabricModules.toTypedArray())
 
     // HTTP client for LLM API calls
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
@@ -62,12 +71,12 @@ dependencies {
 }
 
 loom {
-    splitEnvironmentSourceSets()
+    if (sc.current.parsed >= "1.18") splitEnvironmentSourceSets()
 
     mods {
         create(property("mod.id") as String) {
             sourceSet(sourceSets.main.get())
-            sourceSet(sourceSets.getByName("client"))
+            sourceSets.findByName("client")?.let(::sourceSet)
         }
     }
 
@@ -113,9 +122,11 @@ tasks {
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
-    named<ProcessResources>("processClientResources") {
-        inputs.property("java", mixinJava)
-        filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+    findByName("processClientResources")?.let {
+        named<ProcessResources>("processClientResources") {
+            inputs.property("java", mixinJava)
+            filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+        }
     }
 
     // Builds the version into a shared folder in `build/libs/${mod version}/`

@@ -25,7 +25,10 @@ jobs:
         run: |
           # Extract versions from both version(...) and versions(...) calls
           # Match project names from version(project = "...") and versions("...")
-          VERSIONS=$(grep -oE 'version\s*\([^)]+project\s*=\s*"[^"]+"' settings.gradle.kts | grep -oE 'project\s*=\s*"[^"]+"' | cut -d'"' -f2 | tr '\n' ',' ; grep -oE 'versions\([^)]+\)' settings.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | tr '\n' ',') | sed 's/,$//' | sed 's/^,//')
+          VERSION_PROJECTS=$(grep -oE 'version\s*\([^)]+project\s*=\s*"[^"]+"' settings.gradle.kts | grep -oE 'project\s*=\s*"[^"]+"' | cut -d'"' -f2 | tr '\n' ',')
+          VERSION_LIST=$(grep -oE 'versions\([^)]+\)' settings.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | tr '\n' ',')
+          VERSIONS="${VERSION_PROJECTS}${VERSION_LIST}"
+          VERSIONS=$(echo "$VERSIONS" | sed 's/,$//' | sed 's/^,//')
           echo "Detected versions: $VERSIONS"
           # Format as JSON array for matrix
           VERSIONS_JSON=$(echo "$VERSIONS" | tr ',' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
