@@ -40,7 +40,10 @@ jobs:
             VERSIONS=$(grep -oP 'branches\([^)]+\)' settings.gradle.kts | grep -oP '"[^"]+"' | tr -d '"' | tr '\n' ',' | sed 's/,$//')
           else
             # Extract project names from version(project = "...") and versions("...")
-            VERSIONS=$(grep -oE 'version\s*\([^)]+project\s*=\s*"[^"]+"' settings.gradle.kts | grep -oE 'project\s*=\s*"[^"]+"' | cut -d'"' -f2 | tr '\n' ',' ; grep -oE 'versions\([^)]+\)' settings.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | tr '\n' ',') | sed 's/,$//' | sed 's/^,//')
+            VERSION_PROJECTS=$(grep -oE 'version\s*\([^)]+project\s*=\s*"[^"]+"' settings.gradle.kts | grep -oE 'project\s*=\s*"[^"]+"' | cut -d'"' -f2 | tr '\n' ',')
+            VERSION_LIST=$(grep -oE 'versions\([^)]+\)' settings.gradle.kts | grep -oE '"[^"]+"' | tr -d '"' | tr '\n' ',')
+            VERSIONS="${VERSION_PROJECTS}${VERSION_LIST}"
+            VERSIONS=$(echo "$VERSIONS" | sed 's/,$//' | sed 's/^,//')
           fi
           echo "Detected versions: $VERSIONS"
           # Format as JSON array for matrix
