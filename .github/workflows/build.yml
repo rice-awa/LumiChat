@@ -54,10 +54,10 @@ jobs:
               grep -oE 'versions\s*\([^)]+\)' settings.gradle.kts \
                 | grep -oE '"[^"]+"' \
                 | tr -d '"'
-            ) | awk 'NF && !seen[$0]++' | paste -sd ',' -
+            ) | awk 'NF && !seen[$0]++' | grep -vE '^26(\.|$)' | paste -sd ',' -
           )
 
-          echo "Detected versions: $VERSIONS"
+          echo "Detected versions (JDK 21 CI): $VERSIONS"
 
           VERSIONS_JSON=$(
             echo "$VERSIONS" \
