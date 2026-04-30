@@ -40,10 +40,17 @@ jobs:
 
           VERSIONS=$(
             (
+              # version(project = "x", version = "y") -> capture project name
               grep -oE 'version\s*\([^)]*project\s*=\s*"[^"]+"' settings.gradle.kts \
                 | grep -oE 'project\s*=\s*"[^"]+"' \
                 | cut -d'"' -f2
 
+              # version("x") -> capture direct version node (supports 26.1 / 26.1.1 / 26.1.2 ...)
+              grep -oE 'version\s*\(\s*"[^"]+"\s*\)' settings.gradle.kts \
+                | grep -oE '"[^"]+"' \
+                | tr -d '"'
+
+              # versions("a", "b", ...) -> capture every listed version
               grep -oE 'versions\s*\([^)]+\)' settings.gradle.kts \
                 | grep -oE '"[^"]+"' \
                 | tr -d '"'
