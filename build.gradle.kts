@@ -7,7 +7,7 @@ plugins {
     // id("me.modmuss50.mod-publish-plugin")
 }
 
-val isUnobfuscated = !project.hasProperty("deps.yarn_mappings")
+val isUnobfuscated = sc.current.parsed >= "26.1"
 if (isUnobfuscated) {
     apply(plugin = "net.fabricmc.fabric-loom")
 } else {
