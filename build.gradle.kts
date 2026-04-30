@@ -1,15 +1,18 @@
-plugins {
-    //? if >=26.1 {
-    id("net.fabricmc.fabric-loom")
-    //?} else {
-    /*id("net.fabricmc.fabric-loom-remap")
-    *///?}
+import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import org.gradle.jvm.tasks.Jar
 
-    // `maven-publish`
+plugins {
+    id("net.fabricmc.fabric-loom-remap") apply false
+    id("net.fabricmc.fabric-loom") apply false
     // id("me.modmuss50.mod-publish-plugin")
 }
 
 val isUnobfuscated = !project.hasProperty("deps.yarn_mappings")
+if (isUnobfuscated) {
+    apply(plugin = "net.fabricmc.fabric-loom")
+} else {
+    apply(plugin = "net.fabricmc.fabric-loom-remap")
+}
 
 version = "${property("mod.version")}+${sc.current.version}"
 base.archivesName = property("mod.id") as String
@@ -32,38 +35,33 @@ repositories {
 }
 
 dependencies {
-    fun fapi(configurationName: String, vararg modules: String) {
-        for (it in modules) add(configurationName, fabricApi.module(it, property("deps.fabric_api") as String))
-    }
-
-    minecraft("com.mojang:minecraft:${sc.current.version}")
+    add("minecraft", "com.mojang:minecraft:${sc.current.version}")
 
     if (!isUnobfuscated) {
         add("mappings", "net.fabricmc:yarn:${property("deps.yarn_mappings")}:v2")
         add("modImplementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
     } else {
-        implementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
+        add("implementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
     }
 
-    val commandApiModule = if (sc.current.parsed >= "1.19") "fabric-command-api-v2" else "fabric-command-api-v1"
-    val fabricApiConfiguration = if (isUnobfuscated) "implementation" else "modImplementation"
-    fapi(fabricApiConfiguration, "fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-data-generation-api-v1", commandApiModule)
+    add(if (isUnobfuscated) "implementation" else "modImplementation", "net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
 
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    include("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okio:okio:3.6.0")
-    include("com.squareup.okio:okio:3.6.0")
-    implementation("com.google.code.gson:gson:2.10.1")
-    include("com.google.code.gson:gson:2.10.1")
-    implementation("com.typesafe:config:1.4.3")
-    include("com.typesafe:config:1.4.3")
+    add("implementation", "com.squareup.okhttp3:okhttp:4.12.0")
+    add("include", "com.squareup.okhttp3:okhttp:4.12.0")
+    add("implementation", "com.squareup.okio:okio:3.6.0")
+    add("include", "com.squareup.okio:okio:3.6.0")
+    add("implementation", "com.google.code.gson:gson:2.10.1")
+    add("include", "com.google.code.gson:gson:2.10.1")
+    add("implementation", "com.typesafe:config:1.4.3")
+    add("include", "com.typesafe:config:1.4.3")
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    add("testImplementation", "org.junit.jupiter:junit-jupiter:5.10.2")
+    add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
 }
 
-loom {
+extensions.configure<LoomGradleExtensionAPI>("loom") {
     splitEnvironmentSourceSets()
+
     mods {
         create(property("mod.id") as String) {
             sourceSet(sourceSets.main.get())
@@ -71,12 +69,8 @@ loom {
         }
     }
 
-    fabricModJsonPath = rootProject.file("src/main/resources/fabric.mod.json")
-    accessWidenerPath = rootProject.file("src/main/resources/lumichat.accesswidener")
-
-    decompilerOptions.named("vineflower") {
-        options.put("mark-corresponding-synthetics", "1")
-    }
+    fabricModJsonPath.set(rootProject.file("src/main/resources/fabric.mod.json"))
+    accessWidenerPath.set(rootProject.file("src/main/resources/lumichat.accesswidener"))
 
     runConfigs.all {
         ideConfigGenerated(true)
@@ -92,6 +86,8 @@ java {
 }
 
 tasks {
+    withType<Test> { useJUnitPlatform() }
+
     val mixinJava = "JAVA_${requiredJava.majorVersion}"
 
     processResources {
@@ -117,15 +113,11 @@ tasks {
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
-    withType<Test> { useJUnitPlatform() }
-
     register<Copy>("buildAndCollect") {
         group = "build"
-        val mainJarTaskName = if (isUnobfuscated) "jar" else "remapJar"
-        val sourcesJarTaskName = if (isUnobfuscated) "sourcesJar" else "remapSourcesJar"
-        val mainJarTask = named<org.gradle.jvm.tasks.Jar>(mainJarTaskName)
-        val sourcesJarTask = named<org.gradle.jvm.tasks.Jar>(sourcesJarTaskName)
-        from(mainJarTask.map { it.archiveFile }, sourcesJarTask.map { it.archiveFile })
+        val mainJarTask = named<Jar>(if (isUnobfuscated) "jar" else "remapJar")
+        val sourceJarTask = named<Jar>(if (isUnobfuscated) "sourcesJar" else "remapSourcesJar")
+        from(mainJarTask.map { it.archiveFile }, sourceJarTask.map { it.archiveFile })
         into(rootProject.layout.buildDirectory.file("libs/${project.property("mod.version")}"))
         dependsOn("build")
     }
