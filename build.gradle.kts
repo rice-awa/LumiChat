@@ -1,14 +1,24 @@
-plugins {
-    id("net.fabricmc.fabric-loom-remap")
+import net.fabricmc.loom.api.LoomGradleExtensionAPI
+import org.gradle.jvm.tasks.Jar
 
-    // `maven-publish`
+plugins {
+    id("net.fabricmc.fabric-loom-remap") apply false
+    id("net.fabricmc.fabric-loom") apply false
     // id("me.modmuss50.mod-publish-plugin")
+}
+
+val isUnobfuscated = !project.hasProperty("deps.yarn_mappings")
+if (isUnobfuscated) {
+    apply(plugin = "net.fabricmc.fabric-loom")
+} else {
+    apply(plugin = "net.fabricmc.fabric-loom-remap")
 }
 
 version = "${property("mod.version")}+${sc.current.version}"
 base.archivesName = property("mod.id") as String
 
 val requiredJava = when {
+    sc.current.parsed >= "26.1" -> JavaVersion.VERSION_25
     sc.current.parsed >= "1.20.5" -> JavaVersion.VERSION_21
     sc.current.parsed >= "1.18" -> JavaVersion.VERSION_17
     sc.current.parsed >= "1.17" -> JavaVersion.VERSION_16
@@ -16,10 +26,6 @@ val requiredJava = when {
 }
 
 repositories {
-    /**
-     * Restricts dependency search of the given [groups] to the [maven URL][url],
-     * improving the setup speed.
-     */
     fun strictMaven(url: String, alias: String, vararg groups: String) = exclusiveContent {
         forRepository { maven(url) { name = alias } }
         filter { groups.forEach(::includeGroup) }
@@ -29,43 +35,31 @@ repositories {
 }
 
 dependencies {
-    /**
-     * Fetches only the required Fabric API modules to not waste time downloading all of them for each version.
-     * @see <a href="https://github.com/FabricMC/fabric">List of Fabric API modules</a>
-     */
-    fun fapi(vararg modules: String) {
-        for (it in modules) modImplementation(fabricApi.module(it, property("deps.fabric_api") as String))
+    add("minecraft", "com.mojang:minecraft:${sc.current.version}")
+
+    if (!isUnobfuscated) {
+        add("mappings", "net.fabricmc:yarn:${property("deps.yarn_mappings")}:v2")
+        add("modImplementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
+    } else {
+        add("implementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
     }
 
-    minecraft("com.mojang:minecraft:${sc.current.version}")
-    mappings("net.fabricmc:yarn:${property("deps.yarn_mappings")}:v2")
-    modImplementation("net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
+    add(if (isUnobfuscated) "implementation" else "modImplementation", "net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
 
-    val commandApiModule = if (sc.current.parsed >= "1.19") "fabric-command-api-v2" else "fabric-command-api-v1"
-    fapi("fabric-lifecycle-events-v1", "fabric-resource-loader-v0", "fabric-content-registries-v0", "fabric-data-generation-api-v1", commandApiModule)
+    add("implementation", "com.squareup.okhttp3:okhttp:4.12.0")
+    add("include", "com.squareup.okhttp3:okhttp:4.12.0")
+    add("implementation", "com.squareup.okio:okio:3.6.0")
+    add("include", "com.squareup.okio:okio:3.6.0")
+    add("implementation", "com.google.code.gson:gson:2.10.1")
+    add("include", "com.google.code.gson:gson:2.10.1")
+    add("implementation", "com.typesafe:config:1.4.3")
+    add("include", "com.typesafe:config:1.4.3")
 
-    // HTTP client for LLM API calls
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    include("com.squareup.okhttp3:okhttp:4.12.0")
-
-    // Okio dependency (required by OkHttp)
-    implementation("com.squareup.okio:okio:3.6.0")
-    include("com.squareup.okio:okio:3.6.0")
-
-    // JSON processing
-    implementation("com.google.code.gson:gson:2.10.1")
-    include("com.google.code.gson:gson:2.10.1")
-
-    // Configuration management
-    implementation("com.typesafe:config:1.4.3")
-    include("com.typesafe:config:1.4.3")
-
-    // Test
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    add("testImplementation", "org.junit.jupiter:junit-jupiter:5.10.2")
+    add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
 }
 
-loom {
+extensions.configure<LoomGradleExtensionAPI>("loom") {
     splitEnvironmentSourceSets()
 
     mods {
@@ -75,17 +69,13 @@ loom {
         }
     }
 
-    fabricModJsonPath = rootProject.file("src/main/resources/fabric.mod.json") // Useful for interface injection
-    accessWidenerPath = rootProject.file("src/main/resources/lumichat.accesswidener")
-
-    decompilerOptions.named("vineflower") {
-        options.put("mark-corresponding-synthetics", "1") // Adds names to lambdas - useful for mixins
-    }
+    fabricModJsonPath.set(rootProject.file("src/main/resources/fabric.mod.json"))
+    accessWidenerPath.set(rootProject.file("src/main/resources/lumichat.accesswidener"))
 
     runConfigs.all {
         ideConfigGenerated(true)
-        vmArgs("-Dmixin.debug.export=true") // Exports transformed classes for debugging
-        runDir = "../../run" // Shares the run directory between versions
+        vmArgs("-Dmixin.debug.export=true")
+        runDir = "../../run"
     }
 }
 
@@ -96,6 +86,8 @@ java {
 }
 
 tasks {
+    withType<Test> { useJUnitPlatform() }
+
     val mixinJava = "JAVA_${requiredJava.majorVersion}"
 
     processResources {
@@ -103,17 +95,18 @@ tasks {
         inputs.property("name", project.property("mod.name"))
         inputs.property("version", project.property("mod.version"))
         inputs.property("minecraft", project.property("mod.mc_dep"))
+        inputs.property("fabric_loader", project.property("deps.fabric_loader"))
         inputs.property("java", mixinJava)
 
         val props = mapOf(
             "id" to project.property("mod.id"),
             "name" to project.property("mod.name"),
             "version" to project.property("mod.version"),
-            "minecraft" to project.property("mod.mc_dep")
+            "minecraft" to project.property("mod.mc_dep"),
+            "fabric_loader" to project.property("deps.fabric_loader")
         )
 
         filesMatching("fabric.mod.json") { expand(props) }
-
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
@@ -122,75 +115,12 @@ tasks {
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
-    // Builds the version into a shared folder in `build/libs/${mod version}/`
-    withType<Test> {
-        useJUnitPlatform()
-    }
-
     register<Copy>("buildAndCollect") {
         group = "build"
-        from(remapJar.map { it.archiveFile }, remapSourcesJar.map { it.archiveFile })
+        val mainJarTask = named<Jar>(if (isUnobfuscated) "jar" else "remapJar")
+        val sourceJarTask = named<Jar>(if (isUnobfuscated) "sourcesJar" else "remapSourcesJar")
+        from(mainJarTask.map { it.archiveFile }, sourceJarTask.map { it.archiveFile })
         into(rootProject.layout.buildDirectory.file("libs/${project.property("mod.version")}"))
         dependsOn("build")
     }
 }
-
-/*
-// Publishes builds to Modrinth and Curseforge with changelog from the CHANGELOG.md file
-publishMods {
-    file = tasks.remapJar.map { it.archiveFile.get() }
-    additionalFiles.from(tasks.remapSourcesJar.map { it.archiveFile.get() })
-    displayName = "${property("mod.name")} ${property("mod.version")} for ${property("mod.mc_title")}"
-    version = property("mod.version") as String
-    changelog = rootProject.file("CHANGELOG.md").readText()
-    type = STABLE
-    modLoaders.add("fabric")
-
-    dryRun = providers.environmentVariable("MODRINTH_TOKEN").getOrNull() == null
-        || providers.environmentVariable("CURSEFORGE_TOKEN").getOrNull() == null
-
-    modrinth {
-        projectId = property("publish.modrinth") as String
-        accessToken = providers.environmentVariable("MODRINTH_TOKEN")
-        minecraftVersions.addAll(property("mod.mc_targets").toString().split(' '))
-        requires {
-            slug = "fabric-api"
-        }
-    }
-
-    curseforge {
-        projectId = property("publish.curseforge") as String
-        accessToken = providers.environmentVariable("CURSEFORGE_TOKEN")
-        minecraftVersions.addAll(property("mod.mc_targets").toString().split(' '))
-        requires {
-            slug = "fabric-api"
-        }
-    }
-}
- */
-/*
-// Publishes builds to a maven repository under `com.example:template:0.1.0+mc`
-publishing {
-    repositories {
-        maven("https://maven.example.com/releases") {
-            name = "myMaven"
-            // To authenticate, create `myMavenUsername` and `myMavenPassword` properties in your Gradle home properties.
-            // See https://stonecutter.kikugie.dev/wiki/tips/properties#defining-properties
-            credentials(PasswordCredentials::class.java)
-            authentication {
-                create<BasicAuthentication>("basic")
-            }
-        }
-    }
-
-    publications {
-        create<MavenPublication>("mavenJava") {
-            groupId = "${property("mod.group")}.${property("mod.id")}"
-            artifactId = property("mod.id") as String
-            version = project.version
-
-            from(components["java"])
-        }
-    }
-}
- */
