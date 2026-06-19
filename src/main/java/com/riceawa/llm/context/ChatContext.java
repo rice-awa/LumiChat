@@ -9,7 +9,7 @@ import com.riceawa.llm.core.LLMContext;
 import com.riceawa.llm.service.LLMServiceManager;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.logging.LogManager;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.player.Player;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -36,14 +36,14 @@ public class ChatContext {
         /**
          * 当上下文即将被压缩时调用（带玩家实体参数）
          */
-        default void onContextCompressionStarted(UUID playerId, int messagesToCompress, PlayerEntity player) {
+        default void onContextCompressionStarted(UUID playerId, int messagesToCompress, Player player) {
             onContextCompressionStarted(playerId, messagesToCompress);
         }
 
         /**
          * 当上下文压缩完成时调用（带玩家实体参数）
          */
-        default void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount, int compressedCount, PlayerEntity player) {
+        default void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount, int compressedCount, Player player) {
             onContextCompressionCompleted(playerId, success, originalCount, compressedCount);
         }
     }
@@ -64,7 +64,7 @@ public class ChatContext {
     private volatile boolean compressionInProgress = false;
 
     // 当前玩家实体（用于发送通知）
-    private transient PlayerEntity currentPlayer;
+    private transient Player currentPlayer;
 
     public ChatContext(UUID playerId) {
         this.sessionId = UUID.randomUUID().toString();
@@ -204,7 +204,7 @@ public class ChatContext {
     /**
      * 设置当前玩家实体（用于发送通知）
      */
-    public void setCurrentPlayer(PlayerEntity player) {
+    public void setCurrentPlayer(Player player) {
         this.currentPlayer = player;
     }
 
