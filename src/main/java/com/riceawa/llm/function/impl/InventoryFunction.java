@@ -3,11 +3,11 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * 获取玩家背包信息的函数
@@ -48,14 +48,14 @@ public class InventoryFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
-            ServerPlayerEntity targetPlayer = (ServerPlayerEntity) player;
+            ServerPlayer targetPlayer = (ServerPlayer) player;
             
             // 如果指定了玩家名称，尝试查找该玩家
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
-                ServerPlayerEntity foundPlayer = server.getPlayerManager().getPlayer(playerName);
+                ServerPlayer foundPlayer = server.getPlayerManager().getPlayer(playerName);
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
                 }
@@ -78,7 +78,7 @@ public class InventoryFunction implements LLMFunction {
             inventory.append("\n--- 主背包 ---\n");
             int itemCount = 0;
             for (int i = 0; i < 36; i++) {
-                ItemStack stack = targetPlayer.getInventory().getStack(i);
+                ItemStack stack = targetPlayer.getInventory().getItem(i);
                 if (!stack.isEmpty()) {
                     String itemName = getItemDisplayName(stack);
                     inventory.append("槽位 ").append(i).append(": ")
@@ -99,7 +99,7 @@ public class InventoryFunction implements LLMFunction {
             inventory.append("\n--- 装备栏 ---\n");
             String[] equipmentSlots = {"头盔", "胸甲", "护腿", "靴子"};
             for (int i = 0; i < 4; i++) {
-                ItemStack stack = targetPlayer.getInventory().getStack(36 + i);
+                ItemStack stack = targetPlayer.getInventory().getItem(36 + i);
                 inventory.append(equipmentSlots[i]).append(": ");
                 if (!stack.isEmpty()) {
                     String itemName = getItemDisplayName(stack);
@@ -114,7 +114,7 @@ public class InventoryFunction implements LLMFunction {
             }
             
             // 副手
-            ItemStack offhandStack = targetPlayer.getInventory().getStack(40);
+            ItemStack offhandStack = targetPlayer.getInventory().getItem(40);
             inventory.append("副手: ");
             if (!offhandStack.isEmpty()) {
                 String itemName = getItemDisplayName(offhandStack);
@@ -140,7 +140,7 @@ public class InventoryFunction implements LLMFunction {
     }
     
     private String getItemDisplayName(ItemStack stack) {
-        Text displayName = stack.getName();
+        Component displayName = stack.getName();
         String name = displayName.getString();
         
         // 如果是默认名称，尝试获取更友好的中文名称
@@ -149,7 +149,7 @@ public class InventoryFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return true; // 所有玩家都可以查看自己的背包
     }
     

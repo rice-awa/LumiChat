@@ -3,10 +3,10 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * 获取玩家状态效果的函数
@@ -40,14 +40,14 @@ public class PlayerEffectsFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
-            ServerPlayerEntity targetPlayer = (ServerPlayerEntity) player;
+            ServerPlayer targetPlayer = (ServerPlayer) player;
             
             // 如果指定了玩家名称，尝试查找该玩家
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
-                ServerPlayerEntity foundPlayer = server.getPlayerManager().getPlayer(playerName);
+                ServerPlayer foundPlayer = server.getPlayerManager().getPlayer(playerName);
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
                 }
@@ -71,7 +71,7 @@ public class PlayerEffectsFunction implements LLMFunction {
                 effects.append("当前状态效果数量: ").append(statusEffects.size()).append("\n\n");
                 
                 int index = 1;
-                for (StatusEffectInstance effect : statusEffects) {
+                for (MobEffectInstance effect : statusEffects) {
                     String effectName = getEffectDisplayName(effect);
                     int amplifier = effect.getAmplifier();
                     int duration = effect.getDuration();
@@ -134,8 +134,8 @@ public class PlayerEffectsFunction implements LLMFunction {
         }
     }
     
-    private String getEffectDisplayName(StatusEffectInstance effect) {
-        String effectId = effect.getEffectType().toString();
+    private String getEffectDisplayName(MobEffectInstance effect) {
+        String effectId = effect.getEffect().toString();
         
         // 尝试获取本地化名称
         try {
@@ -147,19 +147,19 @@ public class PlayerEffectsFunction implements LLMFunction {
         }
     }
 
-    private boolean isBeneficialEffect(StatusEffectInstance effect) {
+    private boolean isBeneficialEffect(MobEffectInstance effect) {
         //? if >=1.20.5 {
-        return effect.getEffectType().value().isBeneficial();
+        return effect.getEffect().isBeneficial();
         //?} else {
-        /*return effect.getEffectType().isBeneficial();*/
+        /*return effect.getEffect().isBeneficial();*/
         //?}
     }
 
-    private String getEffectTranslationKey(StatusEffectInstance effect) {
+    private String getEffectTranslationKey(MobEffectInstance effect) {
         //? if >=1.20.5 {
-        return effect.getEffectType().value().getTranslationKey();
+        return effect.getEffect().getDescriptionId();
         //?} else {
-        /*return effect.getEffectType().getTranslationKey();*/
+        /*return effect.getEffect().getDescriptionId();*/
         //?}
     }
     
@@ -203,7 +203,7 @@ public class PlayerEffectsFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return true; // 所有玩家都可以查看自己的状态效果
     }
     
