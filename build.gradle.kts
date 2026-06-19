@@ -70,7 +70,9 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
     }
 
     fabricModJsonPath.set(rootProject.file("src/main/resources/fabric.mod.json"))
-    accessWidenerPath.set(rootProject.file("src/main/resources/lumichat.accesswidener"))
+    if (!isUnobfuscated) {
+        accessWidenerPath.set(rootProject.file("src/main/resources/lumichat.accesswidener"))
+    }
 
     runConfigs.all {
         ideConfigGenerated(true)
