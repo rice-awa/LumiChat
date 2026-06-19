@@ -81,17 +81,17 @@
 ### 功能详细文档
 - 📖 [配置指南](docs/CONFIGURATION_GUIDE.md) - 完整的配置选项和多Provider设置
 - 💻 [命令指南](docs/COMMANDS_GUIDE.md) - 所有可用命令和详细用法（包含Resume命令扩展功能）
-- 🔧 [热编辑模板系统](docs/TEMPLATE_HOT_EDITING_SYSTEM.md) - 游戏内模板编辑完整指南
-- 🔧 [内置变量系统](docs/BUILTIN_VARIABLES_SYSTEM.md) - 15+内置变量详细说明
-- 🔍 [Provider健康检查](docs/PROVIDER_FORCE_CHECK_SYSTEM.md) - 强制检测和诊断系统
-- 🔧 [Function Calling开发](docs/FUNCTION_CALLING_DEVELOPMENT.md) - Function Calling功能详解
-- 🛡️ [Function Call安全](docs/FUNCTION_CALL_SECURITY.md) - 权限控制和安全机制
-- 🎮 [Function演示](docs/FUNCTION_DEMO.md) - 实际使用示例和效果展示
-- 📢 [广播功能](docs/BROADCAST_FEATURE.md) - AI聊天广播功能详解
-- 🧠 [上下文管理](docs/CONTEXT_MANAGEMENT.md) - 智能上下文管理和压缩
-- 📊 [日志和历史](docs/LOGGING_AND_HISTORY.md) - 日志系统和历史记录管理
+- 🔧 [热编辑模板系统](docs/features/TEMPLATE_HOT_EDITING_SYSTEM.md) - 游戏内模板编辑完整指南
+- 🔧 [内置变量系统](docs/features/BUILTIN_VARIABLES_SYSTEM_SUMMARY.md) - 15+内置变量详细说明
+- 🔍 [Provider健康检查](docs/features/PROVIDER_FORCE_CHECK_SYSTEM.md) - 强制检测和诊断系统
+- 🔧 [Function Calling开发](docs/features/FUNCTION_CALLING_DEVELOPMENT.md) - Function Calling功能详解
+- 🛡️ [Function Call安全](docs/features/FUNCTION_CALL_SECURITY.md) - 权限控制和安全机制
+- 🎮 [Function演示](docs/features/FUNCTION_DEMO.md) - 实际使用示例和效果展示
+- 📢 [广播功能](docs/features/BROADCAST_FEATURE.md) - AI聊天广播功能详解
+- 🧠 [上下文管理](docs/features/CONTEXT_MANAGEMENT.md) - 智能上下文管理和压缩
+- 📊 [日志和历史](docs/features/LOGGING_AND_HISTORY.md) - 日志系统和历史记录管理
 - 🧪 [测试指南](docs/TESTING_GUIDE.md) - 基础单元测试与游戏内验证流程
-- 🎯 [使用演示](docs/DEMO_USAGE.md) - 实际使用场景和示例
+- 🎯 [使用演示](docs/guides/DEMO_USAGE.md) - 实际使用场景和示例
 
 ## 🔧 Function Calling 功能概览
 
@@ -131,7 +131,7 @@
 # 现在AI会根据你的个性化设置进行回复
 ```
 
-> 📖 **详细功能文档**: 查看 [Function演示](docs/FUNCTION_DEMO.md) 和 [Function Call安全](docs/FUNCTION_CALL_SECURITY.md) 了解完整功能列表和安全机制
+> 📖 **详细功能文档**: 查看 [Function演示](docs/features/FUNCTION_DEMO.md) 和 [Function Call安全](docs/features/FUNCTION_CALL_SECURITY.md) 了解完整功能列表和安全机制
 
 ## 🧪 测试和开发
 
@@ -183,7 +183,7 @@
 
 > ⚠️ **重要配置提醒**: 建议将 `maxContextCharacters` 设置为比模型默认上下文长度低的值，以确保系统有足够空间进行压缩和处理。例如，对于支持128k上下文的模型，建议设置为100,000字符。
 
-> 📖 **详细功能文档**: 查看 [上下文管理](docs/CONTEXT_MANAGEMENT.md) 了解完整的上下文管理功能
+> 📖 **详细功能文档**: 查看 [上下文管理](docs/features/CONTEXT_MANAGEMENT.md) 了解完整的上下文管理功能
 
 ## 📋 项目信息
 
