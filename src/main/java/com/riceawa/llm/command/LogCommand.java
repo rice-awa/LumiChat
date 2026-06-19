@@ -79,9 +79,9 @@ public class LogCommand {
         config.setLogConfig(logConfig);
         
         LogManager.getInstance().system("Log level changed to " + level.getName() + " by " + 
-                context.getSource().getName());
+                context.getSource().getTextName());
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("日志级别已设置为: " + level.getName()).formatted(ChatFormatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("日志级别已设置为: " + level.getName()).withStyle(ChatFormatting.GREEN), true);
         
         return 1;
     }
@@ -110,7 +110,7 @@ public class LogCommand {
         status.append("性能日志: ").append(logConfig.isEnablePerformanceLog() ? "启用" : "禁用").append("\n");
         status.append("审计日志: ").append(logConfig.isEnableAuditLog() ? "启用" : "禁用").append("\n");
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(status.toString()).formatted(ChatFormatting.AQUA), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(status.toString()).withStyle(ChatFormatting.AQUA), false);
         
         return 1;
     }
@@ -156,16 +156,16 @@ public class LogCommand {
                 message = "控制台日志已启用";
                 break;
             default:
-                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).formatted(ChatFormatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).withStyle(ChatFormatting.RED), false);
                 return 0;
         }
 
         config.setLogConfig(logConfig);
         LogManager.getInstance().system("Log category " + category + " enabled by " +
-                context.getSource().getName());
+                context.getSource().getTextName());
 
         final String finalMessage = message;
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(finalMessage).formatted(ChatFormatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(finalMessage).withStyle(ChatFormatting.GREEN), true);
         
         return 1;
     }
@@ -211,16 +211,16 @@ public class LogCommand {
                 message = "控制台日志已禁用";
                 break;
             default:
-                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).formatted(ChatFormatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).withStyle(ChatFormatting.RED), false);
                 return 0;
         }
 
         config.setLogConfig(logConfig);
         LogManager.getInstance().system("Log category " + category + " disabled by " +
-                context.getSource().getName());
+                context.getSource().getTextName());
 
         final String finalMessage = message;
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(finalMessage).formatted(ChatFormatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(finalMessage).withStyle(ChatFormatting.GREEN), true);
         
         return 1;
     }
@@ -230,7 +230,7 @@ public class LogCommand {
      */
     private static int testLogging(CommandContext<CommandSourceStack> context) {
         LogManager logManager = LogManager.getInstance();
-        String executor = context.getSource().getName();
+        String executor = context.getSource().getTextName();
         
         logManager.system("Test log message from " + executor + " - System");
         logManager.chat("Test log message from " + executor + " - Chat");
@@ -238,7 +238,7 @@ public class LogCommand {
         logManager.performance("Test log message from " + executor + " - Performance", null);
         logManager.audit("Test log message from " + executor + " - Audit", null);
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("测试日志已记录，请检查日志文件").formatted(ChatFormatting.GREEN), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("测试日志已记录，请检查日志文件").withStyle(ChatFormatting.GREEN), false);
         
         return 1;
     }
