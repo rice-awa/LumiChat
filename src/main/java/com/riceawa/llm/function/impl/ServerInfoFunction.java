@@ -4,10 +4,10 @@ import com.google.gson.JsonObject;
 import com.riceawa.llm.compat.GameRulesCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 /**
  * 获取服务器信息的函数
@@ -42,7 +42,7 @@ public class ServerInfoFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             boolean includePerformance = arguments.has("include_performance") && 
                                        arguments.get("include_performance").getAsBoolean();
@@ -56,9 +56,9 @@ public class ServerInfoFunction implements LLMFunction {
             info.append("是否单人游戏: ").append(server.isSingleplayer() ? "是" : "否").append("\n");
             info.append("是否硬核模式: ").append(server.isHardcore() ? "是" : "否").append("\n");
             info.append("默认游戏模式: ").append(server.getDefaultGameMode().getTranslatableName().getString()).append("\n");
-            info.append("难度: ").append(server.getOverworld().getDifficulty().getName()).append("\n");
+            info.append("难度: ").append(server.overworld().getDifficulty().getName()).append("\n");
             // PvP状态获取 - 使用兼容层
-            boolean isPvp = GameRulesCompat.isPvpEnabled(server.getOverworld());
+            boolean isPvp = GameRulesCompat.isPvpEnabled(server.overworld());
             info.append("是否允许PvP: ").append(isPvp ? "是" : "否").append("\n");
             
             // 玩家信息
@@ -70,7 +70,7 @@ public class ServerInfoFunction implements LLMFunction {
             if (server.getCurrentPlayerCount() > 0) {
                 info.append("在线玩家: ");
                 boolean first = true;
-                for (ServerPlayerEntity onlinePlayer : server.getPlayerManager().getPlayerList()) {
+                for (ServerPlayer onlinePlayer : server.getPlayerList().getPlayers()) {
                     if (!first) {
                         info.append(", ");
                     }
@@ -83,7 +83,7 @@ public class ServerInfoFunction implements LLMFunction {
             // 世界信息
             info.append("\n=== 世界信息 ===\n");
             int worldCount = 0;
-            for (ServerWorld world : server.getWorlds()) {
+            for (ServerLevel world : server.getAllLevels()) {
                 worldCount++;
             }
             info.append("已加载世界数: ").append(worldCount).append("\n");
@@ -142,7 +142,7 @@ public class ServerInfoFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return true; // 所有玩家都可以查看基本服务器信息
     }
     

@@ -3,14 +3,14 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
-import net.minecraft.world.Heightmap;
-import net.minecraft.world.biome.Biome;
-import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * 获取世界信息的函数
@@ -45,9 +45,9 @@ public class WorldInfoFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
-            ServerWorld world = (ServerWorld) EntityHelper.getWorld(player);
+            ServerLevel world = (ServerLevel) EntityHelper.getWorld(player);
             if (world == null) {
                 return FunctionResult.error("无法获取世界信息");
             }
@@ -64,11 +64,11 @@ public class WorldInfoFunction implements LLMFunction {
             info.append("是否硬核: ").append(server.isHardcore() ? "是" : "否").append("\n");
             
             // 时间信息
-            long time = world.getTimeOfDay();
+            long time = world.getDayTime();
             int hours = (int) ((time / 1000 + 6) % 24);
             int minutes = (int) ((time % 1000) * 60 / 1000);
             info.append("游戏时间: ").append(String.format("%02d:%02d", hours, minutes)).append("\n");
-            info.append("游戏天数: ").append(world.getTimeOfDay() / 24000 + 1).append("\n");
+            info.append("游戏天数: ").append(world.getDayTime() / 24000 + 1).append("\n");
             
             // 天气信息
             info.append("天气: ");
@@ -82,13 +82,13 @@ public class WorldInfoFunction implements LLMFunction {
             info.append("\n");
             
             // 玩家位置信息
-            BlockPos pos = player.getBlockPos();
+            BlockPos pos = player.blockPosition();
             info.append("玩家位置: ").append(pos.getX()).append(", ")
                 .append(pos.getY()).append(", ").append(pos.getZ()).append("\n");
             
             // 生物群系信息
-            RegistryEntry<Biome> biome = world.getBiome(pos);
-            String biomeName = biome.getKey().map(key -> key.getValue().toString()).orElse("未知");
+            Holder<Biome> biome = world.getBiome(pos);
+            String biomeName = biome.unwrapKey().map(key -> key.location().toString()).orElse("未知");
             info.append("当前生物群系: ").append(biomeName).append("\n");
             
             if (includeDetails) {
@@ -97,19 +97,19 @@ public class WorldInfoFunction implements LLMFunction {
                 info.append("世界种子: ").append(world.getSeed()).append("\n");
                 info.append("世界边界大小: ").append((int)world.getWorldBorder().getSize()).append("\n");
                 //? >=1.21.9 {
-                BlockPos spawnPos = world.getSpawnPoint().getPos();
+                BlockPos spawnPos = world.getSharedSpawnPos();
                 //?} else {
-                /*BlockPos spawnPos = world.getSpawnPos();
+                /*BlockPos spawnPos = world.getSharedSpawnPos();
                 *//*?}*/
                 info.append("出生点: ").append(spawnPos.getX()).append(", ")
                     .append(spawnPos.getY()).append(", ")
                     .append(spawnPos.getZ()).append("\n");
                 info.append("海平面高度: ").append(world.getSeaLevel()).append("\n");
-                info.append("最低建筑高度: ").append(world.getBottomY()).append("\n");
+                info.append("最低建筑高度: ").append(world.getMinY()).append("\n");
                 //? >=1.21.9 {
-                info.append("最高建筑高度: ").append(world.getTopY(null, pos)).append("\n");
+                info.append("最高建筑高度: ").append(world.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
                 //?} else {
-                /*info.append("最高建筑高度: ").append(world.getTopY(Heightmap.Type.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
+                /*info.append("最高建筑高度: ").append(world.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
                 *//*?}*/
             }
             
@@ -120,8 +120,8 @@ public class WorldInfoFunction implements LLMFunction {
         }
     }
     
-    private String getDimensionName(World world) {
-        String dimensionId = world.getRegistryKey().getValue().toString();
+    private String getDimensionName(Level world) {
+        String dimensionId = world.dimension().location().toString();
         switch (dimensionId) {
             case "minecraft:overworld":
                 return "主世界";
@@ -135,7 +135,7 @@ public class WorldInfoFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return true; // 所有玩家都可以查看世界信息
     }
     
