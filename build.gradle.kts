@@ -8,8 +8,10 @@ plugins {
 }
 
 val isUnobfuscated = !project.hasProperty("deps.yarn_mappings")
+// Minecraft 26.x nodes omit deps.yarn_mappings, so build them with plain
+// Fabric Loom. Older obfuscated nodes keep using fabric-loom-remap + Yarn.
 if (isUnobfuscated) {
-    apply(plugin = "net.fabricmc.fabric-loom")
+    apply(plugin = "fabric-loom")
 } else {
     apply(plugin = "net.fabricmc.fabric-loom-remap")
 }
@@ -17,11 +19,12 @@ if (isUnobfuscated) {
 version = "${property("mod.version")}+${sc.current.version}"
 base.archivesName = property("mod.id") as String
 
+val buildMinecraftVersion = sc.current.version
 val requiredJava = when {
-    sc.current.parsed >= "26.1" -> JavaVersion.VERSION_25
-    sc.current.parsed >= "1.20.5" -> JavaVersion.VERSION_21
-    sc.current.parsed >= "1.18" -> JavaVersion.VERSION_17
-    sc.current.parsed >= "1.17" -> JavaVersion.VERSION_16
+    sc.eval(buildMinecraftVersion, ">=26.1") -> JavaVersion.VERSION_25
+    sc.eval(buildMinecraftVersion, ">=1.20.5") -> JavaVersion.VERSION_21
+    sc.eval(buildMinecraftVersion, ">=1.18") -> JavaVersion.VERSION_17
+    sc.eval(buildMinecraftVersion, ">=1.17") -> JavaVersion.VERSION_16
     else -> JavaVersion.VERSION_1_8
 }
 
@@ -41,10 +44,10 @@ dependencies {
         add("mappings", "net.fabricmc:yarn:${property("deps.yarn_mappings")}:v2")
         add("modImplementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
     } else {
-        add("implementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
+        add("modImplementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
     }
 
-    add(if (isUnobfuscated) "implementation" else "modImplementation", "net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
+    add("modImplementation", "net.fabricmc.fabric-api:fabric-api:${property("deps.fabric_api")}")
 
     add("implementation", "com.squareup.okhttp3:okhttp:4.12.0")
     add("include", "com.squareup.okhttp3:okhttp:4.12.0")
@@ -59,13 +62,26 @@ dependencies {
     add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
 }
 
+val supportsSplitEnvironmentSourceSets = sc.current.parsed >= "1.20"
+
+if (!supportsSplitEnvironmentSourceSets) {
+    sourceSets.main {
+        java.srcDir(rootProject.file("src/client/java"))
+        resources.srcDir(rootProject.file("src/client/resources"))
+    }
+}
+
 extensions.configure<LoomGradleExtensionAPI>("loom") {
-    splitEnvironmentSourceSets()
+    if (supportsSplitEnvironmentSourceSets) {
+        splitEnvironmentSourceSets()
+    }
 
     mods {
         create(property("mod.id") as String) {
             sourceSet(sourceSets.main.get())
-            sourceSet(sourceSets.getByName("client"))
+            if (supportsSplitEnvironmentSourceSets) {
+                sourceSet(sourceSets.getByName("client"))
+            }
         }
     }
 
@@ -110,9 +126,11 @@ tasks {
         filesMatching("*.mixins.json") { expand("java" to mixinJava) }
     }
 
-    named<ProcessResources>("processClientResources") {
-        inputs.property("java", mixinJava)
-        filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+    if (supportsSplitEnvironmentSourceSets) {
+        named<ProcessResources>("processClientResources") {
+            inputs.property("java", mixinJava)
+            filesMatching("*.mixins.json") { expand("java" to mixinJava) }
+        }
     }
 
     register<Copy>("buildAndCollect") {
