@@ -1,11 +1,11 @@
 package com.riceawa.llm.compat;
 
 //? >=1.21.11 {
-import net.minecraft.world.rule.GameRules;
+import net.minecraft.world.level.gamerules.GameRules;
 //?} else {
-/*import net.minecraft.world.GameRules;
+/*import net.minecraft.world.level.gamerules.GameRules;
 *//*?}*/
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.server.level.ServerLevel;
 
 /**
  * GameRules 兼容层
@@ -13,13 +13,13 @@ import net.minecraft.server.world.ServerWorld;
  * 
  * <p>在 1.21.11+ 中：
  * <ul>
- *   <li>GameRules 类移动到 net.minecraft.world.rule.GameRules</li>
- *   <li>使用 getValue(GameRules.Key) 获取布尔值</li>
+ *   <li>GameRules 类位于 net.minecraft.world.level.gamerules.GameRules</li>
+ *   <li>使用 get(GameRules.Key) 获取布尔值</li>
  * </ul>
  * 
  * <p>在旧版本中：
  * <ul>
- *   <li>GameRules 类位于 net.minecraft.world.GameRules</li>
+ *   <li>GameRules 类位于 net.minecraft.world.level.gamerules.GameRules</li>
  *   <li>使用 getBoolean(GameRules.Key) 获取布尔值</li>
  * </ul>
  */
@@ -30,57 +30,57 @@ public final class GameRulesCompat {
     /**
      * 获取世界的 PvP 规则值
      * 
-     * @param world 服务器世界
+     * @param level 服务器世界
      * @return PvP 是否启用
      */
-    public static boolean isPvpEnabled(ServerWorld world) {
+    public static boolean isPvpEnabled(ServerLevel level) {
         // `pvp` 在旧版本中由服务器级配置控制，不是 GameRules 常量。
         //? >=1.21.11 {
-        return world.getGameRules().getValue(GameRules.PVP);
+        return level.getGameRules().get(GameRules.PVP);
         //?} else {
-        /*return world.getServer().isPvpEnabled();
+        /*return level.getServer().isPvpEnabled();
         *//*?}*/
     }
     
     /**
      * 获取世界的命令方块输出规则值
      * 
-     * @param world 服务器世界
+     * @param level 服务器世界
      * @return 命令方块是否输出到控制台
      */
-    public static boolean isCommandBlockOutputEnabled(ServerWorld world) {
+    public static boolean isCommandBlockOutputEnabled(ServerLevel level) {
         //? >=1.21.11 {
-        return world.getGameRules().getValue(GameRules.COMMAND_BLOCK_OUTPUT);
+        return level.getGameRules().get(GameRules.COMMAND_BLOCK_OUTPUT);
         //?} else {
-        /*return world.getGameRules().getBoolean(GameRules.COMMAND_BLOCK_OUTPUT);
+        /*return level.getGameRules().getBoolean(GameRules.COMMAND_BLOCK_OUTPUT);
         *//*?}*/
     }
     
     /**
      * 获取世界的命令反馈规则值
      * 
-     * @param world 服务器世界
+     * @param level 服务器世界
      * @return 是否发送命令反馈
      */
-    public static boolean isSendCommandFeedbackEnabled(ServerWorld world) {
+    public static boolean isSendCommandFeedbackEnabled(ServerLevel level) {
         //? >=1.21.11 {
-        return world.getGameRules().getValue(GameRules.SEND_COMMAND_FEEDBACK);
+        return level.getGameRules().get(GameRules.SEND_COMMAND_FEEDBACK);
         //?} else {
-        /*return world.getGameRules().getBoolean(GameRules.SEND_COMMAND_FEEDBACK);
+        /*return level.getGameRules().getBoolean(GameRules.SEND_COMMAND_FEEDBACK);
         *//*?}*/
     }
     
     /**
      * 获取世界的保持库存规则值
      * 
-     * @param world 服务器世界
+     * @param level 服务器世界
      * @return 死亡是否保留库存
      */
-    public static boolean isKeepInventoryEnabled(ServerWorld world) {
+    public static boolean isKeepInventoryEnabled(ServerLevel level) {
         //? >=1.21.11 {
-        return world.getGameRules().getValue(GameRules.KEEP_INVENTORY);
+        return level.getGameRules().get(GameRules.KEEP_INVENTORY);
         //?} else {
-        /*return world.getGameRules().getBoolean(GameRules.KEEP_INVENTORY);
+        /*return level.getGameRules().getBoolean(GameRules.KEEP_INVENTORY);
         *//*?}*/
     }
 }
