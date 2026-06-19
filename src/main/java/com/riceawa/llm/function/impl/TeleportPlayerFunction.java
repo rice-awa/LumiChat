@@ -85,7 +85,11 @@ public class TeleportPlayerFunction implements LLMFunction {
             
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
+                //? >=1.21.11 {
                 ServerPlayer foundPlayer = server.getPlayerList().getPlayer(playerName);
+                //?} else {
+                /*ServerPlayer foundPlayer = server.getPlayerList().getPlayerByName(playerName);
+                *//*?}*/
                 
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
@@ -103,7 +107,11 @@ public class TeleportPlayerFunction implements LLMFunction {
             if (arguments.has("target_player")) {
                 // 传送到其他玩家身边
                 String targetPlayerName = arguments.get("target_player").getAsString();
+                //? >=1.21.11 {
                 ServerPlayer destinationPlayer = server.getPlayerList().getPlayer(targetPlayerName);
+                //?} else {
+                /*ServerPlayer destinationPlayer = server.getPlayerList().getPlayerByName(targetPlayerName);
+                *//*?}*/
                 
                 if (destinationPlayer == null) {
                     return FunctionResult.error("找不到目标玩家: " + targetPlayerName);
@@ -124,8 +132,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                 targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
                                     java.util.Set.of(), targetPlayer.getYRot(), targetPlayer.getXRot(), true);
                 //?} else {
-                /*targetPlayer.teleport(targetLevel, targetPos.x, targetPos.y, targetPos.z,
-                                    java.util.Set.of(), targetPlayer.getYaw(), targetPlayer.getPitch());
+                /*targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
+                                    targetPlayer.getYRot(), targetPlayer.getXRot());
                 *//*?}*/
                 
                 // 发送消息
@@ -180,8 +188,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                 targetPlayer.teleportTo(targetLevel, x, y, z, java.util.Set.of(),
                                      targetPlayer.getYRot(), targetPlayer.getXRot(), true);
                 //?} else {
-                /*targetPlayer.teleport(targetLevel, x, y, z, java.util.Set.of(),
-                                     targetPlayer.getYaw(), targetPlayer.getPitch());
+                /*targetPlayer.teleportTo(targetLevel, x, y, z,
+                                     targetPlayer.getYRot(), targetPlayer.getXRot());
                 *//*?}*/
                 
                 // 发送消息
@@ -204,7 +212,11 @@ public class TeleportPlayerFunction implements LLMFunction {
     }
     
     private String getDimensionName(ServerLevel world) {
+        //? >=1.21.11 {
         String dimensionId = world.dimension().identifier().toString();
+        //?} else {
+        /*String dimensionId = world.dimension().location().toString();
+        *//*?}*/
         switch (dimensionId) {
             case "minecraft:overworld":
                 return "主世界";

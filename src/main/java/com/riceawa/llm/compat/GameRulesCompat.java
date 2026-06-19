@@ -3,7 +3,7 @@ package com.riceawa.llm.compat;
 //? >=1.21.11 {
 import net.minecraft.world.level.gamerules.GameRules;
 //?} else {
-/*import net.minecraft.world.level.gamerules.GameRules;
+/*import net.minecraft.world.level.GameRules;
 *//*?}*/
 import net.minecraft.server.level.ServerLevel;
 
@@ -38,7 +38,7 @@ public final class GameRulesCompat {
         //? >=1.21.11 {
         return level.getGameRules().get(GameRules.PVP);
         //?} else {
-        /*return level.getServer().isPvpEnabled();
+        /*return level.getServer().isPvpAllowed();
         *//*?}*/
     }
     
@@ -52,7 +52,7 @@ public final class GameRulesCompat {
         //? >=1.21.11 {
         return level.getGameRules().get(GameRules.COMMAND_BLOCK_OUTPUT);
         //?} else {
-        /*return level.getGameRules().getBoolean(GameRules.COMMAND_BLOCK_OUTPUT);
+        /*return level.getGameRules().getBoolean(GameRules.RULE_COMMANDBLOCKOUTPUT);
         *//*?}*/
     }
     
@@ -66,7 +66,7 @@ public final class GameRulesCompat {
         //? >=1.21.11 {
         return level.getGameRules().get(GameRules.SEND_COMMAND_FEEDBACK);
         //?} else {
-        /*return level.getGameRules().getBoolean(GameRules.SEND_COMMAND_FEEDBACK);
+        /*return level.getGameRules().getBoolean(GameRules.RULE_SENDCOMMANDFEEDBACK);
         *//*?}*/
     }
     
@@ -80,7 +80,7 @@ public final class GameRulesCompat {
         //? >=1.21.11 {
         return level.getGameRules().get(GameRules.KEEP_INVENTORY);
         //?} else {
-        /*return level.getGameRules().getBoolean(GameRules.KEEP_INVENTORY);
+        /*return level.getGameRules().getBoolean(GameRules.RULE_KEEPINVENTORY);
         *//*?}*/
     }
 }

@@ -49,7 +49,11 @@ public class PlayerStatsFunction implements LLMFunction {
             // 如果指定了玩家名称，尝试查找该玩家
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
+                //? >=1.21.11 {
                 ServerPlayer foundPlayer = server.getPlayerList().getPlayer(playerName);
+                //?} else {
+                /*ServerPlayer foundPlayer = server.getPlayerList().getPlayerByName(playerName);
+                *//*?}*/
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
                 }
@@ -85,13 +89,23 @@ public class PlayerStatsFunction implements LLMFunction {
             stats.append("位置: ").append(pos.getX()).append(", ")
                 .append(pos.getY()).append(", ").append(pos.getZ()).append("\n");
             var world = EntityHelper.getWorld(targetPlayer);
+            //? >=1.21.11 {
             stats.append("维度: ").append(getDimensionName(world != null ? world.dimension().identifier().toString() : "Unknown")).append("\n");
+            //?} else {
+            /*stats.append("维度: ").append(getDimensionName(world != null ? world.dimension().location().toString() : "Unknown")).append("\n");
+            *//*?}*/
             
             // 游戏模式
             stats.append("游戏模式: ").append(targetPlayer.gameMode.getGameModeForPlayer().getLongDisplayName().getString()).append("\n");
             
             // 移动状态
+            //? >=1.21.11 {
             stats.append("是否在地面: ").append(targetPlayer.onGround() ? "是" : "否").append("\n");
+            //?} else if >=1.20.6 {
+            /*stats.append("是否在地面: ").append(targetPlayer.onGround() ? "是" : "否").append("\n");
+            *///?} else {
+            /*stats.append("是否在地面: ").append(targetPlayer.isOnGround() ? "是" : "否").append("\n");
+            *//*?}*/
             stats.append("是否在水中: ").append(targetPlayer.isInWater() ? "是" : "否").append("\n");
             stats.append("是否在潜行: ").append(targetPlayer.isShiftKeyDown() ? "是" : "否").append("\n");
             stats.append("是否在疾跑: ").append(targetPlayer.isSprinting() ? "是" : "否").append("\n");
