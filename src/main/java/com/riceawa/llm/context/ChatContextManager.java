@@ -238,8 +238,8 @@ public class ChatContextManager {
             // 查找玩家并发送通知
             Player player = findPlayerByUuid(playerId);
             if (player != null) {
-                player.displayClientMessage(Component.literal("⚠️ 已达到最大上下文长度，您的之前上下文将被压缩")
-                    .withStyle(ChatFormatting.YELLOW), false);
+                player.sendSystemMessage(Component.literal("⚠️ 已达到最大上下文长度，您的之前上下文将被压缩")
+                    .withStyle(ChatFormatting.YELLOW));
 
                 LogManager.getInstance().chat("Compression notification sent to player " +
                     player.getName().getString() + " for " + messagesToCompress + " messages");
@@ -273,11 +273,11 @@ public class ChatContextManager {
             Player player = findPlayerByUuid(playerId);
             if (player != null) {
                 if (success) {
-                    player.displayClientMessage(Component.literal("✅ 上下文压缩完成，对话历史已优化")
-                        .withStyle(ChatFormatting.GREEN), false);
+                    player.sendSystemMessage(Component.literal("✅ 上下文压缩完成，对话历史已优化")
+                        .withStyle(ChatFormatting.GREEN));
                 } else {
-                    player.displayClientMessage(Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
-                        .withStyle(ChatFormatting.YELLOW), false);
+                    player.sendSystemMessage(Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
+                        .withStyle(ChatFormatting.YELLOW));
                 }
             }
         }
@@ -293,11 +293,11 @@ public class ChatContextManager {
             // 直接使用传入的玩家实体发送通知
             if (player != null) {
                 if (success) {
-                    player.displayClientMessage(Component.literal("✅ 上下文压缩完成，对话历史已优化")
-                        .withStyle(ChatFormatting.GREEN), false);
+                    player.sendSystemMessage(Component.literal("✅ 上下文压缩完成，对话历史已优化")
+                        .withStyle(ChatFormatting.GREEN));
                 } else {
-                    player.displayClientMessage(Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
-                        .withStyle(ChatFormatting.YELLOW), false);
+                    player.sendSystemMessage(Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
+                        .withStyle(ChatFormatting.YELLOW));
                 }
 
                 LogManager.getInstance().chat("Compression completed for player " +

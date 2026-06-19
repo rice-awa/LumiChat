@@ -3,6 +3,7 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
+import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -111,13 +112,13 @@ public class WeatherControlFunction implements LLMFunction {
             // 设置天气
             switch (weatherType) {
                 case "clear":
-                    targetWorld.setWeatherParameters(durationTicks, 0, false, false);
+                    EntityHelper.setWeatherParameters(targetWorld, durationTicks, 0, false, false);
                     break;
                 case "rain":
-                    targetWorld.setWeatherParameters(0, durationTicks, true, false);
+                    EntityHelper.setWeatherParameters(targetWorld, 0, durationTicks, true, false);
                     break;
                 case "thunder":
-                    targetWorld.setWeatherParameters(0, durationTicks, true, true);
+                    EntityHelper.setWeatherParameters(targetWorld, 0, durationTicks, true, true);
                     break;
             }
             

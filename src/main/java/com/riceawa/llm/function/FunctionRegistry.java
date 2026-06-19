@@ -3,6 +3,7 @@ package com.riceawa.llm.function;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.core.LLMConfig;
 import com.riceawa.llm.util.EntityHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.*;
@@ -248,11 +249,11 @@ public class FunctionRegistry {
 
         @Override
         public FunctionResult execute(Player player, net.minecraft.server.MinecraftServer server, JsonObject arguments) {
-            var world = EntityHelper.getWorld(player);
+            ServerLevel world = EntityHelper.getServerWorldSafe(player);
             if (world == null) {
                 return FunctionResult.error("无法获取世界信息");
             }
-            long time = world.getDayTime();
+            long time = EntityHelper.getDayTime(world);
             int hours = (int) ((time / 1000 + 6) % 24);
             int minutes = (int) ((time % 1000) * 60 / 1000);
             

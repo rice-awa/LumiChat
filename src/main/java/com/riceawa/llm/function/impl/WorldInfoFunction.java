@@ -64,11 +64,11 @@ public class WorldInfoFunction implements LLMFunction {
             info.append("是否硬核: ").append(server.isHardcore() ? "是" : "否").append("\n");
             
             // 时间信息
-            long time = world.getDayTime();
+            long time = EntityHelper.getDayTime(world);
             int hours = (int) ((time / 1000 + 6) % 24);
             int minutes = (int) ((time % 1000) * 60 / 1000);
             info.append("游戏时间: ").append(String.format("%02d:%02d", hours, minutes)).append("\n");
-            info.append("游戏天数: ").append(world.getDayTime() / 24000 + 1).append("\n");
+            info.append("游戏天数: ").append(time / 24000 + 1).append("\n");
             
             // 天气信息
             info.append("天气: ");

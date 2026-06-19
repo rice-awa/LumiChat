@@ -110,7 +110,7 @@ public class LogCommand {
         status.append("性能日志: ").append(logConfig.isEnablePerformanceLog() ? "启用" : "禁用").append("\n");
         status.append("审计日志: ").append(logConfig.isEnableAuditLog() ? "启用" : "禁用").append("\n");
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(status.toString()).withStyle(ChatFormatting.AQUA), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(status.toString()).withStyle(ChatFormatting.AQUA));
         
         return 1;
     }
@@ -156,7 +156,7 @@ public class LogCommand {
                 message = "控制台日志已启用";
                 break;
             default:
-                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).withStyle(ChatFormatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).withStyle(ChatFormatting.RED));
                 return 0;
         }
 
@@ -211,7 +211,7 @@ public class LogCommand {
                 message = "控制台日志已禁用";
                 break;
             default:
-                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).withStyle(ChatFormatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).withStyle(ChatFormatting.RED));
                 return 0;
         }
 
@@ -238,7 +238,7 @@ public class LogCommand {
         logManager.performance("Test log message from " + executor + " - Performance", null);
         logManager.audit("Test log message from " + executor + " - Audit", null);
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("测试日志已记录，请检查日志文件").withStyle(ChatFormatting.GREEN), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("测试日志已记录，请检查日志文件").withStyle(ChatFormatting.GREEN));
         
         return 1;
     }
