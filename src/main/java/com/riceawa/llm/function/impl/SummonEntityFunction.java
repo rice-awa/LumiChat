@@ -7,7 +7,11 @@ import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+//? >=1.21 {
 import net.minecraft.resources.Identifier;
+//?} else {
+/*import net.minecraft.resources.ResourceLocation;
+*//*?}*/
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -118,9 +122,17 @@ public class SummonEntityFunction implements LLMFunction {
             }
             
             // 获取实体类型 - 使用兼容层
+            //? >=1.21 {
             Identifier entityId = IdentifierCompat.forEntityType(entityType);
+            //?} else {
+            /*ResourceLocation entityId = IdentifierCompat.forEntityType(entityType);
+            *//*?}*/
             
+            //? >=1.21 {
             EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(entityId);
+            //?} else {
+            /*EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(entityId);
+            *//*?}*/
             if (type == null) {
                 return FunctionResult.error("未知的实体类型: " + entityType);
             }
@@ -141,7 +153,7 @@ public class SummonEntityFunction implements LLMFunction {
                     //? >=1.21.2 {
                     Entity entity = type.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
                     //?} else {
-                    /*Entity entity = type.create(world);
+                    /*Entity entity = type.create(level);
                     *//*?}*/
                     if (entity != null) {
                         entity.setPos(offsetX, y, offsetZ);
