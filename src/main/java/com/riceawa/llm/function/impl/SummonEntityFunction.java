@@ -5,15 +5,15 @@ import com.riceawa.llm.compat.IdentifierCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.registry.Registries;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * 生成实体的函数
@@ -88,7 +88,7 @@ public class SummonEntityFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 获取参数
             if (!arguments.has("entity_type") || !arguments.has("x") || 
@@ -108,8 +108,8 @@ public class SummonEntityFunction implements LLMFunction {
             }
             
             // 检查距离限制
-            Vec3d targetPos = new Vec3d(x, y, z);
-            Vec3d playerPos = EntityHelper.getPos(player);
+            Vec3 targetPos = new Vec3(x, y, z);
+            Vec3 playerPos = EntityHelper.getPos(player);
             double distance = playerPos.distanceTo(targetPos);
             
             if (distance > MAX_DISTANCE) {
@@ -120,13 +120,13 @@ public class SummonEntityFunction implements LLMFunction {
             // 获取实体类型 - 使用兼容层
             Identifier entityId = IdentifierCompat.forEntityType(entityType);
             
-            EntityType<?> type = Registries.ENTITY_TYPE.get(entityId);
+            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(entityId);
             if (type == null) {
                 return FunctionResult.error("未知的实体类型: " + entityType);
             }
             
-            ServerWorld world = (ServerWorld) EntityHelper.getWorld(player);
-            if (world == null) {
+            ServerLevel level = (ServerLevel) EntityHelper.getWorld(player);
+            if (level == null) {
                 return FunctionResult.error("无法获取世界信息");
             }
             int successCount = 0;
@@ -139,14 +139,16 @@ public class SummonEntityFunction implements LLMFunction {
                     double offsetZ = z + (Math.random() - 0.5) * 2;
                     
                     //? >=1.21.2 {
-                    Entity entity = type.create(world, net.minecraft.entity.SpawnReason.COMMAND);
+                    Entity entity = type.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
                     //?} else {
                     /*Entity entity = type.create(world);
                     *//*?}*/
                     if (entity != null) {
-                        entity.refreshPositionAndAngles(offsetX, y, offsetZ, 0.0F, 0.0F);
+                        entity.setPos(offsetX, y, offsetZ);
+                        entity.setYRot(0.0F);
+                        entity.setXRot(0.0F);
 
-                        if (world.spawnEntity(entity)) {
+                        if (level.addFreshEntity(entity)) {
                             successCount++;
                         }
                     }
@@ -170,7 +172,7 @@ public class SummonEntityFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return PermissionHelper.canSummonEntity(player);
     }
     

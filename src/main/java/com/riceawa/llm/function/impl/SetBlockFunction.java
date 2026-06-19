@@ -5,14 +5,14 @@ import com.riceawa.llm.compat.IdentifierCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.registry.Registries;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * 设置方块的函数
@@ -84,7 +84,7 @@ public class SetBlockFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 获取参数
             if (!arguments.has("x") || !arguments.has("y") || !arguments.has("z") || !arguments.has("block_type")) {
@@ -104,8 +104,8 @@ public class SetBlockFunction implements LLMFunction {
             
             // 检查距离限制
             BlockPos targetPos = new BlockPos(x, y, z);
-            BlockPos playerPos = player.getBlockPos();
-            double distance = Math.sqrt(playerPos.getSquaredDistance(targetPos));
+            BlockPos playerPos = player.blockPosition();
+            double distance = Math.sqrt(playerPos.distSqr(targetPos));
             
             if (distance > MAX_DISTANCE) {
                 return FunctionResult.error(String.format(
@@ -118,28 +118,28 @@ public class SetBlockFunction implements LLMFunction {
                 blockId = IdentifierCompat.forBlockType(blockType);
             }
             
-            Block block = Registries.BLOCK.get(blockId);
+            Block block = BuiltInRegistries.BLOCK.getValue(blockId);
             if (block == null) {
                 return FunctionResult.error("未知的方块类型: " + blockType);
             }
             
-            BlockState blockState = block.getDefaultState();
-            ServerWorld world = (ServerWorld) EntityHelper.getWorld(player);
-            if (world == null) {
+            BlockState blockState = block.defaultBlockState();
+            ServerLevel level = (ServerLevel) EntityHelper.getWorld(player);
+            if (level == null) {
                 return FunctionResult.error("无法获取世界信息");
             }
             
             // 检查是否需要替换
-            if (!replace && !world.getBlockState(targetPos).isAir()) {
+            if (!replace && !level.getBlockState(targetPos).isAir()) {
                 return FunctionResult.error("目标位置已有方块，且未启用替换模式");
             }
             
             // 设置方块
-            boolean success = world.setBlockState(targetPos, blockState);
+            boolean success = level.setBlockAndUpdate(targetPos, blockState);
             
             if (success) {
                 // 更新周围方块
-                world.updateNeighbors(targetPos, block);
+                level.updateNeighborsAt(targetPos, block);
                 
                 return FunctionResult.success(String.format(
                     "成功在位置 (%d, %d, %d) 设置方块: %s", x, y, z, blockType));
@@ -153,7 +153,7 @@ public class SetBlockFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return PermissionHelper.canModifyWorld(player);
     }
     
