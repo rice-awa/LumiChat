@@ -132,8 +132,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                 String message = String.format("已将 %s 传送到 %s 身边", 
                     targetPlayer.getName().getString(), destinationPlayer.getName().getString());
                 
-                targetPlayer.sendSystemMessage(Component.literal("你被传送到了 " +
-                    destinationPlayer.getName().getString() + " 身边"));
+                targetPlayer.displayClientMessage(Component.literal("你被传送到了 " +
+                    destinationPlayer.getName().getString() + " 身边"), false);
                 
                 return FunctionResult.success(message);
                 
@@ -189,8 +189,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                 String message = String.format("已将 %s 传送到 %s (%.1f, %.1f, %.1f)", 
                     targetPlayer.getName().getString(), dimensionName, x, y, z);
                 
-                targetPlayer.sendSystemMessage(Component.literal(String.format(
-                    "你被传送到了 %s (%.1f, %.1f, %.1f)", dimensionName, x, y, z)));
+                targetPlayer.displayClientMessage(Component.literal(String.format(
+                    "你被传送到了 %s (%.1f, %.1f, %.1f)", dimensionName, x, y, z)), false);
                 
                 return FunctionResult.success(message);
                 
