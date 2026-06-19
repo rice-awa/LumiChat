@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.MessageCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
@@ -140,7 +141,7 @@ public class TeleportPlayerFunction implements LLMFunction {
                 String message = String.format("已将 %s 传送到 %s 身边", 
                     targetPlayer.getName().getString(), destinationPlayer.getName().getString());
                 
-                targetPlayer.displayClientMessage(Component.literal("你被传送到了 " +
+                MessageCompat.displayClientMessage(targetPlayer, Component.literal("你被传送到了 " +
                     destinationPlayer.getName().getString() + " 身边"), false);
                 
                 return FunctionResult.success(message);
@@ -197,7 +198,7 @@ public class TeleportPlayerFunction implements LLMFunction {
                 String message = String.format("已将 %s 传送到 %s (%.1f, %.1f, %.1f)", 
                     targetPlayer.getName().getString(), dimensionName, x, y, z);
                 
-                targetPlayer.displayClientMessage(Component.literal(String.format(
+                MessageCompat.displayClientMessage(targetPlayer, Component.literal(String.format(
                     "你被传送到了 %s (%.1f, %.1f, %.1f)", dimensionName, x, y, z)), false);
                 
                 return FunctionResult.success(message);

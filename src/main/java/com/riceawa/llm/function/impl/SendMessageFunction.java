@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.MessageCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import net.minecraft.network.chat.Component;
@@ -129,12 +130,12 @@ public class SendMessageFunction implements LLMFunction {
     private void sendMessageToPlayer(ServerPlayer player, Component message, String messageType) {
         switch (messageType.toLowerCase()) {
             case "actionbar":
-                player.displayClientMessage(message, true); // true = actionbar
+                MessageCompat.displayClientMessage(player, message, true); // true = actionbar
                 break;
             case "system":
             case "chat":
             default:
-                player.displayClientMessage(message, false); // chat/system
+                MessageCompat.displayClientMessage(player, message, false); // chat/system
                 break;
         }
     }
