@@ -289,6 +289,8 @@ git commit -m "build: 1.21.x 切换至 officialMojangMappings()，26.1 保持无
 > 原因：`officialMojangMappings()` 将 official 映射注入 `named` 命名空间作为开发命名空间，
 > 故 AW 必须使用 `named`。AW 当前无任何条目，保持 `named` 即可，无需改动。
 
+> **26.1 轨道补充（Task 1.5 执行时发现并修复）：** 26.1 节点使用 `fabric-loom`（无 mappings、`isUnobfuscated = true`），其 AW 期望 `official` 命名空间，与共享 AW 文件的 `named` 头部冲突，配置阶段报 `Expected official namespace for access widener entry, found: named`。由于 AW 文件当前无任何条目，已在 `build.gradle.kts` 用 `if (!isUnobfuscated) { accessWidenerPath.set(...) }` 守卫，使 26.1 完全跳过 access widener。1.21.x 节点仍正常设置 `accessWidenerPath`（`named` 命名空间）。若日后 26.1 需要 AW 条目，需另建 `official` 命名空间的独立 AW 文件（后续任务）。
+
 - [x] **Step 1: 验证保持 `named` 可通过配置阶段**（已验证：`:1.21.11:help` BUILD SUCCESSFUL）
 
 - [x] **Step 2: 无需提交（文件未变更）**
@@ -297,17 +299,23 @@ git commit -m "build: 1.21.x 切换至 officialMojangMappings()，26.1 保持无
 
 **前提：** Phase 2 至少需与本 Phase 一同完成才能全绿；本任务只验证 Gradle 配置阶段不报错。
 
-- [ ] **Step 1: 1.21.11 配置阶段校验**
+- [x] **Step 1: 1.21.11 配置阶段校验**
 
 Run: `export JAVA_HOME=<java21> && ./gradlew :1.21.11:help`
 Expected: 配置阶段通过（`officialMojangMappings()` 可解析、Loom 1.15 插件可应用）。源码编译错误属预期（Phase 2 未完成），不计为失败。
 
-- [ ] **Step 2: 26.1 配置阶段校验**
+已验证：`JAVA_HOME=/usr/local/sdkman/candidates/java/21.0.10-ms ./gradlew :1.21.11:help` → **BUILD SUCCESSFUL in 24s**（Loom 1.15.5、`officialMojangMappings()` 可解析、AW `named` 命名空间通过）。
+
+- [x] **Step 2: 26.1 配置阶段校验**
 
 Run: `export JAVA_HOME=<java25> && ./gradlew :26.1:help`
 Expected: 配置阶段通过（`fabric-loom` 1.15 应用、无 `mappings` 依赖缺失错误）。注意：26.1 节点仅当 Gradle JVM 支持 Java 25 时在 `settings.gradle.kts` 被注册。
 
-- [ ] **Step 3: 不单独提交（校验步骤）**
+已验证：`JAVA_HOME=/usr/local/sdkman/candidates/java/25.0.2-ms ./gradlew :26.1:help` → **BUILD SUCCESSFUL in 21s**（Loom 1.15.5、无 mappings 缺失错误；`accessWidenerPath` 经 `if (!isUnobfuscated)` 守卫跳过，不再报 `Expected official namespace`）。
+
+- [x] **Step 3: 提交 accessWidenerPath 守卫修复与计划更新**
+
+本任务执行时发现 26.1 配置阶段因 AW 命名空间冲突受阻，已在 `build.gradle.kts` 增加 `if (!isUnobfuscated)` 守卫修复，并与本计划更新一同提交（`fix(build): 26.1 跳过 accessWidenerPath 解决命名空间冲突`）。
 
 ---
 
