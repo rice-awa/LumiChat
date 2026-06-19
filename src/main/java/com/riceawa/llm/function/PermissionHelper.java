@@ -48,7 +48,7 @@ public class PermissionHelper {
     public static boolean isOperator(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
             MinecraftServer server = EntityHelper.getServer(serverPlayer);
-            ServerLevel serverLevel = server.getOverworld();
+            ServerLevel serverLevel = server.overworld();
             //? >=1.21.2 {
             CommandSourceStack source = player.createCommandSourceStackForNameResolution(serverLevel);
             //?} else {
@@ -65,7 +65,7 @@ public class PermissionHelper {
     public static boolean hasCommandPermission(Player player, int level) {
         if (player instanceof ServerPlayer serverPlayer) {
             MinecraftServer server = EntityHelper.getServer(serverPlayer);
-            ServerLevel serverLevel = server.getOverworld();
+            ServerLevel serverLevel = server.overworld();
             //? >=1.21.2 {
             CommandSourceStack source = player.createCommandSourceStackForNameResolution(serverLevel);
             //?} else {

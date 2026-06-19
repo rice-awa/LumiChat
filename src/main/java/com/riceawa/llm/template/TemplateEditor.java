@@ -1,7 +1,7 @@
 package com.riceawa.llm.template;
 
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.ChatChatFormatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 
@@ -36,7 +36,7 @@ public class TemplateEditor {
      * 开始编辑会话
      */
     public void startEditSession(Player player, String templateId, boolean isNewTemplate) {
-        UUID playerId = player.getUuid();
+        UUID playerId = player.getUUID();
         
         // 如果已有编辑会话，先结束
         if (editSessions.containsKey(playerId)) {
@@ -72,7 +72,7 @@ public class TemplateEditor {
      * 结束编辑会话
      */
     public void endEditSession(Player player) {
-        UUID playerId = player.getUuid();
+        UUID playerId = player.getUUID();
         EditSession session = editSessions.remove(playerId);
         
         if (session != null) {
@@ -84,14 +84,14 @@ public class TemplateEditor {
      * 获取编辑会话
      */
     public EditSession getEditSession(Player player) {
-        return editSessions.get(player.getUuid());
+        return editSessions.get(player.getUUID());
     }
 
     /**
      * 检查玩家是否在编辑模式
      */
     public boolean isEditing(Player player) {
-        return editSessions.containsKey(player.getUuid());
+        return editSessions.containsKey(player.getUUID());
     }
 
     /**
