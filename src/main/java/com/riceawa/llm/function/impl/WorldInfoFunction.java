@@ -99,7 +99,7 @@ public class WorldInfoFunction implements LLMFunction {
                 //? >=1.21.9 {
                 BlockPos spawnPos = world.getLevelData().getRespawnData().pos();
                 //?} else {
-                /*BlockPos spawnPos = world.getLevelData().getRespawnData().pos();
+                /*BlockPos spawnPos = world.getSharedSpawnPos();
                 *//*?}*/
                 info.append("出生点: ").append(spawnPos.getX()).append(", ")
                     .append(spawnPos.getY()).append(", ")
