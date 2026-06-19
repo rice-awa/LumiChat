@@ -3,7 +3,7 @@ package com.riceawa.llm.template;
 import com.google.gson.annotations.SerializedName;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.MinecraftServer;
 import net.fabricmc.loader.api.FabricLoader;
 import java.time.LocalDateTime;
@@ -67,7 +67,7 @@ public class PromptTemplate {
     /**
      * 渲染带全局上下文的系统提示词
      */
-    public String renderSystemPromptWithContext(ServerPlayerEntity player, LLMChatConfig config) {
+    public String renderSystemPromptWithContext(ServerPlayer player, LLMChatConfig config) {
         String originalPrompt = renderTemplate(systemPrompt, player);
         String globalContext = null;
 
@@ -106,7 +106,7 @@ public class PromptTemplate {
     /**
      * 渲染用户消息（带玩家信息）
      */
-    public String renderUserMessage(String userInput, ServerPlayerEntity player) {
+    public String renderUserMessage(String userInput, ServerPlayer player) {
         StringBuilder result = new StringBuilder();
 
         if (userPromptPrefix != null && !userPromptPrefix.isEmpty()) {
@@ -132,7 +132,7 @@ public class PromptTemplate {
     /**
      * 渲染模板，替换变量（带玩家信息支持内置变量）
      */
-    private String renderTemplate(String template, ServerPlayerEntity player) {
+    private String renderTemplate(String template, ServerPlayer player) {
         if (template == null) {
             return "";
         }
@@ -152,7 +152,7 @@ public class PromptTemplate {
     /**
      * 获取变量值（支持内置变量和自定义变量）
      */
-    private String getVariableValue(String variableName, ServerPlayerEntity player) {
+    private String getVariableValue(String variableName, ServerPlayer player) {
         // 首先检查是否是内置变量
         String builtinValue = getBuiltinVariable(variableName, player);
         if (builtinValue != null) {
@@ -166,7 +166,7 @@ public class PromptTemplate {
     /**
      * 获取内置变量值
      */
-    private String getBuiltinVariable(String variableName, ServerPlayerEntity player) {
+    private String getBuiltinVariable(String variableName, ServerPlayer player) {
         switch (variableName.toLowerCase()) {
             case "player":
                 return player != null ? player.getName().getString() : "Unknown";
@@ -365,7 +365,7 @@ public class PromptTemplate {
     /**
      * 生成全局上下文信息
      */
-    private String generateGlobalContext(ServerPlayerEntity player, String globalContextTemplate) {
+    private String generateGlobalContext(ServerPlayer player, String globalContextTemplate) {
         if (globalContextTemplate == null || globalContextTemplate.trim().isEmpty()) {
             return "";
         }
