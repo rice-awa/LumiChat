@@ -1,5 +1,6 @@
 package com.riceawa.llm.context;
 
+import com.riceawa.llm.compat.MessageCompat;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.core.LLMMessage;
 import com.riceawa.llm.logging.LogManager;
@@ -238,7 +239,7 @@ public class ChatContextManager {
             // 查找玩家并发送通知
             Player player = findPlayerByUuid(playerId);
             if (player != null) {
-                player.displayClientMessage(Component.literal("⚠️ 已达到最大上下文长度，您的之前上下文将被压缩")
+                MessageCompat.displayClientMessage(player, Component.literal("⚠️ 已达到最大上下文长度，您的之前上下文将被压缩")
                     .withStyle(ChatFormatting.YELLOW), false);
 
                 LogManager.getInstance().chat("Compression notification sent to player " +
@@ -273,10 +274,10 @@ public class ChatContextManager {
             Player player = findPlayerByUuid(playerId);
             if (player != null) {
                 if (success) {
-                    player.displayClientMessage(Component.literal("✅ 上下文压缩完成，对话历史已优化")
+                    MessageCompat.displayClientMessage(player, Component.literal("✅ 上下文压缩完成，对话历史已优化")
                         .withStyle(ChatFormatting.GREEN), false);
                 } else {
-                    player.displayClientMessage(Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
+                    MessageCompat.displayClientMessage(player, Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
                         .withStyle(ChatFormatting.YELLOW), false);
                 }
             }
@@ -293,10 +294,10 @@ public class ChatContextManager {
             // 直接使用传入的玩家实体发送通知
             if (player != null) {
                 if (success) {
-                    player.displayClientMessage(Component.literal("✅ 上下文压缩完成，对话历史已优化")
+                    MessageCompat.displayClientMessage(player, Component.literal("✅ 上下文压缩完成，对话历史已优化")
                         .withStyle(ChatFormatting.GREEN), false);
                 } else {
-                    player.displayClientMessage(Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
+                    MessageCompat.displayClientMessage(player, Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
                         .withStyle(ChatFormatting.YELLOW), false);
                 }
 
