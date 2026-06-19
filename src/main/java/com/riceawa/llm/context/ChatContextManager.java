@@ -3,7 +3,7 @@ package com.riceawa.llm.context;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.core.LLMMessage;
 import com.riceawa.llm.logging.LogManager;
-import net.minecraft.ChatChatFormatting;
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
 import java.util.List;
@@ -71,7 +71,7 @@ public class ChatContextManager {
      * 获取玩家的聊天上下文
      */
     public ChatContext getContext(Player player) {
-        return getContext(player.getUuid());
+        return getContext(player.getUUID());
     }
 
     /**
@@ -85,7 +85,7 @@ public class ChatContextManager {
      * 移除玩家的聊天上下文
      */
     public void removeContext(Player player) {
-        removeContext(player.getUuid());
+        removeContext(player.getUUID());
     }
 
     /**
@@ -173,7 +173,7 @@ public class ChatContextManager {
      * 清空指定玩家的聊天历史
      */
     public void clearContext(Player player) {
-        clearContext(player.getUuid());
+        clearContext(player.getUUID());
     }
 
     /**
