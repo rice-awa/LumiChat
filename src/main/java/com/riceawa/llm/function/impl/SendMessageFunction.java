@@ -85,7 +85,7 @@ public class SendMessageFunction implements LLMFunction {
                 }
                 
                 // 发送给所有在线玩家
-                for (ServerPlayer onlinePlayer : server.getPlayerManager().getPlayerList()) {
+                for (ServerPlayer onlinePlayer : server.getPlayerList().getPlayers()) {
                     sendMessageToPlayer(onlinePlayer, messageComponent, messageType);
                 }
                 
@@ -94,7 +94,7 @@ public class SendMessageFunction implements LLMFunction {
                 
             } else {
                 // 发送给指定玩家
-                ServerPlayer targetPlayer = server.getPlayerManager().getPlayer(target);
+                ServerPlayer targetPlayer = server.getPlayerList().getPlayer(target);
                 if (targetPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + target);
                 }
@@ -125,12 +125,12 @@ public class SendMessageFunction implements LLMFunction {
     private void sendMessageToPlayer(ServerPlayer player, Component message, String messageType) {
         switch (messageType.toLowerCase()) {
             case "actionbar":
-                player.sendMessage(message, true); // true = actionbar
+                player.displayClientMessage(message, true); // true = actionbar
                 break;
             case "system":
             case "chat":
             default:
-                player.sendMessage(message, false); // false = chat
+                player.sendSystemMessage(message); // chat/system
                 break;
         }
     }
