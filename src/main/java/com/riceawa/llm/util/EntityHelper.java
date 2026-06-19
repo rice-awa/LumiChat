@@ -37,13 +37,7 @@ public final class EntityHelper {
      * Uses the server reference to get the overworld as context for the command source.
      */
     public static ServerLevel getServerWorld(ServerPlayer player) {
-        MinecraftServer server = getServer(player);
-        // Get the world from the player's command source
-        //? >=1.21.2 {
-        return player.createCommandSourceStackForNameResolution(server.overworld()).getLevel();
-        //?} else {
-        /*return player.createCommandSourceStack().getLevel();
-        *//*?}*/
+        return player.createCommandSourceStack().getLevel();
     }
     
     /**
@@ -103,14 +97,7 @@ public final class EntityHelper {
      */
     public static boolean isOperator(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
-            MinecraftServer server = getServer(serverPlayer);
-            ServerLevel world = server.overworld();
-            //? >=1.21.2 {
-            CommandSourceStack source = player.createCommandSourceStackForNameResolution(world);
-            //?} else {
-            /*CommandSourceStack source = player.createCommandSourceStack();
-            *//*?}*/
-            // Check if player has any elevated permissions
+            CommandSourceStack source = serverPlayer.createCommandSourceStack();
             return hasPermissionLevel(source, 2);
         }
         return false;

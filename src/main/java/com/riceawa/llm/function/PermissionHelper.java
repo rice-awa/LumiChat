@@ -2,11 +2,8 @@ package com.riceawa.llm.function;
 
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.commands.Commands;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.level.ServerLevel;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -47,13 +44,7 @@ public class PermissionHelper {
      */
     public static boolean isOperator(Player player) {
         if (player instanceof ServerPlayer serverPlayer) {
-            MinecraftServer server = EntityHelper.getServer(serverPlayer);
-            ServerLevel serverLevel = server.overworld();
-            //? >=1.21.2 {
-            CommandSourceStack source = player.createCommandSourceStackForNameResolution(serverLevel);
-            //?} else {
-            /*CommandSourceStack source = player.createCommandSourceStack();
-            *//*?}*/
+            CommandSourceStack source = serverPlayer.createCommandSourceStack();
             return EntityHelper.hasPermissionLevel(source, 2);
         }
         return false;
@@ -64,13 +55,7 @@ public class PermissionHelper {
      */
     public static boolean hasCommandPermission(Player player, int level) {
         if (player instanceof ServerPlayer serverPlayer) {
-            MinecraftServer server = EntityHelper.getServer(serverPlayer);
-            ServerLevel serverLevel = server.overworld();
-            //? >=1.21.2 {
-            CommandSourceStack source = player.createCommandSourceStackForNameResolution(serverLevel);
-            //?} else {
-            /*CommandSourceStack source = player.createCommandSourceStack();
-            *//*?}*/
+            CommandSourceStack source = serverPlayer.createCommandSourceStack();
             return EntityHelper.hasPermissionLevel(source, level);
         }
         return false;
