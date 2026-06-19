@@ -3,7 +3,7 @@ package com.riceawa.llm.template;
 import com.google.gson.annotations.SerializedName;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.MinecraftServer;
 import net.fabricmc.loader.api.FabricLoader;
 import java.time.LocalDateTime;
@@ -67,7 +67,7 @@ public class PromptTemplate {
     /**
      * 渲染带全局上下文的系统提示词
      */
-    public String renderSystemPromptWithContext(ServerPlayerEntity player, LLMChatConfig config) {
+    public String renderSystemPromptWithContext(ServerPlayer player, LLMChatConfig config) {
         String originalPrompt = renderTemplate(systemPrompt, player);
         String globalContext = null;
 
@@ -106,7 +106,7 @@ public class PromptTemplate {
     /**
      * 渲染用户消息（带玩家信息）
      */
-    public String renderUserMessage(String userInput, ServerPlayerEntity player) {
+    public String renderUserMessage(String userInput, ServerPlayer player) {
         StringBuilder result = new StringBuilder();
 
         if (userPromptPrefix != null && !userPromptPrefix.isEmpty()) {
@@ -132,7 +132,7 @@ public class PromptTemplate {
     /**
      * 渲染模板，替换变量（带玩家信息支持内置变量）
      */
-    private String renderTemplate(String template, ServerPlayerEntity player) {
+    private String renderTemplate(String template, ServerPlayer player) {
         if (template == null) {
             return "";
         }
@@ -152,7 +152,7 @@ public class PromptTemplate {
     /**
      * 获取变量值（支持内置变量和自定义变量）
      */
-    private String getVariableValue(String variableName, ServerPlayerEntity player) {
+    private String getVariableValue(String variableName, ServerPlayer player) {
         // 首先检查是否是内置变量
         String builtinValue = getBuiltinVariable(variableName, player);
         if (builtinValue != null) {
@@ -166,7 +166,7 @@ public class PromptTemplate {
     /**
      * 获取内置变量值
      */
-    private String getBuiltinVariable(String variableName, ServerPlayerEntity player) {
+    private String getBuiltinVariable(String variableName, ServerPlayer player) {
         switch (variableName.toLowerCase()) {
             case "player":
                 return player != null ? player.getName().getString() : "Unknown";
@@ -187,14 +187,22 @@ public class PromptTemplate {
 
             case "world": {
                 var world = player != null ? EntityHelper.getWorld(player) : null;
-                return world != null ? world.getRegistryKey().getValue().toString() : "Unknown";
+                //? >=1.21.11 {
+                return world != null ? world.dimension().identifier().toString() : "Unknown";
+                //?} else {
+                /*return world != null ? world.dimension().location().toString() : "Unknown";
+                *//*?}*/
             }
 
             case "dimension": {
                 if (player != null) {
                     var world = EntityHelper.getWorld(player);
                     if (world == null) return "Unknown";
-                    String worldKey = world.getRegistryKey().getValue().toString();
+                    //? >=1.21.11 {
+                    String worldKey = world.dimension().identifier().toString();
+                    //?} else {
+                    /*String worldKey = world.dimension().location().toString();
+                    *//*?}*/
                     if (worldKey.contains("overworld")) return "主世界";
                     if (worldKey.contains("nether")) return "下界";
                     if (worldKey.contains("end")) return "末地";
@@ -220,7 +228,7 @@ public class PromptTemplate {
 
             case "gamemode":
                 if (player != null) {
-                    switch (player.interactionManager.getGameMode()) {
+                    switch (player.gameMode.getGameModeForPlayer()) {
                         case SURVIVAL: return "生存模式";
                         case CREATIVE: return "创造模式";
                         case ADVENTURE: return "冒险模式";
@@ -245,7 +253,7 @@ public class PromptTemplate {
 
             case "server": {
                 MinecraftServer server = player != null ? EntityHelper.getServerSafe(player) : null;
-                return server != null ? server.getName() : "Unknown";
+                return server != null ? server.getServerModName() : "Unknown";
             }
 
             default:
@@ -365,7 +373,7 @@ public class PromptTemplate {
     /**
      * 生成全局上下文信息
      */
-    private String generateGlobalContext(ServerPlayerEntity player, String globalContextTemplate) {
+    private String generateGlobalContext(ServerPlayer player, String globalContextTemplate) {
         if (globalContextTemplate == null || globalContextTemplate.trim().isEmpty()) {
             return "";
         }
@@ -386,12 +394,12 @@ public class PromptTemplate {
         MinecraftServer server = EntityHelper.getServerSafe(player);
         if (server != null) {
             // 在线玩家信息
-            var playerManager = server.getPlayerManager();
-            int playerCount = playerManager.getCurrentPlayerCount();
+            var playerManager = server.getPlayerList();
+            int playerCount = playerManager.getPlayerCount();
             contextVariables.put("player_count", String.valueOf(playerCount));
 
             // 在线玩家列表（限制显示数量避免过长）
-            String onlinePlayers = playerManager.getPlayerList().stream()
+            String onlinePlayers = playerManager.getPlayers().stream()
                     .limit(10) // 最多显示10个玩家
                     .map(p -> p.getName().getString())
                     .collect(Collectors.joining(", "));

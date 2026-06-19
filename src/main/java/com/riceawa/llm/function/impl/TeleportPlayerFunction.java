@@ -1,16 +1,17 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.MessageCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.text.Text;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * 传送玩家的函数
@@ -78,14 +79,18 @@ public class TeleportPlayerFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 确定要传送的玩家
-            ServerPlayerEntity targetPlayer = (ServerPlayerEntity) player;
+            ServerPlayer targetPlayer = (ServerPlayer) player;
             
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
-                ServerPlayerEntity foundPlayer = server.getPlayerManager().getPlayer(playerName);
+                //? >=1.21.11 {
+                ServerPlayer foundPlayer = server.getPlayerList().getPlayer(playerName);
+                //?} else {
+                /*ServerPlayer foundPlayer = server.getPlayerList().getPlayerByName(playerName);
+                *//*?}*/
                 
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
@@ -103,7 +108,11 @@ public class TeleportPlayerFunction implements LLMFunction {
             if (arguments.has("target_player")) {
                 // 传送到其他玩家身边
                 String targetPlayerName = arguments.get("target_player").getAsString();
-                ServerPlayerEntity destinationPlayer = server.getPlayerManager().getPlayer(targetPlayerName);
+                //? >=1.21.11 {
+                ServerPlayer destinationPlayer = server.getPlayerList().getPlayer(targetPlayerName);
+                //?} else {
+                /*ServerPlayer destinationPlayer = server.getPlayerList().getPlayerByName(targetPlayerName);
+                *//*?}*/
                 
                 if (destinationPlayer == null) {
                     return FunctionResult.error("找不到目标玩家: " + targetPlayerName);
@@ -114,25 +123,25 @@ public class TeleportPlayerFunction implements LLMFunction {
                 }
                 
                 // 传送到目标玩家位置
-                Vec3d targetPos = EntityHelper.getPos(destinationPlayer);
-                ServerWorld targetWorld = (ServerWorld) EntityHelper.getWorld(destinationPlayer);
-                if (targetWorld == null) {
+                Vec3 targetPos = EntityHelper.getPos(destinationPlayer);
+                ServerLevel targetLevel = (ServerLevel) EntityHelper.getWorld(destinationPlayer);
+                if (targetLevel == null) {
                     return FunctionResult.error("无法获取目标玩家所在世界信息");
                 }
 
                 //? >=1.21.2 {
-                targetPlayer.teleport(targetWorld, targetPos.x, targetPos.y, targetPos.z,
-                                    java.util.Set.of(), targetPlayer.getYaw(), targetPlayer.getPitch(), false);
+                targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
+                                    java.util.Set.of(), targetPlayer.getYRot(), targetPlayer.getXRot(), true);
                 //?} else {
-                /*targetPlayer.teleport(targetWorld, targetPos.x, targetPos.y, targetPos.z,
-                                    java.util.Set.of(), targetPlayer.getYaw(), targetPlayer.getPitch());
+                /*targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
+                                    targetPlayer.getYRot(), targetPlayer.getXRot());
                 *//*?}*/
                 
                 // 发送消息
                 String message = String.format("已将 %s 传送到 %s 身边", 
                     targetPlayer.getName().getString(), destinationPlayer.getName().getString());
                 
-                targetPlayer.sendMessage(Text.literal("你被传送到了 " + 
+                MessageCompat.displayClientMessage(targetPlayer, Component.literal("你被传送到了 " +
                     destinationPlayer.getName().getString() + " 身边"), false);
                 
                 return FunctionResult.success(message);
@@ -149,8 +158,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                 }
                 
                 // 确定目标世界
-                ServerWorld targetWorld = (ServerWorld) EntityHelper.getWorld(targetPlayer);
-                if (targetWorld == null) {
+                ServerLevel targetLevel = (ServerLevel) EntityHelper.getWorld(targetPlayer);
+                if (targetLevel == null) {
                     return FunctionResult.error("无法获取玩家所在世界信息");
                 }
                 
@@ -158,38 +167,38 @@ public class TeleportPlayerFunction implements LLMFunction {
                     String dimension = arguments.get("dimension").getAsString().toLowerCase();
                     switch (dimension) {
                         case "overworld":
-                            targetWorld = server.getOverworld();
+                            targetLevel = server.overworld();
                             break;
                         case "nether":
-                            targetWorld = server.getWorld(World.NETHER);
+                            targetLevel = server.getLevel(Level.NETHER);
                             break;
                         case "end":
-                            targetWorld = server.getWorld(World.END);
+                            targetLevel = server.getLevel(Level.END);
                             break;
                         default:
                             return FunctionResult.error("未知的维度: " + dimension);
                     }
                 }
                 
-                if (targetWorld == null) {
+                if (targetLevel == null) {
                     return FunctionResult.error("目标世界不存在");
                 }
                 
                 // 执行传送
                 //? >=1.21.2 {
-                targetPlayer.teleport(targetWorld, x, y, z, java.util.Set.of(),
-                                     targetPlayer.getYaw(), targetPlayer.getPitch(), false);
+                targetPlayer.teleportTo(targetLevel, x, y, z, java.util.Set.of(),
+                                     targetPlayer.getYRot(), targetPlayer.getXRot(), true);
                 //?} else {
-                /*targetPlayer.teleport(targetWorld, x, y, z, java.util.Set.of(),
-                                     targetPlayer.getYaw(), targetPlayer.getPitch());
+                /*targetPlayer.teleportTo(targetLevel, x, y, z,
+                                     targetPlayer.getYRot(), targetPlayer.getXRot());
                 *//*?}*/
                 
                 // 发送消息
-                String dimensionName = getDimensionName(targetWorld);
+                String dimensionName = getDimensionName(targetLevel);
                 String message = String.format("已将 %s 传送到 %s (%.1f, %.1f, %.1f)", 
                     targetPlayer.getName().getString(), dimensionName, x, y, z);
                 
-                targetPlayer.sendMessage(Text.literal(String.format(
+                MessageCompat.displayClientMessage(targetPlayer, Component.literal(String.format(
                     "你被传送到了 %s (%.1f, %.1f, %.1f)", dimensionName, x, y, z)), false);
                 
                 return FunctionResult.success(message);
@@ -203,8 +212,12 @@ public class TeleportPlayerFunction implements LLMFunction {
         }
     }
     
-    private String getDimensionName(ServerWorld world) {
-        String dimensionId = world.getRegistryKey().getValue().toString();
+    private String getDimensionName(ServerLevel world) {
+        //? >=1.21.11 {
+        String dimensionId = world.dimension().identifier().toString();
+        //?} else {
+        /*String dimensionId = world.dimension().location().toString();
+        *//*?}*/
         switch (dimensionId) {
             case "minecraft:overworld":
                 return "主世界";
@@ -218,7 +231,7 @@ public class TeleportPlayerFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return true; // 所有玩家都可以传送自己，OP可以传送其他玩家
     }
     

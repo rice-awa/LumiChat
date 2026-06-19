@@ -1,11 +1,12 @@
 package com.riceawa.llm.context;
 
+import com.riceawa.llm.compat.MessageCompat;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.core.LLMMessage;
 import com.riceawa.llm.logging.LogManager;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -70,8 +71,8 @@ public class ChatContextManager {
     /**
      * 获取玩家的聊天上下文
      */
-    public ChatContext getContext(PlayerEntity player) {
-        return getContext(player.getUuid());
+    public ChatContext getContext(Player player) {
+        return getContext(player.getUUID());
     }
 
     /**
@@ -84,8 +85,8 @@ public class ChatContextManager {
     /**
      * 移除玩家的聊天上下文
      */
-    public void removeContext(PlayerEntity player) {
-        removeContext(player.getUuid());
+    public void removeContext(Player player) {
+        removeContext(player.getUUID());
     }
 
     /**
@@ -172,8 +173,8 @@ public class ChatContextManager {
     /**
      * 清空指定玩家的聊天历史
      */
-    public void clearContext(PlayerEntity player) {
-        clearContext(player.getUuid());
+    public void clearContext(Player player) {
+        clearContext(player.getUUID());
     }
 
     /**
@@ -236,10 +237,10 @@ public class ChatContextManager {
             }
 
             // 查找玩家并发送通知
-            PlayerEntity player = findPlayerByUuid(playerId);
+            Player player = findPlayerByUuid(playerId);
             if (player != null) {
-                player.sendMessage(Text.literal("⚠️ 已达到最大上下文长度，您的之前上下文将被压缩")
-                    .formatted(Formatting.YELLOW), false);
+                MessageCompat.displayClientMessage(player, Component.literal("⚠️ 已达到最大上下文长度，您的之前上下文将被压缩")
+                    .withStyle(ChatFormatting.YELLOW), false);
 
                 LogManager.getInstance().chat("Compression notification sent to player " +
                     player.getName().getString() + " for " + messagesToCompress + " messages");
@@ -247,7 +248,7 @@ public class ChatContextManager {
         }
 
         @Override
-        public void onContextCompressionStarted(UUID playerId, int messagesToCompress, PlayerEntity player) {
+        public void onContextCompressionStarted(UUID playerId, int messagesToCompress, Player player) {
             // 检查是否启用压缩通知
             LLMChatConfig config = LLMChatConfig.getInstance();
             if (!config.isEnableCompressionNotification()) {
@@ -270,20 +271,20 @@ public class ChatContextManager {
             }
 
             // 查找玩家并发送完成通知
-            PlayerEntity player = findPlayerByUuid(playerId);
+            Player player = findPlayerByUuid(playerId);
             if (player != null) {
                 if (success) {
-                    player.sendMessage(Text.literal("✅ 上下文压缩完成，对话历史已优化")
-                        .formatted(Formatting.GREEN), false);
+                    MessageCompat.displayClientMessage(player, Component.literal("✅ 上下文压缩完成，对话历史已优化")
+                        .withStyle(ChatFormatting.GREEN), false);
                 } else {
-                    player.sendMessage(Text.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
-                        .formatted(Formatting.YELLOW), false);
+                    MessageCompat.displayClientMessage(player, Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
+                        .withStyle(ChatFormatting.YELLOW), false);
                 }
             }
         }
 
         @Override
-        public void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount, int compressedCount, PlayerEntity player) {
+        public void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount, int compressedCount, Player player) {
             // 检查是否启用压缩通知
             LLMChatConfig config = LLMChatConfig.getInstance();
             if (!config.isEnableCompressionNotification()) {
@@ -293,11 +294,11 @@ public class ChatContextManager {
             // 直接使用传入的玩家实体发送通知
             if (player != null) {
                 if (success) {
-                    player.sendMessage(Text.literal("✅ 上下文压缩完成，对话历史已优化")
-                        .formatted(Formatting.GREEN), false);
+                    MessageCompat.displayClientMessage(player, Component.literal("✅ 上下文压缩完成，对话历史已优化")
+                        .withStyle(ChatFormatting.GREEN), false);
                 } else {
-                    player.sendMessage(Text.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
-                        .formatted(Formatting.YELLOW), false);
+                    MessageCompat.displayClientMessage(player, Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
+                        .withStyle(ChatFormatting.YELLOW), false);
                 }
 
                 LogManager.getInstance().chat("Compression completed for player " +
@@ -309,7 +310,7 @@ public class ChatContextManager {
         /**
          * 根据UUID查找在线玩家
          */
-        private PlayerEntity findPlayerByUuid(UUID playerId) {
+        private Player findPlayerByUuid(UUID playerId) {
             // 遍历所有上下文，找到第一个有效的玩家来获取服务器实例
             for (ChatContext context : contexts.values()) {
                 // 尝试通过其他方式获取服务器实例

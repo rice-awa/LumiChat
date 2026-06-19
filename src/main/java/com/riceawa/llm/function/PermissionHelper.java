@@ -1,12 +1,12 @@
 package com.riceawa.llm.function;
 
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -45,14 +45,14 @@ public class PermissionHelper {
     /**
      * 检查玩家是否为OP
      */
-    public static boolean isOperator(PlayerEntity player) {
-        if (player instanceof ServerPlayerEntity serverPlayer) {
+    public static boolean isOperator(Player player) {
+        if (player instanceof ServerPlayer serverPlayer) {
             MinecraftServer server = EntityHelper.getServer(serverPlayer);
-            ServerWorld world = server.getOverworld();
+            ServerLevel serverLevel = server.overworld();
             //? >=1.21.2 {
-            ServerCommandSource source = player.getCommandSource(world);
+            CommandSourceStack source = player.createCommandSourceStackForNameResolution(serverLevel);
             //?} else {
-            /*ServerCommandSource source = player.getCommandSource();
+            /*CommandSourceStack source = player.createCommandSourceStack();
             *//*?}*/
             return EntityHelper.hasPermissionLevel(source, 2);
         }
@@ -62,14 +62,14 @@ public class PermissionHelper {
     /**
      * 检查玩家是否有指定级别的命令权限
      */
-    public static boolean hasCommandPermission(PlayerEntity player, int level) {
-        if (player instanceof ServerPlayerEntity serverPlayer) {
+    public static boolean hasCommandPermission(Player player, int level) {
+        if (player instanceof ServerPlayer serverPlayer) {
             MinecraftServer server = EntityHelper.getServer(serverPlayer);
-            ServerWorld world = server.getOverworld();
+            ServerLevel serverLevel = server.overworld();
             //? >=1.21.2 {
-            ServerCommandSource source = player.getCommandSource(world);
+            CommandSourceStack source = player.createCommandSourceStackForNameResolution(serverLevel);
             //?} else {
-            /*ServerCommandSource source = player.getCommandSource();
+            /*CommandSourceStack source = player.createCommandSourceStack();
             *//*?}*/
             return EntityHelper.hasPermissionLevel(source, level);
         }
@@ -79,14 +79,14 @@ public class PermissionHelper {
     /**
      * 检查玩家是否可以修改世界
      */
-    public static boolean canModifyWorld(PlayerEntity player) {
+    public static boolean canModifyWorld(Player player) {
         return isOperator(player);
     }
     
     /**
      * 检查玩家是否可以执行指定指令
      */
-    public static boolean canExecuteCommand(PlayerEntity player, String command) {
+    public static boolean canExecuteCommand(Player player, String command) {
         if (!isOperator(player)) {
             return false;
         }
@@ -133,7 +133,7 @@ public class PermissionHelper {
     /**
      * 检查玩家是否可以查看其他玩家的信息
      */
-    public static boolean canViewOtherPlayerInfo(PlayerEntity requester, PlayerEntity target) {
+    public static boolean canViewOtherPlayerInfo(Player requester, Player target) {
         // 可以查看自己的信息
         if (requester.equals(target)) {
             return true;
@@ -146,7 +146,7 @@ public class PermissionHelper {
     /**
      * 检查玩家是否可以对其他玩家执行操作
      */
-    public static boolean canOperateOnOtherPlayer(PlayerEntity requester, PlayerEntity target) {
+    public static boolean canOperateOnOtherPlayer(Player requester, Player target) {
         // 不能对自己执行某些操作
         if (requester.equals(target)) {
             return false;
@@ -159,28 +159,28 @@ public class PermissionHelper {
     /**
      * 检查玩家是否可以发送广播消息
      */
-    public static boolean canSendBroadcast(PlayerEntity player) {
+    public static boolean canSendBroadcast(Player player) {
         return isOperator(player);
     }
     
     /**
      * 检查玩家是否可以控制服务器环境（天气、时间等）
      */
-    public static boolean canControlEnvironment(PlayerEntity player) {
+    public static boolean canControlEnvironment(Player player) {
         return isOperator(player);
     }
     
     /**
      * 检查玩家是否可以生成实体
      */
-    public static boolean canSummonEntity(PlayerEntity player) {
+    public static boolean canSummonEntity(Player player) {
         return isOperator(player);
     }
     
     /**
      * 检查玩家是否可以传送其他玩家
      */
-    public static boolean canTeleportOthers(PlayerEntity player) {
+    public static boolean canTeleportOthers(Player player) {
         return isOperator(player);
     }
     

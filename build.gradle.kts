@@ -38,7 +38,7 @@ dependencies {
     add("minecraft", "com.mojang:minecraft:${sc.current.version}")
 
     if (!isUnobfuscated) {
-        add("mappings", "net.fabricmc:yarn:${property("deps.yarn_mappings")}:v2")
+        add("mappings", project.extensions.getByType(LoomGradleExtensionAPI::class.java).officialMojangMappings())
         add("modImplementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
     } else {
         add("implementation", "net.fabricmc:fabric-loader:${property("deps.fabric_loader")}")
@@ -70,7 +70,9 @@ extensions.configure<LoomGradleExtensionAPI>("loom") {
     }
 
     fabricModJsonPath.set(rootProject.file("src/main/resources/fabric.mod.json"))
-    accessWidenerPath.set(rootProject.file("src/main/resources/lumichat.accesswidener"))
+    if (!isUnobfuscated) {
+        accessWidenerPath.set(rootProject.file("src/main/resources/lumichat.accesswidener"))
+    }
 
     runConfigs.all {
         ideConfigGenerated(true)

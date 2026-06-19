@@ -3,10 +3,11 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 
 /**
  * 天气控制函数
@@ -64,7 +65,7 @@ public class WeatherControlFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 获取参数
             if (!arguments.has("weather_type")) {
@@ -86,16 +87,16 @@ public class WeatherControlFunction implements LLMFunction {
             }
             
             // 获取目标世界
-            ServerWorld targetWorld;
+            ServerLevel targetWorld;
             switch (worldName) {
                 case "overworld":
-                    targetWorld = server.getOverworld();
+                    targetWorld = server.overworld();
                     break;
                 case "nether":
-                    targetWorld = server.getWorld(World.NETHER);
+                    targetWorld = server.getLevel(Level.NETHER);
                     break;
                 case "end":
-                    targetWorld = server.getWorld(World.END);
+                    targetWorld = server.getLevel(Level.END);
                     break;
                 default:
                     return FunctionResult.error("无效的世界名称，支持：overworld、nether、end");
@@ -111,13 +112,13 @@ public class WeatherControlFunction implements LLMFunction {
             // 设置天气
             switch (weatherType) {
                 case "clear":
-                    targetWorld.setWeather(durationTicks, 0, false, false);
+                    EntityHelper.setWeatherParameters(targetWorld, durationTicks, 0, false, false);
                     break;
                 case "rain":
-                    targetWorld.setWeather(0, durationTicks, true, false);
+                    EntityHelper.setWeatherParameters(targetWorld, 0, durationTicks, true, false);
                     break;
                 case "thunder":
-                    targetWorld.setWeather(0, durationTicks, true, true);
+                    EntityHelper.setWeatherParameters(targetWorld, 0, durationTicks, true, true);
                     break;
             }
             
@@ -163,7 +164,7 @@ public class WeatherControlFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return PermissionHelper.canControlEnvironment(player);
     }
     

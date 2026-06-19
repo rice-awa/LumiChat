@@ -3,10 +3,11 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.World;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 
 /**
  * 时间控制函数
@@ -63,7 +64,7 @@ public class TimeControlFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 获取参数
             if (!arguments.has("time_type")) {
@@ -74,16 +75,16 @@ public class TimeControlFunction implements LLMFunction {
             String worldName = arguments.has("world") ? arguments.get("world").getAsString().toLowerCase() : "overworld";
             
             // 获取目标世界
-            ServerWorld targetWorld;
+            ServerLevel targetWorld;
             switch (worldName) {
                 case "overworld":
-                    targetWorld = server.getOverworld();
+                    targetWorld = server.overworld();
                     break;
                 case "nether":
-                    targetWorld = server.getWorld(World.NETHER);
+                    targetWorld = server.getLevel(Level.NETHER);
                     break;
                 case "end":
-                    targetWorld = server.getWorld(World.END);
+                    targetWorld = server.getLevel(Level.END);
                     break;
                 default:
                     return FunctionResult.error("无效的世界名称，支持：overworld、nether、end");
@@ -137,7 +138,7 @@ public class TimeControlFunction implements LLMFunction {
             }
             
             // 设置时间
-            targetWorld.setTimeOfDay(targetTime);
+            EntityHelper.setDayTime(targetWorld, targetTime);
             
             // 构建结果消息
             String worldDisplayName = getWorldDisplayName(worldName);
@@ -171,7 +172,7 @@ public class TimeControlFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return PermissionHelper.canControlEnvironment(player);
     }
     

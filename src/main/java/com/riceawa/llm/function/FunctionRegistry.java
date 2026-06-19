@@ -3,7 +3,8 @@ package com.riceawa.llm.function;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.core.LLMConfig;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -88,7 +89,7 @@ public class FunctionRegistry {
     /**
      * 获取玩家可用的函数
      */
-    public Collection<LLMFunction> getAvailableFunctions(PlayerEntity player) {
+    public Collection<LLMFunction> getAvailableFunctions(Player player) {
         return functions.values().stream()
                 .filter(LLMFunction::isEnabled)
                 .filter(function -> function.hasPermission(player))
@@ -127,7 +128,7 @@ public class FunctionRegistry {
     /**
      * 为LLM配置生成工具定义（新的OpenAI API格式）
      */
-    public List<LLMConfig.ToolDefinition> generateToolDefinitions(PlayerEntity player) {
+    public List<LLMConfig.ToolDefinition> generateToolDefinitions(Player player) {
         Collection<LLMFunction> availableFunctions = getAvailableFunctions(player);
         List<LLMConfig.ToolDefinition> definitions = new ArrayList<>();
 
@@ -149,7 +150,7 @@ public class FunctionRegistry {
      * @deprecated 使用 generateToolDefinitions 替代
      */
     @Deprecated
-    public List<LLMConfig.FunctionDefinition> generateFunctionDefinitions(PlayerEntity player) {
+    public List<LLMConfig.FunctionDefinition> generateFunctionDefinitions(Player player) {
         Collection<LLMFunction> availableFunctions = getAvailableFunctions(player);
         List<LLMConfig.FunctionDefinition> definitions = new ArrayList<>();
 
@@ -168,7 +169,7 @@ public class FunctionRegistry {
     /**
      * 执行函数调用
      */
-    public LLMFunction.FunctionResult executeFunction(String functionName, PlayerEntity player, 
+    public LLMFunction.FunctionResult executeFunction(String functionName, Player player,
                                                      JsonObject arguments) {
         LLMFunction function = getFunction(functionName);
         if (function == null) {
@@ -247,12 +248,12 @@ public class FunctionRegistry {
         }
 
         @Override
-        public FunctionResult execute(PlayerEntity player, net.minecraft.server.MinecraftServer server, JsonObject arguments) {
-            var world = EntityHelper.getWorld(player);
+        public FunctionResult execute(Player player, net.minecraft.server.MinecraftServer server, JsonObject arguments) {
+            ServerLevel world = EntityHelper.getServerWorldSafe(player);
             if (world == null) {
                 return FunctionResult.error("无法获取世界信息");
             }
-            long time = world.getTimeOfDay();
+            long time = EntityHelper.getDayTime(world);
             int hours = (int) ((time / 1000 + 6) % 24);
             int minutes = (int) ((time % 1000) * 60 / 1000);
             
@@ -261,7 +262,7 @@ public class FunctionRegistry {
         }
 
         @Override
-        public boolean hasPermission(PlayerEntity player) {
+        public boolean hasPermission(Player player) {
             return true; // 所有玩家都可以查看时间
         }
 
@@ -299,7 +300,7 @@ public class FunctionRegistry {
         }
 
         @Override
-        public FunctionResult execute(PlayerEntity player, net.minecraft.server.MinecraftServer server, JsonObject arguments) {
+        public FunctionResult execute(Player player, net.minecraft.server.MinecraftServer server, JsonObject arguments) {
             String info = String.format("玩家: %s, 生命值: %.1f/%.1f, 经验等级: %d", 
                     player.getName().getString(),
                     player.getHealth(),
@@ -310,7 +311,7 @@ public class FunctionRegistry {
         }
 
         @Override
-        public boolean hasPermission(PlayerEntity player) {
+        public boolean hasPermission(Player player) {
             return true;
         }
 
@@ -348,7 +349,7 @@ public class FunctionRegistry {
         }
 
         @Override
-        public FunctionResult execute(PlayerEntity player, net.minecraft.server.MinecraftServer server, JsonObject arguments) {
+        public FunctionResult execute(Player player, net.minecraft.server.MinecraftServer server, JsonObject arguments) {
             var world = EntityHelper.getWorld(player);
             if (world == null) {
                 return FunctionResult.error("无法获取世界信息");
@@ -369,7 +370,7 @@ public class FunctionRegistry {
         }
 
         @Override
-        public boolean hasPermission(PlayerEntity player) {
+        public boolean hasPermission(Player player) {
             return true;
         }
 

@@ -1,9 +1,9 @@
 package com.riceawa.llm.compat;
 
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.CommandSourceStack;
 //? >=1.21.11 {
-import net.minecraft.command.permission.PermissionCheck;
+import net.minecraft.server.permissions.PermissionCheck;
 //?}
 
 import java.util.function.Predicate;
@@ -14,13 +14,13 @@ import java.util.function.Predicate;
  * 
  * <p>在 1.21.11+ 中，权限检查使用新的 PermissionPredicate API：
  * <ul>
- *   <li>CommandManager.requirePermissionLevel(PermissionCheck)</li>
- *   <li>返回 Predicate&lt;ServerCommandSource&gt;</li>
+ *   <li>Commands.hasPermission(PermissionCheck)</li>
+ *   <li>返回 Predicate&lt;CommandSourceStack&gt;</li>
  * </ul>
  * 
  * <p>在旧版本中，使用传统方法：
  * <ul>
- *   <li>source.hasPermissionLevel(int)</li>
+ *   <li>source.hasPermission(int)</li>
  * </ul>
  */
 public final class PermissionCompat {
@@ -34,11 +34,11 @@ public final class PermissionCompat {
      * @param source 命令源
      * @return 是否有管理员权限
      */
-    public static boolean hasGamemastersPermission(ServerCommandSource source) {
+    public static boolean hasGamemastersPermission(CommandSourceStack source) {
         //? >=1.21.11 {
-        return CommandManager.requirePermissionLevel(CommandManager.GAMEMASTERS_CHECK).test(source);
+        return Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source);
         //?} else {
-        /*return source.hasPermissionLevel(2);
+        /*return source.hasPermission(2);
         *//*?}*/
     }
     
@@ -49,20 +49,22 @@ public final class PermissionCompat {
      * @param level 权限等级 (1-4)
      * @return 是否有指定权限
      */
-    public static boolean hasPermissionLevel(ServerCommandSource source, int level) {
+    public static boolean hasPermissionLevel(CommandSourceStack source, int level) {
         //? >=1.21.11 {
-        // Map permission levels to the new PermissionCheck constants
+        if (level <= 0) {
+            return Commands.hasPermission(Commands.LEVEL_ALL).test(source);
+        }
         PermissionCheck check = switch (level) {
-            case 1 -> CommandManager.MODERATORS_CHECK;
-            case 2 -> CommandManager.GAMEMASTERS_CHECK;
-            case 3 -> CommandManager.ADMINS_CHECK;
-            case 4 -> CommandManager.OWNERS_CHECK;
-            default -> CommandManager.GAMEMASTERS_CHECK;
+            case 1 -> Commands.LEVEL_MODERATORS;
+            case 2 -> Commands.LEVEL_GAMEMASTERS;
+            case 3 -> Commands.LEVEL_ADMINS;
+            case 4 -> Commands.LEVEL_OWNERS;
+            default -> null;
         };
-        return CommandManager.requirePermissionLevel(check).test(source);
+        return check != null && Commands.hasPermission(check).test(source);
         //?} else {
         /*// In older versions, use the simple permission level check
-        return source.hasPermissionLevel(level);
+        return source.hasPermission(level);
         *//*?}*/
     }
     
@@ -72,11 +74,11 @@ public final class PermissionCompat {
      * 
      * @return 权限检查 Predicate
      */
-    public static Predicate<ServerCommandSource> requireGamemasters() {
+    public static Predicate<CommandSourceStack> requireGamemasters() {
         //? >=1.21.11 {
-        return CommandManager.requirePermissionLevel(CommandManager.GAMEMASTERS_CHECK);
+        return Commands.hasPermission(Commands.LEVEL_GAMEMASTERS);
         //?} else {
-        /*return source -> source.hasPermissionLevel(2);
+        /*return source -> source.hasPermission(2);
         *//*?}*/
     }
     
@@ -86,18 +88,21 @@ public final class PermissionCompat {
      * @param level 权限等级 (1-4)
      * @return 权限检查 Predicate
      */
-    public static Predicate<ServerCommandSource> requirePermissionLevel(int level) {
+    public static Predicate<CommandSourceStack> requirePermissionLevel(int level) {
         //? >=1.21.11 {
+        if (level <= 0) {
+            return Commands.hasPermission(Commands.LEVEL_ALL);
+        }
         PermissionCheck check = switch (level) {
-            case 1 -> CommandManager.MODERATORS_CHECK;
-            case 2 -> CommandManager.GAMEMASTERS_CHECK;
-            case 3 -> CommandManager.ADMINS_CHECK;
-            case 4 -> CommandManager.OWNERS_CHECK;
-            default -> CommandManager.GAMEMASTERS_CHECK;
+            case 1 -> Commands.LEVEL_MODERATORS;
+            case 2 -> Commands.LEVEL_GAMEMASTERS;
+            case 3 -> Commands.LEVEL_ADMINS;
+            case 4 -> Commands.LEVEL_OWNERS;
+            default -> null;
         };
-        return CommandManager.requirePermissionLevel(check);
+        return check != null ? Commands.hasPermission(check) : source -> false;
         //?} else {
-        /*return source -> source.hasPermissionLevel(level);
+        /*return source -> source.hasPermission(level);
         *//*?}*/
     }
 }

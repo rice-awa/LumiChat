@@ -3,14 +3,14 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.util.EntityHelper;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.mob.HostileEntity;
-import net.minecraft.entity.passive.PassiveEntity;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.AgeableMob;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
@@ -56,7 +56,7 @@ public class NearbyEntitiesFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 获取参数
             double radius = arguments.has("radius") ? 
@@ -71,13 +71,13 @@ public class NearbyEntitiesFunction implements LLMFunction {
             if (world == null) {
                 return FunctionResult.error("无法获取世界信息");
             }
-            Vec3d playerPos = EntityHelper.getPos(player);
-            Box searchBox = new Box(
+            Vec3 playerPos = EntityHelper.getPos(player);
+            AABB searchAABB = new AABB(
                 playerPos.x - radius, playerPos.y - radius, playerPos.z - radius,
                 playerPos.x + radius, playerPos.y + radius, playerPos.z + radius
             );
             
-            List<Entity> entities = world.getOtherEntities(player, searchBox);
+            List<Entity> entities = world.getEntities(player, searchAABB);
             
             StringBuilder result = new StringBuilder();
             result.append("=== 附近实体信息 ===\n");
@@ -105,13 +105,13 @@ public class NearbyEntitiesFunction implements LLMFunction {
                         livingEntity.getHealth(), livingEntity.getMaxHealth()));
                 }
                 
-                if (entity instanceof PlayerEntity) {
+                if (entity instanceof Player) {
                     playerCount++;
                     result.append(" [玩家]");
-                } else if (entity instanceof HostileEntity) {
+                } else if (entity instanceof Monster) {
                     hostileCount++;
                     result.append(" [敌对生物]");
-                } else if (entity instanceof PassiveEntity) {
+                } else if (entity instanceof AgeableMob) {
                     passiveCount++;
                     result.append(" [友好生物]");
                 } else {
@@ -143,13 +143,13 @@ public class NearbyEntitiesFunction implements LLMFunction {
     private boolean shouldIncludeEntity(Entity entity, String entityType) {
         switch (entityType.toLowerCase()) {
             case "players":
-                return entity instanceof PlayerEntity;
+                return entity instanceof Player;
             case "mobs":
-                return entity instanceof LivingEntity && !(entity instanceof PlayerEntity);
+                return entity instanceof LivingEntity && !(entity instanceof Player);
             case "hostile":
-                return entity instanceof HostileEntity;
+                return entity instanceof Monster;
             case "passive":
-                return entity instanceof PassiveEntity;
+                return entity instanceof AgeableMob;
             case "all":
             default:
                 return true;
@@ -168,7 +168,7 @@ public class NearbyEntitiesFunction implements LLMFunction {
     }
     
     private String getEntityDisplayName(Entity entity) {
-        if (entity instanceof PlayerEntity) {
+        if (entity instanceof Player) {
             return entity.getName().getString() + " (玩家)";
         }
         
@@ -184,7 +184,7 @@ public class NearbyEntitiesFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return true; // 所有玩家都可以查看附近实体
     }
     

@@ -10,13 +10,13 @@ import com.riceawa.llm.history.ChatHistory;
 import com.riceawa.llm.history.HistoryExporter;
 import com.riceawa.llm.history.HistoryStatistics;
 import com.riceawa.llm.logging.LogManager;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.command.argument.EntityArgumentType;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
 
@@ -25,17 +25,17 @@ import java.util.UUID;
  */
 public class HistoryCommand {
     
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
-        dispatcher.register(CommandManager.literal("llmhistory")
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess) {
+        dispatcher.register(Commands.literal("llmhistory")
                 .requires(PermissionCompat.requireGamemasters()) // 需要管理员权限
-                .then(CommandManager.literal("stats")
+                .then(Commands.literal("stats")
                         .executes(context -> showPlayerStats(context, null))
-                        .then(CommandManager.argument("player", EntityArgumentType.player())
+                        .then(Commands.argument("player", EntityArgument.player())
                                 .executes(context -> showPlayerStats(context, 
-                                        EntityArgumentType.getPlayer(context, "player")))))
-                .then(CommandManager.literal("export")
-                        .then(CommandManager.argument("player", EntityArgumentType.player())
-                                .then(CommandManager.argument("format", StringArgumentType.string())
+                                        EntityArgument.getPlayer(context, "player")))))
+                .then(Commands.literal("export")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .then(Commands.argument("format", StringArgumentType.string())
                                         .suggests((context, builder) -> {
                                             builder.suggest("json");
                                             builder.suggest("csv");
@@ -44,12 +44,12 @@ public class HistoryCommand {
                                             return builder.buildFuture();
                                         })
                                         .executes(HistoryCommand::exportPlayerHistory))))
-                .then(CommandManager.literal("search")
-                        .then(CommandManager.argument("player", EntityArgumentType.player())
-                                .then(CommandManager.argument("keyword", StringArgumentType.greedyString())
+                .then(Commands.literal("search")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .then(Commands.argument("keyword", StringArgumentType.greedyString())
                                         .executes(HistoryCommand::searchHistory))))
-                .then(CommandManager.literal("clear")
-                        .then(CommandManager.argument("player", EntityArgumentType.player())
+                .then(Commands.literal("clear")
+                        .then(Commands.argument("player", EntityArgument.player())
                                 .executes(HistoryCommand::clearPlayerHistory)))
         );
     }
@@ -57,20 +57,20 @@ public class HistoryCommand {
     /**
      * 显示玩家统计信息
      */
-    private static int showPlayerStats(CommandContext<ServerCommandSource> context, ServerPlayerEntity targetPlayer) {
-        ServerPlayerEntity player = targetPlayer;
+    private static int showPlayerStats(CommandContext<CommandSourceStack> context, ServerPlayer targetPlayer) {
+        ServerPlayer player = targetPlayer;
         
         // 如果没有指定玩家，尝试获取执行命令的玩家
         if (player == null) {
             try {
-                player = context.getSource().getPlayerOrThrow();
+                player = context.getSource().getPlayerOrException();
             } catch (Exception e) {
-                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("必须指定玩家或由玩家执行此命令").formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("必须指定玩家或由玩家执行此命令").withStyle(ChatFormatting.RED));
                 return 0;
             }
         }
 
-        UUID playerId = player.getUuid();
+        UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
         
         HistoryStatistics historyStats = new HistoryStatistics();
@@ -81,12 +81,12 @@ public class HistoryCommand {
         // 记录审计日志
         LogManager.getInstance().audit("Player statistics viewed", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString()
                 ));
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(report).formatted(Formatting.AQUA), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(report).withStyle(ChatFormatting.AQUA));
         
         return 1;
     }
@@ -94,19 +94,19 @@ public class HistoryCommand {
     /**
      * 导出玩家历史记录
      */
-    private static int exportPlayerHistory(CommandContext<ServerCommandSource> context) {
+    private static int exportPlayerHistory(CommandContext<CommandSourceStack> context) {
         try {
-            ServerPlayerEntity player = EntityArgumentType.getPlayer(context, "player");
+            ServerPlayer player = EntityArgument.getPlayer(context, "player");
             String formatStr = StringArgumentType.getString(context, "format");
         
-        UUID playerId = player.getUuid();
+        UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
         
         HistoryExporter.ExportFormat format;
         try {
             format = HistoryExporter.ExportFormat.valueOf(formatStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("不支持的导出格式: " + formatStr).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("不支持的导出格式: " + formatStr).withStyle(ChatFormatting.RED));
             return 0;
         }
         
@@ -116,7 +116,7 @@ public class HistoryCommand {
         // 记录审计日志
         LogManager.getInstance().audit("Player history exported", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString(),
                         "format", formatStr,
@@ -124,15 +124,15 @@ public class HistoryCommand {
                 ));
         
             if (result.isSuccess()) {
-                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("历史记录导出成功: " + result.getExportFile().getFileName())
-                                .formatted(Formatting.GREEN), true);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("历史记录导出成功: " + result.getExportFile().getFileName())
+                                .withStyle(ChatFormatting.GREEN), true);
             } else {
-                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("导出失败: " + result.getMessage()).formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("导出失败: " + result.getMessage()).withStyle(ChatFormatting.RED));
             }
 
             return result.isSuccess() ? 1 : 0;
         } catch (CommandSyntaxException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).withStyle(ChatFormatting.RED));
             return 0;
         }
     }
@@ -140,12 +140,12 @@ public class HistoryCommand {
     /**
      * 搜索历史记录
      */
-    private static int searchHistory(CommandContext<ServerCommandSource> context) {
+    private static int searchHistory(CommandContext<CommandSourceStack> context) {
         try {
-            ServerPlayerEntity player = EntityArgumentType.getPlayer(context, "player");
+            ServerPlayer player = EntityArgument.getPlayer(context, "player");
             String keyword = StringArgumentType.getString(context, "keyword");
         
-        UUID playerId = player.getUuid();
+        UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
         
         var sessions = ChatHistory.getInstance().searchHistory(playerId, keyword);
@@ -153,7 +153,7 @@ public class HistoryCommand {
         // 记录审计日志
         LogManager.getInstance().audit("Player history searched", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString(),
                         "keyword", keyword,
@@ -161,8 +161,8 @@ public class HistoryCommand {
                 ));
         
         if (sessions.isEmpty()) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("没有找到包含关键词 \"" + keyword + "\" 的历史记录")
-                            .formatted(Formatting.YELLOW), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("没有找到包含关键词 \"" + keyword + "\" 的历史记录")
+                            .withStyle(ChatFormatting.YELLOW));
             return 0;
         }
         
@@ -188,11 +188,11 @@ public class HistoryCommand {
             count++;
         }
         
-            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(result.toString()).formatted(Formatting.AQUA), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(result.toString()).withStyle(ChatFormatting.AQUA));
 
             return 1;
         } catch (CommandSyntaxException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).withStyle(ChatFormatting.RED));
             return 0;
         }
     }
@@ -200,29 +200,29 @@ public class HistoryCommand {
     /**
      * 清除玩家历史记录
      */
-    private static int clearPlayerHistory(CommandContext<ServerCommandSource> context) {
+    private static int clearPlayerHistory(CommandContext<CommandSourceStack> context) {
         try {
-            ServerPlayerEntity player = EntityArgumentType.getPlayer(context, "player");
+            ServerPlayer player = EntityArgument.getPlayer(context, "player");
         
-        UUID playerId = player.getUuid();
+        UUID playerId = player.getUUID();
         String playerName = player.getName().getString();
         
         // 记录审计日志（在删除之前）
         LogManager.getInstance().audit("Player history cleared", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString()
                 ));
         
             ChatHistory.getInstance().clearPlayerHistory(playerId);
 
-            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("已清除玩家 " + playerName + " 的所有历史记录")
-                            .formatted(Formatting.GREEN), true);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("已清除玩家 " + playerName + " 的所有历史记录")
+                            .withStyle(ChatFormatting.GREEN), true);
 
             return 1;
         } catch (CommandSyntaxException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("命令语法错误: " + e.getMessage()).formatted(Formatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).withStyle(ChatFormatting.RED));
             return 0;
         }
     }

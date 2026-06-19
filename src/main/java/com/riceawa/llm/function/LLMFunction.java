@@ -1,7 +1,7 @@
 package com.riceawa.llm.function;
 
 import com.google.gson.JsonObject;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.MinecraftServer;
 
 /**
@@ -32,7 +32,7 @@ public interface LLMFunction {
      * @param arguments 函数参数（JSON格式）
      * @return 函数执行结果
      */
-    FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments);
+    FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments);
     
     /**
      * 检查玩家是否有权限调用此函数
@@ -40,7 +40,7 @@ public interface LLMFunction {
      * @param player 玩家
      * @return 是否有权限
      */
-    boolean hasPermission(PlayerEntity player);
+    boolean hasPermission(Player player);
     
     /**
      * 函数是否启用
