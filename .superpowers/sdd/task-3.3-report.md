@@ -30,3 +30,20 @@
   - Legacy Identifier/ResourceLocation branches in 1.19/1.20.6 generated code.
   - Player lookup methods expecting UUID rather than String in 1.20.6 generated functions.
   - Teleport rotation getters (`getYaw`/`getPitch`) and dimension `.identifier()` usages.
+
+## Fix pass: EntityHelper 26.1 branch leakage
+
+- Files changed:
+  - `/workspaces/LumiChat/src/main/java/com/riceawa/llm/util/EntityHelper.java`: kept the `>=26.1` imports and clock/weather implementations inside inactive Stonecutter comments for raw 1.21.11 source, and made the legacy-compatible `getDayTime`, `setDayTime`, and `setWeatherParameters` calls active in raw source.
+  - `/workspaces/LumiChat/.superpowers/sdd/task-3.3-report.md`: this report section.
+- Commands/results:
+  - `JAVA_HOME=/usr/local/sdkman/candidates/java/21.0.10-ms ./gradlew :1.21.11:compileJava --console=plain`: RED before fix; failed only with `EntityHelper` unresolved 26.1 clock/weather APIs (`WorldClocks`, `Registries.WORLD_CLOCK`, `clockManager()`, `WeatherData`, `getWeatherData()`).
+  - `JAVA_HOME=/usr/local/sdkman/candidates/java/21.0.10-ms ./gradlew :1.21.11:compileJava --console=plain`: PASS after fix.
+  - `JAVA_HOME=/usr/local/sdkman/candidates/java/21.0.10-ms ./gradlew :1.19:compileJava :1.20.6:compileJava :1.21.11:compileJava --console=plain`: first post-fix run exposed Stonecutter marker parse errors from closing inactive branches; corrected markers.
+  - `JAVA_HOME=/usr/local/sdkman/candidates/java/21.0.10-ms ./gradlew :1.19:compileJava :1.20.6:compileJava :1.21.11:compileJava --console=plain`: FAIL, but Stonecutter generation and `:1.21.11:compileJava` passed; remaining errors are out-of-scope generated 1.19/1.20.6 API domains.
+- Remaining out-of-scope domains:
+  - Legacy Identifier/ResourceLocation branches (`net.minecraft.resources.Identifier`, `IdentifierCompat`).
+  - GameRules package/API differences.
+  - Dimension and biome key `.identifier()` usages.
+  - Player lookup methods expecting UUID rather than String.
+  - Legacy world/height and teleport rotation getter differences.
