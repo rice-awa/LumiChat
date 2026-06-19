@@ -7,7 +7,11 @@ import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+//? >=1.21 {
 import net.minecraft.resources.Identifier;
+//?} else {
+/*import net.minecraft.resources.ResourceLocation;
+*//*?}*/
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -113,12 +117,20 @@ public class SetBlockFunction implements LLMFunction {
             }
             
             // 获取方块类型 - 使用兼容层
+            //? >=1.21 {
             Identifier blockId = IdentifierCompat.parse(blockType);
+            //?} else {
+            /*ResourceLocation blockId = IdentifierCompat.parse(blockType);
+            *//*?}*/
             if (blockId == null) {
                 blockId = IdentifierCompat.forBlockType(blockType);
             }
             
+            //? >=1.21 {
             Block block = BuiltInRegistries.BLOCK.getValue(blockId);
+            //?} else {
+            /*Block block = BuiltInRegistries.BLOCK.get(blockId);
+            *//*?}*/
             if (block == null) {
                 return FunctionResult.error("未知的方块类型: " + blockType);
             }

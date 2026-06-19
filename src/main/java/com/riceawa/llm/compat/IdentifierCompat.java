@@ -1,6 +1,10 @@
 package com.riceawa.llm.compat;
 
+//? >=1.21 {
 import net.minecraft.resources.Identifier;
+//?} else {
+/*import net.minecraft.resources.ResourceLocation;
+*//*?}*/
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,8 +39,13 @@ public final class IdentifierCompat {
      * @return 解析的 Identifier，如果无法解析则返回 null
      */
     @Nullable
+    //? >=1.21 {
     public static Identifier parse(String id) {
         return Identifier.tryParse(id);
+    //?} else {
+    /*public static ResourceLocation parse(String id) {
+        return ResourceLocation.tryParse(id);
+    *//*?}*/
     }
     
     /**
@@ -47,8 +56,13 @@ public final class IdentifierCompat {
      * @return 解析或创建的 Identifier
      */
     @NotNull
+    //? >=1.21 {
     public static Identifier parseOrCreate(String id) {
         Identifier parsed = Identifier.tryParse(id);
+    //?} else {
+    /*public static ResourceLocation parseOrCreate(String id) {
+        ResourceLocation parsed = ResourceLocation.tryParse(id);
+    *//*?}*/
         if (parsed != null) {
             return parsed;
         }
@@ -56,7 +70,7 @@ public final class IdentifierCompat {
         //? >=1.21 {
         return Identifier.fromNamespaceAndPath("minecraft", id);
         //?} else {
-        /*return new Identifier("minecraft", id);
+        /*return new ResourceLocation("minecraft", id);
         *//*?}*/
     }
     
@@ -68,11 +82,15 @@ public final class IdentifierCompat {
      * @return 新创建的 Identifier
      */
     @NotNull
+    //? >=1.21 {
     public static Identifier of(String namespace, String path) {
+    //?} else {
+    /*public static ResourceLocation of(String namespace, String path) {
+    *//*?}*/
         //? >=1.21 {
         return Identifier.fromNamespaceAndPath(namespace, path);
         //?} else {
-        /*return new Identifier(namespace, path);
+        /*return new ResourceLocation(namespace, path);
         *//*?}*/
     }
     
@@ -84,11 +102,15 @@ public final class IdentifierCompat {
      * @return 新创建的 Identifier
      */
     @NotNull
+    //? >=1.21 {
     public static Identifier of(String id) {
+    //?} else {
+    /*public static ResourceLocation of(String id) {
+    *//*?}*/
         //? >=1.21 {
         return Identifier.parse(id);
         //?} else {
-        /*return new Identifier(id);
+        /*return new ResourceLocation(id);
         *//*?}*/
     }
     
@@ -100,7 +122,11 @@ public final class IdentifierCompat {
      * @return 对应的 Identifier
      */
     @NotNull
+    //? >=1.21 {
     public static Identifier forEntityType(String entityType) {
+    //?} else {
+    /*public static ResourceLocation forEntityType(String entityType) {
+    *//*?}*/
         //? >=1.21 {
         if (entityType.contains(":")) {
             return Identifier.parse(entityType);
@@ -109,9 +135,9 @@ public final class IdentifierCompat {
         }
         //?} else {
         /*if (entityType.contains(":")) {
-            return new Identifier(entityType);
+            return new ResourceLocation(entityType);
         } else {
-            return new Identifier("minecraft", entityType);
+            return new ResourceLocation("minecraft", entityType);
         }
         *//*?}*/
     }
@@ -124,7 +150,11 @@ public final class IdentifierCompat {
      * @return 对应的 Identifier
      */
     @NotNull
+    //? >=1.21 {
     public static Identifier forBlockType(String blockType) {
+    //?} else {
+    /*public static ResourceLocation forBlockType(String blockType) {
+    *//*?}*/
         return forEntityType(blockType); // 逻辑相同，复用
     }
 }
