@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-LumiChat is a Fabric mod using Stonecutter for multi-version builds. Shared logic is in `src/main/java/com/riceawa`, client-only code in `src/client/java`, and resources in `src/main/resources` and `src/client/resources`. Version nodes live in `versions/<mc-version>/`. Design and feature docs are in `docs/`.
+LumiChat is a Fabric mod using Stonecutter for multi-version builds. Shared logic is in `src/main/java/com/riceawa`, client-only code in `src/client/java`, and resources in `src/main/resources` and `src/client/resources`. Version nodes live in `versions/<mc-version>/`. Design and feature docs are organized under `docs/` with subfolders: core guides at the root, feature docs in `docs/features/`, API/reference docs in `docs/api/`, examples in `docs/examples/`, and reports in `docs/reports/`.
 
 ## Build, Test, and Development Commands
 - `./gradlew build`: Build the active Stonecutter target.
