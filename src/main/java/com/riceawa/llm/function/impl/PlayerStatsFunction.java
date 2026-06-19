@@ -101,7 +101,7 @@ public class PlayerStatsFunction implements LLMFunction {
             // 移动状态
             //? >=1.21.11 {
             stats.append("是否在地面: ").append(targetPlayer.onGround() ? "是" : "否").append("\n");
-            //?} else if >=1.20.6 {
+            //?} else if >=1.20 {
             /*stats.append("是否在地面: ").append(targetPlayer.onGround() ? "是" : "否").append("\n");
             *///?} else {
             /*stats.append("是否在地面: ").append(targetPlayer.isOnGround() ? "是" : "否").append("\n");
