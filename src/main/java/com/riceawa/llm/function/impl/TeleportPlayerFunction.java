@@ -122,7 +122,7 @@ public class TeleportPlayerFunction implements LLMFunction {
 
                 //? >=1.21.2 {
                 targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
-                                    java.util.Set.of(), targetPlayer.getYRot(), targetPlayer.getXRot(), false);
+                                    java.util.Set.of(), targetPlayer.getYRot(), targetPlayer.getXRot(), true);
                 //?} else {
                 /*targetPlayer.teleport(targetLevel, targetPos.x, targetPos.y, targetPos.z,
                                     java.util.Set.of(), targetPlayer.getYaw(), targetPlayer.getPitch());
@@ -178,7 +178,7 @@ public class TeleportPlayerFunction implements LLMFunction {
                 // 执行传送
                 //? >=1.21.2 {
                 targetPlayer.teleportTo(targetLevel, x, y, z, java.util.Set.of(),
-                                     targetPlayer.getYRot(), targetPlayer.getXRot(), false);
+                                     targetPlayer.getYRot(), targetPlayer.getXRot(), true);
                 //?} else {
                 /*targetPlayer.teleport(targetLevel, x, y, z, java.util.Set.of(),
                                      targetPlayer.getYaw(), targetPlayer.getPitch());

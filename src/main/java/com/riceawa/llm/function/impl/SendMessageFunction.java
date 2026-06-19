@@ -125,7 +125,7 @@ public class SendMessageFunction implements LLMFunction {
     private void sendMessageToPlayer(ServerPlayer player, Component message, String messageType) {
         switch (messageType.toLowerCase()) {
             case "actionbar":
-                player.displayClientMessage(message, true); // true = actionbar
+                player.sendOverlayMessage(message); // true = actionbar
                 break;
             case "system":
             case "chat":

@@ -3,6 +3,7 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
+import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -137,7 +138,7 @@ public class TimeControlFunction implements LLMFunction {
             }
             
             // 设置时间
-            targetWorld.setDayTime(targetTime);
+            EntityHelper.setDayTime(targetWorld, targetTime);
             
             // 构建结果消息
             String worldDisplayName = getWorldDisplayName(worldName);
