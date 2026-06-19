@@ -20,7 +20,7 @@ import java.util.function.Predicate;
  * 
  * <p>在旧版本中，使用传统方法：
  * <ul>
- *   <li>source.hasPermissionLevel(int)</li>
+ *   <li>source.hasPermission(int)</li>
  * </ul>
  */
 public final class PermissionCompat {
@@ -38,7 +38,7 @@ public final class PermissionCompat {
         //? >=1.21.11 {
         return Commands.hasPermission(Commands.LEVEL_GAMEMASTERS).test(source);
         //?} else {
-        /*return source.hasPermissionLevel(2);
+        /*return source.hasPermission(2);
         *//*?}*/
     }
     
@@ -64,7 +64,7 @@ public final class PermissionCompat {
         return check != null && Commands.hasPermission(check).test(source);
         //?} else {
         /*// In older versions, use the simple permission level check
-        return source.hasPermissionLevel(level);
+        return source.hasPermission(level);
         *//*?}*/
     }
     
@@ -78,7 +78,7 @@ public final class PermissionCompat {
         //? >=1.21.11 {
         return Commands.hasPermission(Commands.LEVEL_GAMEMASTERS);
         //?} else {
-        /*return source -> source.hasPermissionLevel(2);
+        /*return source -> source.hasPermission(2);
         *//*?}*/
     }
     
@@ -102,7 +102,7 @@ public final class PermissionCompat {
         };
         return check != null ? Commands.hasPermission(check) : source -> false;
         //?} else {
-        /*return source -> source.hasPermissionLevel(level);
+        /*return source -> source.hasPermission(level);
         *//*?}*/
     }
 }

@@ -88,7 +88,11 @@ public class WorldInfoFunction implements LLMFunction {
             
             // 生物群系信息
             Holder<Biome> biome = world.getBiome(pos);
+            //? >=1.21.11 {
             String biomeName = biome.unwrapKey().map(key -> key.identifier().toString()).orElse("未知");
+            //?} else {
+            /*String biomeName = biome.unwrapKey().map(key -> key.location().toString()).orElse("未知");
+            *//*?}*/
             info.append("当前生物群系: ").append(biomeName).append("\n");
             
             if (includeDetails) {
@@ -105,7 +109,11 @@ public class WorldInfoFunction implements LLMFunction {
                     .append(spawnPos.getY()).append(", ")
                     .append(spawnPos.getZ()).append("\n");
                 info.append("海平面高度: ").append(world.getSeaLevel()).append("\n");
+                //? >=1.21.11 {
                 info.append("最低建筑高度: ").append(world.getMinY()).append("\n");
+                //?} else {
+                /*info.append("最低建筑高度: ").append(world.getMinBuildHeight()).append("\n");
+                *//*?}*/
                 //? >=1.21.9 {
                 info.append("最高建筑高度: ").append(world.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
                 //?} else {
@@ -121,7 +129,11 @@ public class WorldInfoFunction implements LLMFunction {
     }
     
     private String getDimensionName(Level world) {
+        //? >=1.21.11 {
         String dimensionId = world.dimension().identifier().toString();
+        //?} else {
+        /*String dimensionId = world.dimension().location().toString();
+        *//*?}*/
         switch (dimensionId) {
             case "minecraft:overworld":
                 return "主世界";

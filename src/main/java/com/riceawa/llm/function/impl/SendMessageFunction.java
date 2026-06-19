@@ -94,7 +94,11 @@ public class SendMessageFunction implements LLMFunction {
                 
             } else {
                 // 发送给指定玩家
+                //? >=1.21.11 {
                 ServerPlayer targetPlayer = server.getPlayerList().getPlayer(target);
+                //?} else {
+                /*ServerPlayer targetPlayer = server.getPlayerList().getPlayerByName(target);
+                *//*?}*/
                 if (targetPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + target);
                 }

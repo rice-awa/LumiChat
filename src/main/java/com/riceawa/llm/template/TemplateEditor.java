@@ -203,7 +203,11 @@ public class TemplateEditor {
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) + " (当前时间)").withStyle(ChatFormatting.GREEN), false);
         player.displayClientMessage(Component.literal("  {{date}} = " + java.time.LocalDate.now().format(
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) + " (当前日期)").withStyle(ChatFormatting.GREEN), false);
+        //? >=1.21.11 {
         player.displayClientMessage(Component.literal("  {{world}} = " + EntityHelper.getWorld(player).dimension().identifier().toString() + " (世界)").withStyle(ChatFormatting.GREEN), false);
+        //?} else {
+        /*player.displayClientMessage(Component.literal("  {{world}} = " + EntityHelper.getWorld(player).dimension().location().toString() + " (世界)").withStyle(ChatFormatting.GREEN), false);
+        *//*?}*/
         player.displayClientMessage(Component.literal("  {{x}}, {{y}}, {{z}} = " + (int)player.getX() + ", " + (int)player.getY() + ", " + (int)player.getZ() + " (坐标)").withStyle(ChatFormatting.GREEN), false);
         player.displayClientMessage(Component.literal("  {{health}}, {{level}} = " + (int)player.getHealth() + ", " + player.experienceLevel + " (生命值, 等级)").withStyle(ChatFormatting.GREEN), false);
         player.displayClientMessage(Component.literal("  更多内置变量: {{hour}}, {{minute}}, {{dimension}}, {{gamemode}}, {{weather}}, {{server}}").withStyle(ChatFormatting.GREEN), false);

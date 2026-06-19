@@ -55,7 +55,11 @@ public class InventoryFunction implements LLMFunction {
             // 如果指定了玩家名称，尝试查找该玩家
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
+                //? >=1.21.11 {
                 ServerPlayer foundPlayer = server.getPlayerList().getPlayer(playerName);
+                //?} else {
+                /*ServerPlayer foundPlayer = server.getPlayerList().getPlayerByName(playerName);
+                *//*?}*/
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
                 }
