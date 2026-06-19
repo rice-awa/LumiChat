@@ -50,6 +50,8 @@ dependencies {
     add("include", "com.squareup.okhttp3:okhttp:4.12.0")
     add("implementation", "com.squareup.okio:okio:3.6.0")
     add("include", "com.squareup.okio:okio:3.6.0")
+    add("implementation", "org.jetbrains.kotlin:kotlin-stdlib:1.9.10")
+    add("include", "org.jetbrains.kotlin:kotlin-stdlib:1.9.10")
     add("implementation", "com.google.code.gson:gson:2.10.1")
     add("include", "com.google.code.gson:gson:2.10.1")
     add("implementation", "com.typesafe:config:1.4.3")
