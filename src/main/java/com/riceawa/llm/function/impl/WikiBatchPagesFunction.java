@@ -6,7 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.function.LLMFunction;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.MinecraftServer;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -106,7 +106,7 @@ public class WikiBatchPagesFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 解析参数
             if (!arguments.has("pages")) {
@@ -317,7 +317,7 @@ public class WikiBatchPagesFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return true; // 所有玩家都可以批量查看Wiki页面
     }
     

@@ -4,10 +4,10 @@ import com.google.gson.JsonObject;
 import com.riceawa.llm.compat.CommandCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
+import net.minecraft.world.entity.player.Player;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,7 +60,7 @@ public class ExecuteCommandFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         long startTime = System.currentTimeMillis();
 
         try {
@@ -104,14 +104,14 @@ public class ExecuteCommandFunction implements LLMFunction {
             List<String> outputMessages = new ArrayList<>();
 
             // 获取服务器控制台命令源
-            ServerCommandSource consoleSource = server.getCommandSource();
+            CommandSourceStack consoleSource = server.getCommandSource();
 
             // 创建自定义的CommandOutput来捕获输出
             CommandOutputCapture outputCapture = new CommandOutputCapture(outputMessages);
 
             // 创建自定义的CommandSource来捕获输出
             // 使用withOutput方法创建带有自定义输出的命令源
-            ServerCommandSource captureSource = consoleSource.withOutput(outputCapture);
+            CommandSourceStack captureSource = consoleSource.withOutput(outputCapture);
 
             // 执行命令并获取返回值
             int resultCode = 0;
@@ -300,7 +300,7 @@ public class ExecuteCommandFunction implements LLMFunction {
     }
 
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         return PermissionHelper.isOperator(player);
     }
     
@@ -317,7 +317,7 @@ public class ExecuteCommandFunction implements LLMFunction {
     /**
      * 自定义命令输出捕获器
      */
-    private static class CommandOutputCapture implements net.minecraft.server.command.CommandOutput {
+    private static class CommandOutputCapture implements net.minecraft.commands.CommandSource {
         private final List<String> outputMessages;
         private int messageCount = 0;
 
@@ -326,12 +326,12 @@ public class ExecuteCommandFunction implements LLMFunction {
         }
 
         @Override
-        public void sendMessage(Text message) {
+        public void sendMessage(Component message) {
             messageCount++;
-            String messageText = message.getString();
-            outputMessages.add("[消息" + messageCount + "] " + messageText);
+            String messageComponent = message.getString();
+            outputMessages.add("[消息" + messageCount + "] " + messageComponent);
             // 添加调试日志
-            System.out.println("[CommandOutputCapture] 捕获到消息: " + messageText);
+            System.out.println("[CommandOutputCapture] 捕获到消息: " + messageComponent);
         }
 
         @Override
