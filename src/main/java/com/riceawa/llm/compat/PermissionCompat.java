@@ -51,15 +51,17 @@ public final class PermissionCompat {
      */
     public static boolean hasPermissionLevel(CommandSourceStack source, int level) {
         //? >=1.21.11 {
-        // Map permission levels to the new PermissionCheck constants
+        if (level <= 0) {
+            return Commands.hasPermission(Commands.LEVEL_ALL).test(source);
+        }
         PermissionCheck check = switch (level) {
             case 1 -> Commands.LEVEL_MODERATORS;
             case 2 -> Commands.LEVEL_GAMEMASTERS;
             case 3 -> Commands.LEVEL_ADMINS;
             case 4 -> Commands.LEVEL_OWNERS;
-            default -> Commands.LEVEL_GAMEMASTERS;
+            default -> null;
         };
-        return Commands.hasPermission(check).test(source);
+        return check != null && Commands.hasPermission(check).test(source);
         //?} else {
         /*// In older versions, use the simple permission level check
         return source.hasPermissionLevel(level);
@@ -88,14 +90,17 @@ public final class PermissionCompat {
      */
     public static Predicate<CommandSourceStack> requirePermissionLevel(int level) {
         //? >=1.21.11 {
+        if (level <= 0) {
+            return Commands.hasPermission(Commands.LEVEL_ALL);
+        }
         PermissionCheck check = switch (level) {
             case 1 -> Commands.LEVEL_MODERATORS;
             case 2 -> Commands.LEVEL_GAMEMASTERS;
             case 3 -> Commands.LEVEL_ADMINS;
             case 4 -> Commands.LEVEL_OWNERS;
-            default -> Commands.LEVEL_GAMEMASTERS;
+            default -> null;
         };
-        return Commands.hasPermission(check);
+        return check != null ? Commands.hasPermission(check) : source -> false;
         //?} else {
         /*return source -> source.hasPermissionLevel(level);
         *//*?}*/
