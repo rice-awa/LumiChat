@@ -11,10 +11,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.Level;
 //? >=26.1 {
-import net.minecraft.core.registries.Registries;
+/*import net.minecraft.core.registries.Registries;
 import net.minecraft.world.clock.WorldClocks;
 import net.minecraft.world.level.saveddata.WeatherData;
-//?}
+*///?}
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -142,32 +142,32 @@ public final class EntityHelper {
 
     public static long getDayTime(ServerLevel world) {
         //? >=26.1 {
-        var clock = world.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD);
+        /*var clock = world.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD);
         return world.clockManager().getTotalTicks(clock);
-        //?} else {
-        /*return world.getDayTime();
-        *//*?}*/
+        *///?} else {
+        return world.getDayTime();
+        //?}
     }
 
     public static void setDayTime(ServerLevel world, long time) {
         //? >=26.1 {
-        var clock = world.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD);
+        /*var clock = world.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD);
         world.clockManager().setTotalTicks(clock, time);
-        //?} else {
-        /*world.setDayTime(time);
-        *//*?}*/
+        *///?} else {
+        world.setDayTime(time);
+        //?}
     }
 
     public static void setWeatherParameters(ServerLevel world, int clearDuration, int weatherDuration, boolean raining, boolean thundering) {
         //? >=26.1 {
-        WeatherData weatherData = world.getWeatherData();
+        /*WeatherData weatherData = world.getWeatherData();
         weatherData.setClearWeatherTime(clearDuration);
         weatherData.setRainTime(weatherDuration);
         weatherData.setThunderTime(weatherDuration);
         weatherData.setRaining(raining);
         weatherData.setThundering(thundering);
-        //?} else {
-        /*world.setWeatherParameters(clearDuration, weatherDuration, raining, thundering);
-        *//*?}*/
+        *///?} else {
+        world.setWeatherParameters(clearDuration, weatherDuration, raining, thundering);
+        //?}
     }
 }
