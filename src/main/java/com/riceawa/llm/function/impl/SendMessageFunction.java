@@ -90,7 +90,7 @@ public class SendMessageFunction implements LLMFunction {
                 }
                 
                 return FunctionResult.success("消息已发送给所有在线玩家 (" + 
-                    server.getCurrentPlayerCount() + " 人)");
+                    server.getPlayerCount() + " 人)");
                 
             } else {
                 // 发送给指定玩家
@@ -113,12 +113,12 @@ public class SendMessageFunction implements LLMFunction {
         
         switch (messageType.toLowerCase()) {
             case "system":
-                return Component.literal("[系统] " + content).formatted(ChatFormatting.YELLOW);
+                return Component.literal("[系统] " + content).withStyle(ChatFormatting.YELLOW);
             case "actionbar":
-                return Component.literal(content).formatted(ChatFormatting.AQUA);
+                return Component.literal(content).withStyle(ChatFormatting.AQUA);
             case "chat":
             default:
-                return Component.literal("[" + senderName + " 通过AI] " + content).formatted(ChatFormatting.GREEN);
+                return Component.literal("[" + senderName + " 通过AI] " + content).withStyle(ChatFormatting.GREEN);
         }
     }
     

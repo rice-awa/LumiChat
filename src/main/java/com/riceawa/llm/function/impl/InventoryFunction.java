@@ -85,7 +85,7 @@ public class InventoryFunction implements LLMFunction {
                            .append(itemName).append(" x").append(stack.getCount());
                     
                     // 如果有附魔或其他特殊属性
-                    if (stack.hasEnchantments()) {
+                    if (stack.isEnchanted()) {
                         inventory.append(" (有特殊属性)");
                     }
                     inventory.append("\n");
@@ -104,7 +104,7 @@ public class InventoryFunction implements LLMFunction {
                 if (!stack.isEmpty()) {
                     String itemName = getItemDisplayName(stack);
                     inventory.append(itemName);
-                    if (stack.hasEnchantments()) {
+                    if (stack.isEnchanted()) {
                         inventory.append(" (有特殊属性)");
                     }
                 } else {
@@ -119,7 +119,7 @@ public class InventoryFunction implements LLMFunction {
             if (!offhandStack.isEmpty()) {
                 String itemName = getItemDisplayName(offhandStack);
                 inventory.append(itemName).append(" x").append(offhandStack.getCount());
-                if (offhandStack.hasEnchantments()) {
+                if (offhandStack.isEnchanted()) {
                     inventory.append(" (有特殊属性)");
                 }
             } else {
@@ -140,7 +140,7 @@ public class InventoryFunction implements LLMFunction {
     }
     
     private String getItemDisplayName(ItemStack stack) {
-        Component displayName = stack.getName();
+        Component displayName = stack.getHoverName();
         String name = displayName.getString();
         
         // 如果是默认名称，尝试获取更友好的中文名称

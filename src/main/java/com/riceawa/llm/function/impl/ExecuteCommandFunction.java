@@ -149,8 +149,8 @@ public class ExecuteCommandFunction implements LLMFunction {
                     // 添加调试信息
                     output += "\n[调试] 命令: " + command +
                              ", 捕获器消息数: " + outputCapture.getMessageCount() +
-                             ", 输出捕获器配置: shouldReceiveFeedback=" + outputCapture.shouldReceiveFeedback() +
-                             ", shouldTrackOutput=" + outputCapture.shouldTrackOutput();
+                             ", 输出捕获器配置: acceptsSuccess=" + outputCapture.acceptsSuccess() +
+                             ", acceptsFailure=" + outputCapture.acceptsFailure();
                 }
 
             } catch (RuntimeException e) {
@@ -326,7 +326,7 @@ public class ExecuteCommandFunction implements LLMFunction {
         }
 
         @Override
-        public void sendMessage(Component message) {
+        public void sendSystemMessage(Component message) {
             messageCount++;
             String messageComponent = message.getString();
             outputMessages.add("[消息" + messageCount + "] " + messageComponent);
@@ -335,17 +335,17 @@ public class ExecuteCommandFunction implements LLMFunction {
         }
 
         @Override
-        public boolean shouldReceiveFeedback() {
+        public boolean acceptsSuccess() {
             return true;
         }
 
         @Override
-        public boolean shouldTrackOutput() {
+        public boolean acceptsFailure() {
             return true;
         }
 
         @Override
-        public boolean shouldBroadcastConsoleToOps() {
+        public boolean shouldInformAdmins() {
             return false;
         }
 

@@ -51,23 +51,23 @@ public class ServerInfoFunction implements LLMFunction {
             
             // 基本服务器信息
             info.append("=== 服务器信息 ===\n");
-            info.append("服务器版本: ").append(server.getVersion()).append("\n");
-            info.append("Minecraft版本: ").append(server.getServerModName()).append("\n");
+            info.append("服务器版本: ").append(server.getServerModName()).append("\n");
+            info.append("Minecraft版本: ").append(server.getServerVersion()).append("\n");
             info.append("是否单人游戏: ").append(server.isSingleplayer() ? "是" : "否").append("\n");
             info.append("是否硬核模式: ").append(server.isHardcore() ? "是" : "否").append("\n");
-            info.append("默认游戏模式: ").append(server.getDefaultGameMode().getTranslatableName().getString()).append("\n");
-            info.append("难度: ").append(server.overworld().getDifficulty().getName()).append("\n");
+            info.append("默认游戏模式: ").append(server.getDefaultGameType().getLongDisplayName().getString()).append("\n");
+            info.append("难度: ").append(server.overworld().getDifficulty().getDisplayName().getString()).append("\n");
             // PvP状态获取 - 使用兼容层
             boolean isPvp = GameRulesCompat.isPvpEnabled(server.overworld());
             info.append("是否允许PvP: ").append(isPvp ? "是" : "否").append("\n");
             
             // 玩家信息
             info.append("\n=== 玩家信息 ===\n");
-            info.append("在线玩家数: ").append(server.getCurrentPlayerCount())
-                .append("/").append(server.getMaxPlayerCount()).append("\n");
+            info.append("在线玩家数: ").append(server.getPlayerCount())
+                .append("/").append(server.getMaxPlayers()).append("\n");
             
             // 列出在线玩家
-            if (server.getCurrentPlayerCount() > 0) {
+            if (server.getPlayerCount() > 0) {
                 info.append("在线玩家: ");
                 boolean first = true;
                 for (ServerPlayer onlinePlayer : server.getPlayerList().getPlayers()) {
@@ -89,7 +89,7 @@ public class ServerInfoFunction implements LLMFunction {
             info.append("已加载世界数: ").append(worldCount).append("\n");
             
             // 运行时间
-            long uptimeMillis = System.currentTimeMillis() - server.getTimeReference();
+            long uptimeMillis = server.getTickCount() * 50L;
             long uptimeSeconds = uptimeMillis / 1000;
             long hours = uptimeSeconds / 3600;
             long minutes = (uptimeSeconds % 3600) / 60;

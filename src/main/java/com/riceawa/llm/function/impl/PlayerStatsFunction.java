@@ -85,13 +85,13 @@ public class PlayerStatsFunction implements LLMFunction {
             stats.append("位置: ").append(pos.getX()).append(", ")
                 .append(pos.getY()).append(", ").append(pos.getZ()).append("\n");
             var world = EntityHelper.getWorld(targetPlayer);
-            stats.append("维度: ").append(getDimensionName(world != null ? world.dimension().location().toString() : "Unknown")).append("\n");
+            stats.append("维度: ").append(getDimensionName(world != null ? world.dimension().identifier().toString() : "Unknown")).append("\n");
             
             // 游戏模式
             stats.append("游戏模式: ").append(targetPlayer.gameMode.getGameModeForPlayer().getLongDisplayName().getString()).append("\n");
             
             // 移动状态
-            stats.append("是否在地面: ").append(targetPlayer.isOnGround() ? "是" : "否").append("\n");
+            stats.append("是否在地面: ").append(targetPlayer.onGround() ? "是" : "否").append("\n");
             stats.append("是否在水中: ").append(targetPlayer.isInWater() ? "是" : "否").append("\n");
             stats.append("是否在潜行: ").append(targetPlayer.isShiftKeyDown() ? "是" : "否").append("\n");
             stats.append("是否在疾跑: ").append(targetPlayer.isSprinting() ? "是" : "否").append("\n");
@@ -101,21 +101,21 @@ public class PlayerStatsFunction implements LLMFunction {
                 stats.append("\n=== 游戏统计 ===\n");
                 
                 // 游戏时间
-                int playTime = targetPlayer.getStats().getStat(Stats.CUSTOM.getOrCreateStat(Stats.PLAY_TIME));
+                int playTime = targetPlayer.getStats().getValue(Stats.CUSTOM.get(Stats.PLAY_TIME));
                 int hours = playTime / 72000; // 20 ticks per second * 3600 seconds per hour
                 int minutes = (playTime % 72000) / 1200; // 20 ticks per second * 60 seconds per minute
                 stats.append("游戏时间: ").append(hours).append("小时 ").append(minutes).append("分钟\n");
                 
                 // 移动距离
-                int walkDistance = targetPlayer.getStats().getStat(Stats.CUSTOM.getOrCreateStat(Stats.WALK_ONE_CM));
+                int walkDistance = targetPlayer.getStats().getValue(Stats.CUSTOM.get(Stats.WALK_ONE_CM));
                 stats.append("步行距离: ").append(walkDistance / 100).append("米\n");
                 
                 // 跳跃次数
-                int jumps = targetPlayer.getStats().getStat(Stats.CUSTOM.getOrCreateStat(Stats.JUMP));
+                int jumps = targetPlayer.getStats().getValue(Stats.CUSTOM.get(Stats.JUMP));
                 stats.append("跳跃次数: ").append(jumps).append("\n");
                 
                 // 死亡次数
-                int deaths = targetPlayer.getStats().getStat(Stats.CUSTOM.getOrCreateStat(Stats.DEATHS));
+                int deaths = targetPlayer.getStats().getValue(Stats.CUSTOM.get(Stats.DEATHS));
                 stats.append("死亡次数: ").append(deaths).append("\n");
             }
             

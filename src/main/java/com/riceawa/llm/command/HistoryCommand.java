@@ -63,9 +63,9 @@ public class HistoryCommand {
         // 如果没有指定玩家，尝试获取执行命令的玩家
         if (player == null) {
             try {
-                player = context.getSource().getPlayerOrThrow();
+                player = context.getSource().getPlayerOrException();
             } catch (Exception e) {
-                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("必须指定玩家或由玩家执行此命令").formatted(ChatFormatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("必须指定玩家或由玩家执行此命令").withStyle(ChatFormatting.RED), false);
                 return 0;
             }
         }
@@ -81,12 +81,12 @@ public class HistoryCommand {
         // 记录审计日志
         LogManager.getInstance().audit("Player statistics viewed", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString()
                 ));
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(report).formatted(ChatFormatting.AQUA), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(report).withStyle(ChatFormatting.AQUA), false);
         
         return 1;
     }
@@ -106,7 +106,7 @@ public class HistoryCommand {
         try {
             format = HistoryExporter.ExportFormat.valueOf(formatStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("不支持的导出格式: " + formatStr).formatted(ChatFormatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("不支持的导出格式: " + formatStr).withStyle(ChatFormatting.RED), false);
             return 0;
         }
         
@@ -116,7 +116,7 @@ public class HistoryCommand {
         // 记录审计日志
         LogManager.getInstance().audit("Player history exported", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString(),
                         "format", formatStr,
@@ -125,14 +125,14 @@ public class HistoryCommand {
         
             if (result.isSuccess()) {
                 CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("历史记录导出成功: " + result.getExportFile().getFileName())
-                                .formatted(ChatFormatting.GREEN), true);
+                                .withStyle(ChatFormatting.GREEN), true);
             } else {
-                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("导出失败: " + result.getMessage()).formatted(ChatFormatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("导出失败: " + result.getMessage()).withStyle(ChatFormatting.RED), false);
             }
 
             return result.isSuccess() ? 1 : 0;
         } catch (CommandSyntaxException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).formatted(ChatFormatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
             return 0;
         }
     }
@@ -153,7 +153,7 @@ public class HistoryCommand {
         // 记录审计日志
         LogManager.getInstance().audit("Player history searched", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString(),
                         "keyword", keyword,
@@ -162,7 +162,7 @@ public class HistoryCommand {
         
         if (sessions.isEmpty()) {
             CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("没有找到包含关键词 \"" + keyword + "\" 的历史记录")
-                            .formatted(ChatFormatting.YELLOW), false);
+                            .withStyle(ChatFormatting.YELLOW), false);
             return 0;
         }
         
@@ -188,11 +188,11 @@ public class HistoryCommand {
             count++;
         }
         
-            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(result.toString()).formatted(ChatFormatting.AQUA), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(result.toString()).withStyle(ChatFormatting.AQUA), false);
 
             return 1;
         } catch (CommandSyntaxException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).formatted(ChatFormatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
             return 0;
         }
     }
@@ -210,7 +210,7 @@ public class HistoryCommand {
         // 记录审计日志（在删除之前）
         LogManager.getInstance().audit("Player history cleared", 
                 java.util.Map.of(
-                        "executor", context.getSource().getName(),
+                        "executor", context.getSource().getTextName(),
                         "target_player", playerName,
                         "target_player_id", playerId.toString()
                 ));
@@ -218,11 +218,11 @@ public class HistoryCommand {
             ChatHistory.getInstance().clearPlayerHistory(playerId);
 
             CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("已清除玩家 " + playerName + " 的所有历史记录")
-                            .formatted(ChatFormatting.GREEN), true);
+                            .withStyle(ChatFormatting.GREEN), true);
 
             return 1;
         } catch (CommandSyntaxException e) {
-            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).formatted(ChatFormatting.RED), false);
+            CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("命令语法错误: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
             return 0;
         }
     }
