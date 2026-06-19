@@ -104,14 +104,14 @@ public class ExecuteCommandFunction implements LLMFunction {
             List<String> outputMessages = new ArrayList<>();
 
             // 获取服务器控制台命令源
-            CommandSourceStack consoleSource = server.getCommandSource();
+            CommandSourceStack consoleSource = server.createCommandSourceStack();
 
             // 创建自定义的CommandOutput来捕获输出
             CommandOutputCapture outputCapture = new CommandOutputCapture(outputMessages);
 
             // 创建自定义的CommandSource来捕获输出
-            // 使用withOutput方法创建带有自定义输出的命令源
-            CommandSourceStack captureSource = consoleSource.withOutput(outputCapture);
+            // 使用withSource方法创建带有自定义输出的命令源
+            CommandSourceStack captureSource = consoleSource.withSource(outputCapture);
 
             // 执行命令并获取返回值
             int resultCode = 0;
@@ -124,7 +124,7 @@ public class ExecuteCommandFunction implements LLMFunction {
 
                 // 使用兼容层执行命令
                 try {
-                    resultCode = server.getCommandManager().getDispatcher().execute(command, captureSource);
+                    resultCode = server.getCommands().getDispatcher().execute(command, captureSource);
                     System.out.println("[ExecuteCommandFunction] 命令执行完成，返回码: " + resultCode + ", 捕获到 " + outputMessages.size() + " 条消息");
                 } catch (Exception e) {
                     // 如果直接执行失败，使用兼容层的备用方法

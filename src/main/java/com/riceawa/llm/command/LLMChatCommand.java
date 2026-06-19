@@ -613,7 +613,7 @@ public class LLMChatCommand {
         String templateId = StringArgumentType.getString(context, "template");
         TemplateEditor editor = TemplateEditor.getInstance();
 
-        editor.startEditSession(player, templateId);
+        editor.startEditSession(player, templateId, false);
         return 1;
     }
 
@@ -1342,7 +1342,8 @@ public class LLMChatCommand {
         if (shouldBroadcast(config, serverPlayer.getName().getString())) {
             EntityHelper.getServer(serverPlayer).getPlayerList().broadcastSystemMessage(
                 Component.literal("[" + serverPlayer.getName().getString() + " 问AI] " + message)
-                    .formatted(ChatFormatting.LIGHT_PURPLE)
+                    .formatted(ChatFormatting.LIGHT_PURPLE),
+                false
             );
         } else {
             // 如果没有启用广播，向玩家自己显示提示词确认
@@ -1356,7 +1357,8 @@ public class LLMChatCommand {
         if (shouldBroadcast(config, serverPlayer.getName().getString())) {
             EntityHelper.getServer(serverPlayer).getPlayerList().broadcastSystemMessage(
                 Component.literal("[AI正在为 " + serverPlayer.getName().getString() + " 思考...]")
-                    .formatted(ChatFormatting.GRAY)
+                    .formatted(ChatFormatting.GRAY),
+                false
             );
         } else {
             serverPlayer.sendSystemMessage(Component.literal("正在思考...").formatted(ChatFormatting.GRAY));
@@ -1434,7 +1436,8 @@ public class LLMChatCommand {
             if (shouldBroadcast(config, player.getName().getString())) {
                 EntityHelper.getServer(player).getPlayerList().broadcastSystemMessage(
                     Component.literal("[AI回复给 " + player.getName().getString() + "] " + content)
-                        .formatted(ChatFormatting.AQUA)
+                        .formatted(ChatFormatting.AQUA),
+                    false
                 );
             } else {
                 player.sendSystemMessage(Component.literal("[AI] " + content).formatted(ChatFormatting.AQUA));
@@ -1644,7 +1647,8 @@ public class LLMChatCommand {
             if (shouldBroadcast(config, player.getName().getString())) {
                 EntityHelper.getServer(player).getPlayerList().broadcastSystemMessage(
                     Component.literal("[AI回复给 " + player.getName().getString() + "] " + content)
-                        .formatted(ChatFormatting.AQUA)
+                        .formatted(ChatFormatting.AQUA),
+                    false
                 );
             } else {
                 player.sendSystemMessage(Component.literal("[AI] " + content).formatted(ChatFormatting.AQUA));
@@ -1771,7 +1775,8 @@ public class LLMChatCommand {
                                 if (shouldBroadcast(config, player.getName().getString())) {
                                     EntityHelper.getServer(player).getPlayerList().broadcastSystemMessage(
                                         Component.literal("[AI回复给 " + player.getName().getString() + "] " + content)
-                                            .formatted(ChatFormatting.AQUA)
+                                            .formatted(ChatFormatting.AQUA),
+                                        false
                                     );
                                 } else {
                                     player.sendSystemMessage(Component.literal("[AI] " + content).formatted(ChatFormatting.AQUA));
