@@ -40,4 +40,3 @@ Expected: 无 `remappedSrc/` 相关待提交项
 ## Phase 1：构建工具链升级（配置层）
 
 > 与 Phase 2 同分支。单独提交可记录，但构建只在 Phase 2 完成后才绿。
-
