@@ -3,11 +3,11 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.ChatFormatting;
 
 /**
  * 发送消息给其他玩家的函数
@@ -58,7 +58,7 @@ public class SendMessageFunction implements LLMFunction {
     }
     
     @Override
-    public FunctionResult execute(PlayerEntity player, MinecraftServer server, JsonObject arguments) {
+    public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
         try {
             // 获取必需参数
             if (!arguments.has("message")) {
@@ -76,7 +76,7 @@ public class SendMessageFunction implements LLMFunction {
                 arguments.get("message_type").getAsString() : "chat";
             
             // 构建消息
-            Text messageText = buildMessage(player, messageContent, messageType);
+            Component messageComponent = buildMessage(player, messageContent, messageType);
             
             if (target == null || target.trim().isEmpty()) {
                 // 发送给所有玩家 - 需要OP权限
@@ -85,8 +85,8 @@ public class SendMessageFunction implements LLMFunction {
                 }
                 
                 // 发送给所有在线玩家
-                for (ServerPlayerEntity onlinePlayer : server.getPlayerManager().getPlayerList()) {
-                    sendMessageToPlayer(onlinePlayer, messageText, messageType);
+                for (ServerPlayer onlinePlayer : server.getPlayerManager().getPlayerList()) {
+                    sendMessageToPlayer(onlinePlayer, messageComponent, messageType);
                 }
                 
                 return FunctionResult.success("消息已发送给所有在线玩家 (" + 
@@ -94,12 +94,12 @@ public class SendMessageFunction implements LLMFunction {
                 
             } else {
                 // 发送给指定玩家
-                ServerPlayerEntity targetPlayer = server.getPlayerManager().getPlayer(target);
+                ServerPlayer targetPlayer = server.getPlayerManager().getPlayer(target);
                 if (targetPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + target);
                 }
                 
-                sendMessageToPlayer(targetPlayer, messageText, messageType);
+                sendMessageToPlayer(targetPlayer, messageComponent, messageType);
                 return FunctionResult.success("消息已发送给 " + target);
             }
             
@@ -108,21 +108,21 @@ public class SendMessageFunction implements LLMFunction {
         }
     }
     
-    private Text buildMessage(PlayerEntity sender, String content, String messageType) {
+    private Component buildMessage(Player sender, String content, String messageType) {
         String senderName = sender.getName().getString();
         
         switch (messageType.toLowerCase()) {
             case "system":
-                return Text.literal("[系统] " + content).formatted(Formatting.YELLOW);
+                return Component.literal("[系统] " + content).formatted(ChatFormatting.YELLOW);
             case "actionbar":
-                return Text.literal(content).formatted(Formatting.AQUA);
+                return Component.literal(content).formatted(ChatFormatting.AQUA);
             case "chat":
             default:
-                return Text.literal("[" + senderName + " 通过AI] " + content).formatted(Formatting.GREEN);
+                return Component.literal("[" + senderName + " 通过AI] " + content).formatted(ChatFormatting.GREEN);
         }
     }
     
-    private void sendMessageToPlayer(ServerPlayerEntity player, Text message, String messageType) {
+    private void sendMessageToPlayer(ServerPlayer player, Component message, String messageType) {
         switch (messageType.toLowerCase()) {
             case "actionbar":
                 player.sendMessage(message, true); // true = actionbar
@@ -136,7 +136,7 @@ public class SendMessageFunction implements LLMFunction {
     }
     
     @Override
-    public boolean hasPermission(PlayerEntity player) {
+    public boolean hasPermission(Player player) {
         // 所有玩家都可以使用此功能，但向所有玩家发送消息需要OP权限
         return true;
     }
