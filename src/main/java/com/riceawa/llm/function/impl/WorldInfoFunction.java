@@ -100,16 +100,18 @@ public class WorldInfoFunction implements LLMFunction {
                 info.append("\n=== 详细信息 ===\n");
                 info.append("世界种子: ").append(world.getSeed()).append("\n");
                 info.append("世界边界大小: ").append((int)world.getWorldBorder().getSize()).append("\n");
-                //? >=1.21.9 {
-                BlockPos spawnPos = world.getLevelData().getRespawnData().pos();
-                //?} else {
+                //? >=1.21.11 {
+                BlockPos spawnPos = world.getRespawnData().pos();
+                //?} else if >=1.21.9 {
+                /*BlockPos spawnPos = world.getLevelData().getRespawnData().pos();
+                *///?} else {
                 /*BlockPos spawnPos = world.getSharedSpawnPos();
                 *//*?}*/
                 info.append("出生点: ").append(spawnPos.getX()).append(", ")
                     .append(spawnPos.getY()).append(", ")
                     .append(spawnPos.getZ()).append("\n");
                 info.append("海平面高度: ").append(world.getSeaLevel()).append("\n");
-                //? >=1.21.11 {
+                //? >=1.21.2 {
                 info.append("最低建筑高度: ").append(world.getMinY()).append("\n");
                 //?} else {
                 /*info.append("最低建筑高度: ").append(world.getMinBuildHeight()).append("\n");
