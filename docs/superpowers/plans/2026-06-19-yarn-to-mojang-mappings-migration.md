@@ -97,7 +97,7 @@
 - `gradle/wrapper/gradle-wrapper.properties` — Gradle 版本
 - `stonecutter.gradle.kts` — Loom 插件版本
 - `build.gradle.kts` — mappings 声明、modImplementation 分支、AW 路径
-- `src/main/resources/lumichat.accesswidener` — `named` → `official`
+- `src/main/resources/lumichat.accesswidener` — 保持 `named`（经验证：Loom 1.15 + officialMojangMappings 的 productionNamespace 仍为 `named`，详见 Task 1.4）
 - `versions/*/gradle.properties` — 1.21.x 节点移除 `deps.yarn_mappings`？（**否**——保留，仅改 mappings 类型为官方；详见 Task 1.3）
 
 **源码（Phase 2，按依赖层级分组，均可并行分发）：**
@@ -279,29 +279,19 @@ git add build.gradle.kts
 git commit -m "build: 1.21.x 切换至 officialMojangMappings()，26.1 保持无 mappings"
 ```
 
-### Task 1.4: Access Widener 头部改为 official
+### Task 1.4: Access Widener 命名空间保持 named（经验证修正）
 
 **Files:**
-- Modify: `src/main/resources/lumichat.accesswidener`
+- 无需修改 `src/main/resources/lumichat.accesswidener`
 
-- [ ] **Step 1: 修改头部命名空间**
+> **执行时发现：** 计划初稿拟将 AW 头部从 `named` 改为 `official`，但实测 Loom 1.15.5 + `officialMojangMappings()` 的 productionNamespace 仍为 `named`。
+> 将 AW 改为 `official` 会导致配置阶段报错 `Namespace mismatch, expected named got official`。
+> 原因：`officialMojangMappings()` 将 official 映射注入 `named` 命名空间作为开发命名空间，
+> 故 AW 必须使用 `named`。AW 当前无任何条目，保持 `named` 即可，无需改动。
 
-将文件内容：
-```
-accessWidener v2 named
-```
-改为：
-```
-accessWidener v2 official
-```
-（文件仅此一行头部、无任何条目，故无其他改动。）
+- [x] **Step 1: 验证保持 `named` 可通过配置阶段**（已验证：`:1.21.11:help` BUILD SUCCESSFUL）
 
-- [ ] **Step 2: 提交**
-
-```bash
-git add src/main/resources/lumichat.accesswidener
-git commit -m "build: access widener 命名空间由 named 改为 official"
-```
+- [x] **Step 2: 无需提交（文件未变更）**
 
 ### Task 1.5: 校验构建配置可解析（不期望源码通过）
 
