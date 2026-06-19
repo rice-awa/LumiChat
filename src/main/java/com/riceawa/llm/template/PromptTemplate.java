@@ -187,14 +187,14 @@ public class PromptTemplate {
 
             case "world": {
                 var world = player != null ? EntityHelper.getWorld(player) : null;
-                return world != null ? world.getRegistryKey().getValue().toString() : "Unknown";
+                return world != null ? world.dimension().identifier().toString() : "Unknown";
             }
 
             case "dimension": {
                 if (player != null) {
                     var world = EntityHelper.getWorld(player);
                     if (world == null) return "Unknown";
-                    String worldKey = world.getRegistryKey().getValue().toString();
+                    String worldKey = world.dimension().identifier().toString();
                     if (worldKey.contains("overworld")) return "主世界";
                     if (worldKey.contains("nether")) return "下界";
                     if (worldKey.contains("end")) return "末地";
@@ -220,7 +220,7 @@ public class PromptTemplate {
 
             case "gamemode":
                 if (player != null) {
-                    switch (player.interactionManager.getGameMode()) {
+                    switch (player.gameMode.getGameModeForPlayer()) {
                         case SURVIVAL: return "生存模式";
                         case CREATIVE: return "创造模式";
                         case ADVENTURE: return "冒险模式";
@@ -245,7 +245,7 @@ public class PromptTemplate {
 
             case "server": {
                 MinecraftServer server = player != null ? EntityHelper.getServerSafe(player) : null;
-                return server != null ? server.getName() : "Unknown";
+                return server != null ? server.getServerModName() : "Unknown";
             }
 
             default:
@@ -386,12 +386,12 @@ public class PromptTemplate {
         MinecraftServer server = EntityHelper.getServerSafe(player);
         if (server != null) {
             // 在线玩家信息
-            var playerManager = server.getPlayerManager();
-            int playerCount = playerManager.getCurrentPlayerCount();
+            var playerManager = server.getPlayerList();
+            int playerCount = playerManager.getPlayerCount();
             contextVariables.put("player_count", String.valueOf(playerCount));
 
             // 在线玩家列表（限制显示数量避免过长）
-            String onlinePlayers = playerManager.getPlayerList().stream()
+            String onlinePlayers = playerManager.getPlayers().stream()
                     .limit(10) // 最多显示10个玩家
                     .map(p -> p.getName().getString())
                     .collect(Collectors.joining(", "));

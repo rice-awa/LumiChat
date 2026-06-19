@@ -63,7 +63,7 @@ public class PlayerEffectsFunction implements LLMFunction {
             StringBuilder effects = new StringBuilder();
             effects.append("=== ").append(targetPlayer.getName().getString()).append(" 的状态效果 ===\n");
             
-            var statusEffects = targetPlayer.getStatusEffects();
+            var statusEffects = targetPlayer.getActiveEffects();
             
             if (statusEffects.isEmpty()) {
                 effects.append("当前没有任何状态效果\n");
@@ -104,11 +104,11 @@ public class PlayerEffectsFunction implements LLMFunction {
                     }
                     
                     // 显示是否可见
-                    if (!effect.shouldShowParticles()) {
+                    if (!effect.isVisible()) {
                         effects.append(" [隐藏粒子]");
                     }
                     
-                    if (!effect.shouldShowIcon()) {
+                    if (!effect.showIcon()) {
                         effects.append(" [隐藏图标]");
                     }
                     

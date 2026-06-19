@@ -59,8 +59,8 @@ public class WorldInfoFunction implements LLMFunction {
             // 基本世界信息
             info.append("=== 世界信息 ===\n");
             info.append("维度: ").append(getDimensionName(world)).append("\n");
-            info.append("难度: ").append(world.getDifficulty().getName()).append("\n");
-            info.append("游戏模式: ").append(server.getDefaultGameMode().getTranslatableName().getString()).append("\n");
+            info.append("难度: ").append(world.getDifficulty().getDisplayName().getString()).append("\n");
+            info.append("游戏模式: ").append(server.getDefaultGameType().getLongDisplayName().getString()).append("\n");
             info.append("是否硬核: ").append(server.isHardcore() ? "是" : "否").append("\n");
             
             // 时间信息
@@ -88,7 +88,7 @@ public class WorldInfoFunction implements LLMFunction {
             
             // 生物群系信息
             Holder<Biome> biome = world.getBiome(pos);
-            String biomeName = biome.unwrapKey().map(key -> key.location().toString()).orElse("未知");
+            String biomeName = biome.unwrapKey().map(key -> key.identifier().toString()).orElse("未知");
             info.append("当前生物群系: ").append(biomeName).append("\n");
             
             if (includeDetails) {
@@ -97,9 +97,9 @@ public class WorldInfoFunction implements LLMFunction {
                 info.append("世界种子: ").append(world.getSeed()).append("\n");
                 info.append("世界边界大小: ").append((int)world.getWorldBorder().getSize()).append("\n");
                 //? >=1.21.9 {
-                BlockPos spawnPos = world.getSharedSpawnPos();
+                BlockPos spawnPos = world.getLevelData().getRespawnData().pos();
                 //?} else {
-                /*BlockPos spawnPos = world.getSharedSpawnPos();
+                /*BlockPos spawnPos = world.getLevelData().getRespawnData().pos();
                 *//*?}*/
                 info.append("出生点: ").append(spawnPos.getX()).append(", ")
                     .append(spawnPos.getY()).append(", ")
@@ -121,7 +121,7 @@ public class WorldInfoFunction implements LLMFunction {
     }
     
     private String getDimensionName(Level world) {
-        String dimensionId = world.dimension().location().toString();
+        String dimensionId = world.dimension().identifier().toString();
         switch (dimensionId) {
             case "minecraft:overworld":
                 return "主世界";

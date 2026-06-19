@@ -111,13 +111,13 @@ public class WeatherControlFunction implements LLMFunction {
             // 设置天气
             switch (weatherType) {
                 case "clear":
-                    targetWorld.setWeather(durationTicks, 0, false, false);
+                    targetWorld.setWeatherParameters(durationTicks, 0, false, false);
                     break;
                 case "rain":
-                    targetWorld.setWeather(0, durationTicks, true, false);
+                    targetWorld.setWeatherParameters(0, durationTicks, true, false);
                     break;
                 case "thunder":
-                    targetWorld.setWeather(0, durationTicks, true, true);
+                    targetWorld.setWeatherParameters(0, durationTicks, true, true);
                     break;
             }
             
