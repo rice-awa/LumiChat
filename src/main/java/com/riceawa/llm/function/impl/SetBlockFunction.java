@@ -7,7 +7,7 @@ import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-//? >=1.21 {
+//? >=1.21.11 {
 import net.minecraft.resources.Identifier;
 //?} else {
 /*import net.minecraft.resources.ResourceLocation;
@@ -117,7 +117,7 @@ public class SetBlockFunction implements LLMFunction {
             }
             
             // 获取方块类型 - 使用兼容层
-            //? >=1.21 {
+            //? >=1.21.11 {
             Identifier blockId = IdentifierCompat.parse(blockType);
             //?} else {
             /*ResourceLocation blockId = IdentifierCompat.parse(blockType);
@@ -126,7 +126,7 @@ public class SetBlockFunction implements LLMFunction {
                 blockId = IdentifierCompat.forBlockType(blockType);
             }
             
-            //? >=1.21 {
+            //? >=1.21.2 {
             Block block = BuiltInRegistries.BLOCK.getValue(blockId);
             //?} else {
             /*Block block = BuiltInRegistries.BLOCK.get(blockId);
