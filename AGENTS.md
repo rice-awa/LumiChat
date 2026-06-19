@@ -34,7 +34,7 @@ LumiChat 是一个使用 Stonecutter 进行多版本构建的 Fabric 模组。�
 
 ## 文档优先工作流（Context7/MCP）
 
-在新增功能或修复缺陷前，先通过 Context7 查阅文档，再基于确认过的行为实现代码。
+在新增功能或修复缺陷前，先通过 Context7 或 firecrawl 查阅文档，再基于确认过的行为实现代码。
 
 - 基础流程：`resolve-library-id` -> `query-docs` -> 将结论应用到代码。
 - 优先参考官方文档：Fabric API/Loom、Minecraft 映射表、Stonecutter。
@@ -100,6 +100,47 @@ code20_1();
 - 发布前针对每个版本节点验证构建
 - 在 `stonecutter.gradle.kts` 中使用 `parameters` 配置版本特定常量和替换
 
+## 维护的最佳实践
+
+### 版本升级前的差异评估
+
+- 新增 Minecraft 版本节点或升级现有节点前，先查阅 `docs/api/Notable_Minecraft_changes.md`（同步自 [Stonecutter 官方 wiki](https://codeberg.org/stonecutter/docs/raw/branch/main/docs/wiki/start/index.md) 的 "Notable Minecraft changes" 表）评估目标版本引入的破坏性变更。
+- 重点关注会引发大量 API 替换的变更：Java 版本提升、类重命名/包搬迁、API 签名变更、Registry/GameRules/Recipe/渲染/NBT/网络层重写。
+- 涉及具体行为时，再查表内 Sources 列的 Fabric/NeoForge changelog 确认细节。
+
+### 优先抽象 API，避免散落的条件注释
+
+- 跨版本 Minecraft API 差异优先收敛到 `src/main/java/com/riceawa/llm/compat/` 兼容层（参考 `IdentifierCompat`、`GameRulesCompat`）。
+- 业务代码只调用 compat 层稳定接口，不直接用 `//? if` 处理 Minecraft API 差异。
+- 仅当差异无法抽象（签名级/泛型级差异、import 路径整体搬迁、返回类型本身被重命名）时才使用 Stonecutter 条件注释，且应就近放在 compat 层内，避免污染业务代码。
+- 目标是：当 Minecraft 再次重构某 API 时，只需改动 compat 层一处，业务层零改动。
+
+### compat 层抽象设计原则
+
+- 按"语义能力"命名而非"版本别名"：`IdentifierCompat.of(ns, path)` 而非 `IdentifierCompat.of1_21_11`。
+- 返回类型优先用稳定类型（`String`、`boolean`、项目内 DTO）；必须返回 Minecraft 类型时，在 compat 方法签名上用 `//?` 切换返回类型（如 `ResourceLocation` → `Identifier`），保持调用点签名一致。
+- 一处差异一个方法：避免单个 compat 方法内嵌套多层版本分支，必要时拆分为多个方法。
+- compat 类保持 `final` + 私有构造，纯静态工具方法。
+
+### 新增/升级版本节点的流程
+
+1. 查 Notable Minecraft changes 表，确认目标版本的破坏性变更范围。
+2. 评估现有 compat 层是否能覆盖；不能覆盖则先扩 compat 层再动业务代码。
+3. 在 `settings.gradle.kts` 增加版本节点，补 `versions/<mc-version>/gradle.properties`。
+4. 切到新版本：`./gradlew setActiveVersion -Pversion=<version>`。
+5. 编译并修复：先 `:新版本:build`，再回归代表性节点 `:1.19:build`、`:1.20.6:build`、`:1.21.11:build`。
+6. 提交前 `./gradlew resetActiveVersion`。
+
+### 常见版本升级引发 API 替换的应对
+
+- **大规模类重命名**（如 1.21.11 `ResourceLocation` → `Identifier`、26.1 `GuiGraphics` → `GuiGraphicsExtractor`）：在 compat 层用 `//? if >=x.y` 切换 import 与返回类型，业务层零改动。
+- **渲染层重写**（render states、`RenderPipeline`、extract 模式）：仅当客户端代码接触时才抽象，服务端/通用代码不受影响，避免无谓扩散。
+- **Registry/GameRules/Recipe 重构**：在 compat 层封装访问入口，业务层只调稳定方法。
+- **Java 版本提升**（1.20.5 → Java 21、26.1 → Java 25）：在 `build.gradle.kts` 按 Minecraft 版本切 Java toolchain；共享代码不使用高版本语法，避免低版本节点编译失败。
+
 ## 安全与配置提示
 
 切勿提交 API 密钥或敏感信息。运行时凭据应放在游戏的 `config/` 目录下，而不是源码中。涉及权限的修改需谨慎审查（OP 检查、命令边界、Provider 错误处理等）。
+
+## PR提交规范
+PR 描述应包含摘要、动机、受影响的 Minecraft 版本、验证命令，以及用户可见变更的截图或日志。涉及 Fabric/Loom/Stonecutter/Minecraft API 行为时，先查阅当前文档并在 PR 中简短说明参考来源。
