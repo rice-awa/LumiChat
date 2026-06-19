@@ -9,22 +9,22 @@ import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.logging.LogConfig;
 import com.riceawa.llm.logging.LogLevel;
 import com.riceawa.llm.logging.LogManager;
-import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandBuildContext;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 
 /**
  * 日志管理命令
  */
 public class LogCommand {
     
-    public static void register(CommandDispatcher<ServerCommandSource> dispatcher, CommandRegistryAccess registryAccess) {
-        dispatcher.register(CommandManager.literal("llmlog")
+    public static void register(CommandDispatcher<CommandSourceStack> dispatcher, CommandBuildContext registryAccess) {
+        dispatcher.register(Commands.literal("llmlog")
                 .requires(PermissionCompat.requireGamemasters()) // 需要管理员权限
-                .then(CommandManager.literal("level")
-                        .then(CommandManager.argument("level", StringArgumentType.string())
+                .then(Commands.literal("level")
+                        .then(Commands.argument("level", StringArgumentType.string())
                                 .suggests((context, builder) -> {
                                     builder.suggest("DEBUG");
                                     builder.suggest("INFO");
@@ -33,10 +33,10 @@ public class LogCommand {
                                     return builder.buildFuture();
                                 })
                                 .executes(LogCommand::setLogLevel)))
-                .then(CommandManager.literal("status")
+                .then(Commands.literal("status")
                         .executes(LogCommand::showLogStatus))
-                .then(CommandManager.literal("enable")
-                        .then(CommandManager.argument("category", StringArgumentType.string())
+                .then(Commands.literal("enable")
+                        .then(Commands.argument("category", StringArgumentType.string())
                                 .suggests((context, builder) -> {
                                     builder.suggest("system");
                                     builder.suggest("chat");
@@ -48,8 +48,8 @@ public class LogCommand {
                                     return builder.buildFuture();
                                 })
                                 .executes(LogCommand::enableCategory)))
-                .then(CommandManager.literal("disable")
-                        .then(CommandManager.argument("category", StringArgumentType.string())
+                .then(Commands.literal("disable")
+                        .then(Commands.argument("category", StringArgumentType.string())
                                 .suggests((context, builder) -> {
                                     builder.suggest("system");
                                     builder.suggest("chat");
@@ -61,7 +61,7 @@ public class LogCommand {
                                     return builder.buildFuture();
                                 })
                                 .executes(LogCommand::disableCategory)))
-                .then(CommandManager.literal("test")
+                .then(Commands.literal("test")
                         .executes(LogCommand::testLogging))
         );
     }
@@ -69,7 +69,7 @@ public class LogCommand {
     /**
      * 设置日志级别
      */
-    private static int setLogLevel(CommandContext<ServerCommandSource> context) {
+    private static int setLogLevel(CommandContext<CommandSourceStack> context) {
         String levelStr = StringArgumentType.getString(context, "level");
         LogLevel level = LogLevel.fromString(levelStr);
         
@@ -81,7 +81,7 @@ public class LogCommand {
         LogManager.getInstance().system("Log level changed to " + level.getName() + " by " + 
                 context.getSource().getName());
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("日志级别已设置为: " + level.getName()).formatted(Formatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("日志级别已设置为: " + level.getName()).formatted(ChatFormatting.GREEN), true);
         
         return 1;
     }
@@ -89,7 +89,7 @@ public class LogCommand {
     /**
      * 显示日志状态
      */
-    private static int showLogStatus(CommandContext<ServerCommandSource> context) {
+    private static int showLogStatus(CommandContext<CommandSourceStack> context) {
         LLMChatConfig config = LLMChatConfig.getInstance();
         LogConfig logConfig = config.getLogConfig();
         
@@ -110,7 +110,7 @@ public class LogCommand {
         status.append("性能日志: ").append(logConfig.isEnablePerformanceLog() ? "启用" : "禁用").append("\n");
         status.append("审计日志: ").append(logConfig.isEnableAuditLog() ? "启用" : "禁用").append("\n");
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(status.toString()).formatted(Formatting.AQUA), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(status.toString()).formatted(ChatFormatting.AQUA), false);
         
         return 1;
     }
@@ -118,7 +118,7 @@ public class LogCommand {
     /**
      * 启用日志类别
      */
-    private static int enableCategory(CommandContext<ServerCommandSource> context) {
+    private static int enableCategory(CommandContext<CommandSourceStack> context) {
         String category = StringArgumentType.getString(context, "category");
         
         LLMChatConfig config = LLMChatConfig.getInstance();
@@ -156,7 +156,7 @@ public class LogCommand {
                 message = "控制台日志已启用";
                 break;
             default:
-                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("未知的日志类别: " + category).formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).formatted(ChatFormatting.RED), false);
                 return 0;
         }
 
@@ -165,7 +165,7 @@ public class LogCommand {
                 context.getSource().getName());
 
         final String finalMessage = message;
-        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(finalMessage).formatted(Formatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(finalMessage).formatted(ChatFormatting.GREEN), true);
         
         return 1;
     }
@@ -173,7 +173,7 @@ public class LogCommand {
     /**
      * 禁用日志类别
      */
-    private static int disableCategory(CommandContext<ServerCommandSource> context) {
+    private static int disableCategory(CommandContext<CommandSourceStack> context) {
         String category = StringArgumentType.getString(context, "category");
         
         LLMChatConfig config = LLMChatConfig.getInstance();
@@ -211,7 +211,7 @@ public class LogCommand {
                 message = "控制台日志已禁用";
                 break;
             default:
-                CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("未知的日志类别: " + category).formatted(Formatting.RED), false);
+                CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("未知的日志类别: " + category).formatted(ChatFormatting.RED), false);
                 return 0;
         }
 
@@ -220,7 +220,7 @@ public class LogCommand {
                 context.getSource().getName());
 
         final String finalMessage = message;
-        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal(finalMessage).formatted(Formatting.GREEN), true);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal(finalMessage).formatted(ChatFormatting.GREEN), true);
         
         return 1;
     }
@@ -228,7 +228,7 @@ public class LogCommand {
     /**
      * 测试日志记录
      */
-    private static int testLogging(CommandContext<ServerCommandSource> context) {
+    private static int testLogging(CommandContext<CommandSourceStack> context) {
         LogManager logManager = LogManager.getInstance();
         String executor = context.getSource().getName();
         
@@ -238,7 +238,7 @@ public class LogCommand {
         logManager.performance("Test log message from " + executor + " - Performance", null);
         logManager.audit("Test log message from " + executor + " - Audit", null);
         
-        CommandSourceCompat.sendFeedback(context.getSource(), Text.literal("测试日志已记录，请检查日志文件").formatted(Formatting.GREEN), false);
+        CommandSourceCompat.sendFeedback(context.getSource(), Component.literal("测试日志已记录，请检查日志文件").formatted(ChatFormatting.GREEN), false);
         
         return 1;
     }
