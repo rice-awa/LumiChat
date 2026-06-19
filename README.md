@@ -211,11 +211,16 @@
 
 ## 📝 更新日志
 
-### v2.0.1 (2026-03-16) - 最新版本
+### v2.1.0 (2026-06-19) - 最新版本
+- 🔥 **迁移至 Mojang mappings** - 从 Yarn mappings 迁移到 Mojang/official mappings，覆盖命令、上下文、Function Calling、模板、Mixin 与兼容层等核心代码。
+- 📦 **多版本构建恢复** - 恢复并验证 1.16.5/1.17/1.18/1.19 版本组、1.20-1.20.6、1.21-1.21.11，以及可选的 26.1 构建节点。
+- 🛠️ **构建工具升级** - Fabric Loom/remap 插件升级到 1.15-SNAPSHOT，Gradle Wrapper 升级到 9.4.0，并完善 Mojang mappings 与 26.1 unobfuscated 构建分流。
+- ☕ **Java 版本矩阵明确化** - 26.1 使用 Java 25，1.20.5+ 使用 Java 21，1.18+ 使用 Java 17，1.17 使用 Java 16，旧版本使用 Java 8。
+- ✅ **迁移验证完成** - 已验证代表性节点 `:1.19:build`、`:1.20.6:build`、`:1.21.11:build`、`buildAndCollect`，并完成 1.21.11 与 26.1 服务端启动 smoke test。
+
+### v2.0.1 (2026-03-16)
 - 🔥 **更多版本矩阵支持** - 添加对 1.19-1.19.4、1.20-1.20.6 与 1.21-1.21.11 跨代构建的支持（含 Stonecutter 版本组）
-
 - 📦 **Stonecutter 架构优化** - 重构多版本构建架构，提升构建效率
-
 - 🛠️ **Mixin 配置修复** - 修复客户端 mixin 配置未打包问题，补充 datagen 依赖
 - ⚙️ **兼容性增强** - 修复全版本 compatibilityLevel 兼容矩阵，确保各版本正常运行
 - 📝 **Java 字节码目标** - 修复 1.16.5 等低版本的 Java 字节码目标版本问题
