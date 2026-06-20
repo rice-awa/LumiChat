@@ -18,7 +18,7 @@
 
 ### 1. 安装模组
 将编译好的jar文件放入Minecraft的`mods`文件夹中。
-> 你可以在Actions artifacts中获取编译好的jar文件，其中 Multi-Version Build 构建有多个版本的mod文件。
+> 你可以在项目的 [Release](https://github.com/riceawa/LumiChat/releases) 页面下载各版本的mod文件。或者在 [Actions artifacts](https://github.com/rice-awa/LumiChat/actions/workflows/build.yml) 中获取最新编译的jar文件
 
 ### 2. 配置API密钥
 1. 首次使用时，尝试发送任意消息：`/llmchat 你好`
