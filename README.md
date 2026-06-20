@@ -1,6 +1,6 @@
 # A LLM Chat Mod for Minecraft
 
-一个让人眼前一亮的Minecraft Fabric模组，集成了LLM（大语言模型）聊天功能，支持多种AI服务和自定义功能。
+一个想让你眼前一亮的Minecraft Fabric模组，集成了LLM（大语言模型）聊天功能，支持多种AI服务和自定义功能。
 
 ## ✨ 核心功能
 
