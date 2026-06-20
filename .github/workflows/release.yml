@@ -1,20 +1,50 @@
 name: Release
 
+# 手动触发的发布工作流。
+# - 在 GitHub Actions 页面点击 "Run workflow" 时，顶部可手动选择目标分支。
+# - actions/checkout 默认检出所选分支（github.ref），无需额外配置。
+# - 默认发布为草稿，便于在 GitHub UI 审核后再正式发布。
 on:
-  release:
-    types: [published]
+  workflow_dispatch:
+    inputs:
+      draft:
+        description: 发布为草稿（审核后再正式发布）
+        required: false
+        type: boolean
+        default: true
+      tag_name:
+        description: 'Release 标签名（留空则用 v<mod.version>，如 v2.1.0）'
+        required: false
+        type: string
+        default: ''
+      release_name:
+        description: 'Release 标题（留空则用 LumiChat <mod.version>）'
+        required: false
+        type: string
+        default: ''
+      since_ref:
+        description: '变更日志起始引用（tag/SHA/分支，留空自动检测上一个 tag）'
+        required: false
+        type: string
+        default: ''
+
+# 最小权限：顶层只读，发布作业单独提权
+permissions:
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  # Dynamically detect available versions from settings.gradle.kts
+  # 动态解析 settings.gradle.kts 中的版本矩阵与 gradle.properties 中的 mod.version
   detect-versions:
     runs-on: ubuntu-latest
     outputs:
       versions: ${{ steps.versions.outputs.versions }}
       mod_version: ${{ steps.versions.outputs.mod_version }}
+      tag_name: ${{ steps.resolve.outputs.tag_name }}
+      release_name: ${{ steps.resolve.outputs.release_name }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -64,7 +94,30 @@ jobs:
           echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
           echo "Mod version: $MOD_VERSION"
 
-  # Build each version independently
+      - name: Resolve Release Tag and Name
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          MOD_VERSION="${{ steps.versions.outputs.mod_version }}"
+
+          # tag_name: 输入为空则用 v<mod.version>
+          TAG="${{ inputs.tag_name }}"
+          if [[ -z "$TAG" ]]; then
+            TAG="v${MOD_VERSION}"
+          fi
+          echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag: $TAG"
+
+          # release_name: 输入为空则用 LumiChat <mod.version>
+          NAME="${{ inputs.release_name }}"
+          if [[ -z "$NAME" ]]; then
+            NAME="LumiChat ${MOD_VERSION}"
+          fi
+          echo "release_name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "Resolved release name: $NAME"
+
+  # 矩阵并行构建各 Minecraft 版本
   build-version:
     needs: detect-versions
     runs-on: ubuntu-latest
@@ -108,13 +161,18 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-  # Publish all artifacts to GitHub Release
+  # 生成中文变更日志并创建/更新 GitHub Release（草稿或正式）
   publish-release:
     needs: [detect-versions, build-version]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
       - name: Download All Artifacts
         uses: actions/download-artifact@v5
         with:
@@ -127,31 +185,79 @@ jobs:
           echo "Release artifacts:"
           find release-artifacts -type f -name "*.jar" || echo "No JAR files found"
 
-      - name: Upload to GitHub Release
+      - name: Generate Chinese Changelog
+        id: changelog
+        env:
+          SINCE_REF: ${{ inputs.since_ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x .github/scripts/generate-changelog.sh
+          CHANGELOG="$(bash .github/scripts/generate-changelog.sh "$SINCE_REF" "HEAD")"
+
+          # 支持的 Minecraft 版本列表（用于 Release 正文头）
+          VERSIONS='${{ needs.detect-versions.outputs.versions }}'
+          VERSIONS_LIST="$(printf '%s' "$VERSIONS" | jq -r '. | join(", ")')"
+
+          # 组装 Release 正文（用户可见内容用中文）
+          {
+            echo "## 模组信息"
+            echo ""
+            echo "- 模组版本：${{ needs.detect-versions.outputs.mod_version }}"
+            echo "- 支持的 Minecraft 版本：${VERSIONS_LIST}"
+            echo ""
+            echo "## 变更日志"
+            echo ""
+            printf '%s\n' "$CHANGELOG"
+          } > release_body.md
+
+          echo "=== Release 正文预览 ==="
+          cat release_body.md
+
+          # 输出 body 到 GITHUB_OUTPUT（多行需用 delimiter）
+          {
+            echo "body<<EOF"
+            cat release_body.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.detect-versions.outputs.tag_name }}
+          name: ${{ needs.detect-versions.outputs.release_name }}
+          body: ${{ steps.changelog.outputs.body }}
+          draft: ${{ inputs.draft }}
+          target_commitish: ${{ github.sha }}
           files: release-artifacts/**/*.jar
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Summary job
+  # 中文运行总结
   release-summary:
     needs: [detect-versions, build-version, publish-release]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Generate Release Summary
+        shell: bash
         run: |
-          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Mod Version: ${{ needs.detect-versions.outputs.mod_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Minecraft Version | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------------------|--------|" >> $GITHUB_STEP_SUMMARY
-          
+          set -euo pipefail
+          echo "## 发布总结" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 模组版本：${{ needs.detect-versions.outputs.mod_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release 标签：\`${{ needs.detect-versions.outputs.tag_name }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Release 标题：${{ needs.detect-versions.outputs.release_name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- 草稿状态：${{ inputs.draft && '是（草稿）' || '否（正式发布）' }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### 各 Minecraft 版本构建结果" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Minecraft 版本 | 状态 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|----------------|------|" >> "$GITHUB_STEP_SUMMARY"
+
           for version in ${{ join(fromJson(needs.detect-versions.outputs.versions), ' ') }}; do
-            echo "| $version | Published |" >> $GITHUB_STEP_SUMMARY
+            echo "| $version | 已发布 |" >> "$GITHUB_STEP_SUMMARY"
           done
 
       - name: Fail if any step failed
