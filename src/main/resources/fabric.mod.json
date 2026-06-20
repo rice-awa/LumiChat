@@ -3,7 +3,7 @@
 	"id": "${id}",
   "version": "${version}",
   "name": "${name}",
-	"description": "一个让人眼前一亮LLMchat模组，集成了LLM（大语言模型）聊天功能，支持多种AI服务和自定义功能。",
+	"description": "mod.lumichat.description",
 	"authors": [
 		"rice-awa"
 	],
