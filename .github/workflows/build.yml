@@ -1,5 +1,11 @@
 name: Build
 
+# 依照 Stonecutter 官方模板 + 社区推荐（rotgruengelb）改造为单 job buildAndCollect：
+# - 一次 ./gradlew buildAndCollect 构建并收集所有 Minecraft 版本产物到 build/libs/<mod.version>/
+# - toolchain 自动按各版本 requiredJava 下载所需 JDK（8/21/25）
+# - 删除原先 detect-versions matrix + 二次聚合 package-artifacts
+# 参考：https://github.com/stonecutter-versioning/stonecutter-template-fabric
+#      https://github.com/rotgruengelb/stonecutter-mod-template
 on:
   push:
     branches:
@@ -22,70 +28,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Dynamically detect available versions from settings.gradle.kts
-  detect-versions:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      versions: ${{ steps.versions.outputs.versions }}
-      mod_version: ${{ steps.versions.outputs.mod_version }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
-
-      - name: Detect Minecraft Versions and Mod Version
-        id: versions
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          VERSIONS=$(
-            (
-              # version(project = "x", version = "y") -> capture project name
-              grep -oE 'version\s*\([^)]*project\s*=\s*"[^"]+"' settings.gradle.kts \
-                | grep -oE 'project\s*=\s*"[^"]+"' \
-                | cut -d'"' -f2
-
-              # version("x") -> capture direct version node (supports 26.1 / 26.1.1 / 26.1.2 ...)
-              grep -oE 'version\s*\(\s*"[^"]+"\s*\)' settings.gradle.kts \
-                | grep -oE '"[^"]+"' \
-                | tr -d '"'
-
-              # versions("a", "b", ...) -> capture every listed version
-              grep -oE 'versions\s*\([^)]+\)' settings.gradle.kts \
-                | grep -oE '"[^"]+"' \
-                | tr -d '"'
-            ) | awk 'NF && !seen[$0]++' | paste -sd ',' -
-          )
-
-          echo "Detected versions: $VERSIONS"
-
-          VERSIONS_JSON=$(
-            echo "$VERSIONS" \
-              | tr ',' '\n' \
-              | jq -R -s -c 'split("\n") | map(select(length > 0))'
-          )
-
-          echo "versions=$VERSIONS_JSON" >> "$GITHUB_OUTPUT"
-
-          MOD_VERSION=$(
-            grep -E '^mod\.version\s*=' gradle.properties \
-              | head -n1 \
-              | cut -d'=' -f2- \
-              | xargs
-          )
-
-          echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Mod version: $MOD_VERSION"
-
-  # Build each version independently
-  build-version:
-    needs: detect-versions
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        version: ${{ fromJson(needs.detect-versions.outputs.versions) }}
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -93,88 +37,53 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v5
 
-      - name: Setup JDK 21
-        if: "!startsWith(matrix.version, '26')"
+      - name: Setup Base JDK 21
+        # 仅作为 Gradle 运行环境；各版本编译 JDK 由 toolchain auto-download 解析。
         uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup JDK 25
-        if: "startsWith(matrix.version, '26')"
-        uses: actions/setup-java@v5
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
         with:
-          java-version: '25'
-          distribution: 'temurin'
+          gradle-version: wrapper
 
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Build Version ${{ matrix.version }}
-        run: ./gradlew :${{ matrix.version }}:build --stacktrace
+      - name: Resolve Mod Version
+        id: modver
+        run: |
+          MOD_VERSION=$(grep -E '^mod\.version\s*=' gradle.properties | head -n1 | cut -d'=' -f2- | xargs)
+          echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Mod version: $MOD_VERSION"
 
-      - name: Upload Build Artifacts for ${{ matrix.version }}
+      - name: Build and Collect All Versions
+        run: ./gradlew buildAndCollect --stacktrace
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: lumichat-${{ needs.detect-versions.outputs.mod_version }}-mc${{ matrix.version }}
-          path: versions/${{ matrix.version }}/build/libs/*.jar
-          if-no-files-found: warn
+          name: lumichat-${{ steps.modver.outputs.mod_version }}-all-builds
+          path: build/libs/
+          if-no-files-found: error
           retention-days: 90
 
-  # Summary job to report overall status
-  build-summary:
-    needs: [detect-versions, build-version]
+  summary:
+    needs: build
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Check Build Results
+      - name: Build Summary
         shell: bash
         run: |
           echo "## Build Summary" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Mod Version: ${{ needs.detect-versions.outputs.mod_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Result: ${{ needs.build.result }}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Minecraft Version | Status |" >> "$GITHUB_STEP_SUMMARY"
-          echo "|-------------------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "All Minecraft versions built via \`./gradlew buildAndCollect\`." >> "$GITHUB_STEP_SUMMARY"
 
-          for version in ${{ join(fromJson(needs.detect-versions.outputs.versions), ' ') }}; do
-            echo "| $version | See build-version ($version) |" >> "$GITHUB_STEP_SUMMARY"
-          done
-
-      - name: Fail if any build failed
-        if: contains(needs.*.result, 'failure')
+      - name: Fail if build failed
+        if: ${{ needs.build.result != 'success' }}
         run: exit 1
-
-  # Collect and package all successful builds into a single ZIP
-  package-artifacts:
-    needs: [detect-versions, build-version]
-    runs-on: ubuntu-latest
-    if: success()
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
-
-      - name: Download All Build Artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: artifacts
-          pattern: lumichat-*
-          merge-multiple: false
-
-      - name: Organize Artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p packaged-artifacts
-          echo "Organizing artifacts..."
-          find artifacts -name "*.jar" -type f ! -name "*sources*" -exec cp {} packaged-artifacts/ \;
-          echo "Filtered out sources JARs, keeping only main JARs:"
-          ls -la packaged-artifacts/
-
-      - name: Upload Combined Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: lumichat-${{ needs.detect-versions.outputs.mod_version }}-all-builds
-          path: packaged-artifacts/
-          retention-days: 120
-          if-no-files-found: error

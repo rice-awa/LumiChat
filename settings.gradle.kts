@@ -10,6 +10,8 @@ pluginManagement {
 
 plugins {
     id("dev.kikugie.stonecutter") version "0.8.3"
+    // 让 Gradle toolchain auto-download 按 requiredJava 解析对应 JDK（Temurim/Adoptium）。
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.1"
 }
 
 stonecutter {

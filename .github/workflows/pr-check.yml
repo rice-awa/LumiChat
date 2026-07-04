@@ -1,5 +1,7 @@
 name: PR Check
 
+# PR 检查：单 job buildAndCollect（build.gradle.kts 中 buildAndCollect dependsOn("build")
+# 因此会顺带跑 check/test），不再用矩阵 + 逐版本 :build。
 on:
   pull_request:
     paths-ignore:
@@ -11,69 +13,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Dynamically detect available versions from settings.gradle.kts
-  detect-versions:
+  check:
     runs-on: ubuntu-latest
-    outputs:
-      versions: ${{ steps.versions.outputs.versions }}
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v5
-
-      - name: Detect Minecraft Versions and Mod Version
-        id: versions
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          VERSIONS=$(
-            (
-              # version(project = "x", version = "y") -> capture project name
-              grep -oE 'version\s*\([^)]*project\s*=\s*"[^"]+"' settings.gradle.kts \
-                | grep -oE 'project\s*=\s*"[^"]+"' \
-                | cut -d'"' -f2
-
-              # version("x") -> capture direct version node (supports 26.1 / 26.1.1 / 26.1.2 ...)
-              grep -oE 'version\s*\(\s*"[^"]+"\s*\)' settings.gradle.kts \
-                | grep -oE '"[^"]+"' \
-                | tr -d '"'
-
-              # versions("a", "b", ...) -> capture every listed version
-              grep -oE 'versions\s*\([^)]+\)' settings.gradle.kts \
-                | grep -oE '"[^"]+"' \
-                | tr -d '"'
-            ) | awk 'NF && !seen[$0]++' | paste -sd ',' -
-          )
-
-          echo "Detected versions: $VERSIONS"
-
-          VERSIONS_JSON=$(
-            echo "$VERSIONS" \
-              | tr ',' '\n' \
-              | jq -R -s -c 'split("\n") | map(select(length > 0))'
-          )
-
-          echo "versions=$VERSIONS_JSON" >> "$GITHUB_OUTPUT"
-
-          MOD_VERSION=$(
-            grep -E '^mod\.version\s*=' gradle.properties \
-              | head -n1 \
-              | cut -d'=' -f2- \
-              | xargs
-          )
-
-          echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Mod version: $MOD_VERSION"
-
-  # Check each version independently
-  check-version:
-    needs: detect-versions
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        version: ${{ fromJson(needs.detect-versions.outputs.versions) }}
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -81,48 +22,36 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v5
 
-      - name: Setup JDK 21
-        if: "!startsWith(matrix.version, '26')"
+      - name: Setup Base JDK 21
         uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup JDK 25
-        if: "startsWith(matrix.version, '26')"
-        uses: actions/setup-java@v5
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
         with:
-          java-version: '25'
-          distribution: 'temurin'
+          gradle-version: wrapper
 
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Run Checks for Version ${{ matrix.version }}
-        run: ./gradlew :${{ matrix.version }}:check --stacktrace
+      - name: Build and Collect All Versions
+        run: ./gradlew buildAndCollect --stacktrace
 
-      - name: Build Version ${{ matrix.version }}
-        run: ./gradlew :${{ matrix.version }}:build --stacktrace
-
-  # Summary job to report overall PR status
-  pr-summary:
-    needs: [detect-versions, check-version]
+  summary:
+    needs: check
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Generate PR Check Summary
+      - name: PR Check Summary
         run: |
           echo "## PR Check Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All supported Minecraft versions have been checked." >> $GITHUB_STEP_SUMMARY
+          echo "Result: ${{ needs.check.result }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Minecraft Version | Check | Build |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------------------|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          
-          for version in ${{ join(fromJson(needs.detect-versions.outputs.versions), ' ') }}; do
-            echo "| $version | See job logs | See job logs |" >> $GITHUB_STEP_SUMMARY
-          done
+          echo "All Minecraft versions checked via \`./gradlew buildAndCollect\`." >> $GITHUB_STEP_SUMMARY
 
-      - name: Fail if any check failed
-        if: contains(needs.*.result, 'failure')
+      - name: Fail if check failed
+        if: ${{ needs.check.result != 'success' }}
         run: exit 1
