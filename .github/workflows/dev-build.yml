@@ -1,6 +1,6 @@
 name: Dev Build
 
-# 单 job buildAndCollect 构建（手动触发，可指定分支与额外参数）。
+# 多版本矩阵并行构建（手动触发，可指定分支与额外参数）。
 on:
   workflow_dispatch:
     inputs:
@@ -20,8 +20,78 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dev-build:
+  detect-versions:
     runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.versions.outputs.versions }}
+      mod_version: ${{ steps.versions.outputs.mod_version }}
+      build_timestamp: ${{ steps.timestamp.outputs.timestamp }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Detect Minecraft Versions and Mod Version
+        id: versions
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSIONS=$(
+            (
+              # version(project = "x", version = "y") -> capture project name
+              grep -oE 'version\s*\([^)]*project\s*=\s*"[^"]+"' settings.gradle.kts \
+                | grep -oE 'project\s*=\s*"[^"]+"' \
+                | cut -d'"' -f2
+
+              # version("x") -> capture direct version node (supports 26.1 / 26.1.1 / 26.1.2 ...)
+              grep -oE 'version\s*\(\s*"[^"]+"\s*\)' settings.gradle.kts \
+                | grep -oE '"[^"]+"' \
+                | tr -d '"'
+
+              # versions("a", "b", ...) -> capture every listed version
+              grep -oE 'versions\s*\([^)]+\)' settings.gradle.kts \
+                | grep -oE '"[^"]+"' \
+                | tr -d '"'
+            ) | awk 'NF && !seen[$0]++' | paste -sd ',' -
+          )
+
+          echo "Detected versions: $VERSIONS"
+
+          VERSIONS_JSON=$(
+            echo "$VERSIONS" \
+              | tr ',' '\n' \
+              | jq -R -s -c 'split("\n") | map(select(length > 0))'
+          )
+
+          echo "versions=$VERSIONS_JSON" >> "$GITHUB_OUTPUT"
+
+          MOD_VERSION=$(
+            grep -E '^mod\.version\s*=' gradle.properties \
+              | head -n1 \
+              | cut -d'=' -f2- \
+              | xargs
+          )
+
+          echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Mod version: $MOD_VERSION"
+
+      - name: Generate Build Timestamp
+        id: timestamp
+        run: |
+          TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
+          echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
+          echo "Build timestamp: $TIMESTAMP"
+
+  build-version:
+    needs: detect-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        version: ${{ fromJson(needs.detect-versions.outputs.versions) }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
@@ -31,10 +101,18 @@ jobs:
       - name: Validate Gradle Wrapper
         uses: gradle/actions/wrapper-validation@v5
 
-      - name: Setup Base JDK 21
+      - name: Setup JDK 21
+        if: "!startsWith(matrix.version, '26')"
         uses: actions/setup-java@v5
         with:
           java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup JDK 25
+        if: "startsWith(matrix.version, '26')"
+        uses: actions/setup-java@v5
+        with:
+          java-version: '25'
           distribution: 'temurin'
 
       - name: Setup Gradle
@@ -45,51 +123,45 @@ jobs:
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Generate Build Timestamp
-        id: timestamp
-        run: |
-          TIMESTAMP=$(date +'%Y%m%d-%H%M%S')
-          echo "timestamp=$TIMESTAMP" >> "$GITHUB_OUTPUT"
-          echo "Build timestamp: $TIMESTAMP"
-
-      - name: Resolve Mod Version
-        id: modver
-        run: |
-          MOD_VERSION=$(grep -E '^mod\.version\s*=' gradle.properties | head -n1 | cut -d'=' -f2- | xargs)
-          echo "mod_version=$MOD_VERSION" >> "$GITHUB_OUTPUT"
-          echo "Mod version: $MOD_VERSION"
-
-      - name: Build and Collect All Versions
+      - name: Build Version ${{ matrix.version }}
         run: |
           EXTRA_ARGS="${{ github.event.inputs.additional_args }}"
           if [ -z "$EXTRA_ARGS" ]; then
-            ./gradlew buildAndCollect --stacktrace
+            ./gradlew :${{ matrix.version }}:build --stacktrace
           else
-            ./gradlew buildAndCollect --stacktrace $EXTRA_ARGS
+            ./gradlew :${{ matrix.version }}:build --stacktrace $EXTRA_ARGS
           fi
 
-      - name: Upload Build Artifacts
+      - name: Upload Build Artifacts for ${{ matrix.version }}
         uses: actions/upload-artifact@v4
         with:
-          name: lumichat-dev-${{ steps.timestamp.outputs.timestamp }}-all-builds
-          path: build/libs/
+          name: lumichat-dev-${{ needs.detect-versions.outputs.build_timestamp }}-mc${{ matrix.version }}
+          path: |
+            versions/${{ matrix.version }}/build/libs/*.jar
+            !versions/${{ matrix.version }}/build/libs/*-dev.jar
           if-no-files-found: error
           retention-days: 30
 
-  summary:
-    needs: dev-build
+  build-summary:
+    needs: [detect-versions, build-version]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Dev Build Summary
+      - name: Check Build Results
         run: |
-          echo "## Dev Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.event.inputs.branch }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Result:** ${{ needs.dev-build.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All Minecraft versions built via \`./gradlew buildAndCollect\`." >> $GITHUB_STEP_SUMMARY
+          echo "## Dev Build Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Branch:** ${{ github.event.inputs.branch }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Build Time:** ${{ needs.detect-versions.outputs.build_timestamp }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Mod Version:** ${{ needs.detect-versions.outputs.mod_version }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Minecraft Version | Status |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------------------|--------|" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Fail if build failed
-        if: ${{ needs.dev-build.result != 'success' }}
+          for version in ${{ join(fromJson(needs.detect-versions.outputs.versions), ' ') }}; do
+            echo "| $version | See build-version ($version) |" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Fail if any build failed
+        if: contains(needs.*.result, 'failure')
         run: exit 1
