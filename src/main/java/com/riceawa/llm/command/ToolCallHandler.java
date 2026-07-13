@@ -309,10 +309,11 @@ public final class ToolCallHandler {
                                       LLMChatConfig config) {
         if (result.isSuccess()) {
             String resultMessage = result.getResult();
+            String llmSafeResult = toolResultContent(functionName, result);
             MessageCompat.displayClientMessage(player,
                     Component.literal("[函数执行] " + resultMessage)
                             .withStyle(ChatFormatting.GREEN), false);
-            chatContext.addAssistantMessage("调用了函数 " + functionName + "，结果：" + resultMessage);
+            chatContext.addAssistantMessage("调用了函数 " + functionName + "，结果：" + llmSafeResult);
             if (config.isEnableHistory()) {
                 ChatHistory.getInstance().saveSession(chatContext);
             }
@@ -348,12 +349,33 @@ public final class ToolCallHandler {
         toolCallMessage.setMetadata(metadata);
         chatContext.addMessage(toolCallMessage);
 
-        String resultContent = result.isSuccess() ? result.getResult() : "错误: " + result.getError();
+        String resultContent = toolResultContent(functionName, result);
         LLMMessage toolResponseMessage = new LLMMessage(
                 LLMMessage.MessageRole.TOOL, resultContent);
         toolResponseMessage.setName(functionName);
         toolResponseMessage.setToolCallId(toolCallId);
         chatContext.addMessage(toolResponseMessage);
+    }
+
+    static String toolResultContent(String functionName, LLMFunction.FunctionResult result) {
+        if (!result.isSuccess()) {
+            return "错误: " + result.getError();
+        }
+        if ("execute_command".equals(functionName)) {
+            return commandExecutionSummary(result);
+        }
+        return result.getResult();
+    }
+
+    private static String commandExecutionSummary(LLMFunction.FunctionResult result) {
+        if (result.getData() == null) {
+            return "命令执行成功";
+        }
+        String root = result.getData().has("command_root")
+                ? result.getData().get("command_root").getAsString() : "";
+        int resultCode = result.getData().has("result_code")
+                ? result.getData().get("result_code").getAsInt() : 0;
+        return "命令执行成功: " + root + " (返回码: " + resultCode + ")";
     }
 
     private void observeFinalFailure(String playerId, String operation, Throwable finalFailure) {

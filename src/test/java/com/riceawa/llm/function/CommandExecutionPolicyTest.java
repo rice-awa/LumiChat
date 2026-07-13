@@ -66,6 +66,15 @@ class CommandExecutionPolicyTest {
     }
 
     @Test
+    void rejectsWhitespacePaddedCommandsLongerThanTheConfiguredLimit() {
+        CommandExecutionPolicy.Decision decision = CommandExecutionPolicy.evaluate(
+                " ".repeat(253) + "list", true, true, Set.of("list"));
+
+        assertFalse(decision.allowed());
+        assertEquals("too_long", decision.reason());
+    }
+
+    @Test
     void rejectsControlCharactersAndCommandSeparators() {
         assertEquals("invalid_command", CommandExecutionPolicy.evaluate(
                 "list\nstop", true, true, Set.of("list")).reason());

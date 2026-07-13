@@ -33,6 +33,10 @@ public final class CommandExecutionPolicy {
             return new Decision(false, "", "not_operator");
         }
 
+        if (command != null && command.length() > normalizeMaxLength(maxLength)) {
+            return new Decision(false, "", "too_long");
+        }
+
         String normalizedCommand = normalizeCommand(command);
         if (normalizedCommand == null) {
             return new Decision(false, "", "invalid_command");

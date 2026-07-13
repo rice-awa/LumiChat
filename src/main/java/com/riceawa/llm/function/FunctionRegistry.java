@@ -229,7 +229,7 @@ public class FunctionRegistry {
         
         try {
             JsonObject argumentsSnapshot = arguments == null ? new JsonObject() : arguments.deepCopy();
-            auditExecution(functionName, player, function.executionMode());
+            auditExecutionIfGeneric(functionName, player, function.executionMode());
             return function.execute(player, server, argumentsSnapshot);
         } catch (Exception e) {
             logExecutionFailure(functionName, player, function.executionMode());
@@ -318,6 +318,17 @@ public class FunctionRegistry {
             return throwable.getCause();
         }
         return throwable;
+    }
+
+    static boolean shouldAuditGeneric(String functionName) {
+        return !"execute_command".equals(functionName);
+    }
+
+    private static void auditExecutionIfGeneric(String functionName, Player player,
+                                                LLMFunction.ExecutionMode mode) {
+        if (shouldAuditGeneric(functionName)) {
+            auditExecution(functionName, player, mode);
+        }
     }
 
     private static void auditExecution(String functionName, Player player,
