@@ -1,9 +1,16 @@
 # 多版本构建指南
 
-本项目使用 Stonecutter 框架支持跨大版本 Minecraft 并行开发，当前矩阵覆盖 1.19-1.19.4、1.20-1.20.6、1.21-1.21.11 与 26.1，并采用版本组减少历史分支产物数量。
+本项目使用 Stonecutter 框架支持跨大版本 Minecraft 并行开发。Gradle 项目节点用于任务路径，实际编译目标用于选择 Minecraft 依赖，发布兼容范围则由各节点的 `mod.mc_targets` 元数据声明；这三者不能互相替代。
 
+| Gradle 项目节点（集合） | 实际编译目标 | 发布兼容范围 |
+| --- | --- | --- |
+| `1.19` | `1.19.4` | `1.19`-`1.19.4` |
+| `1.20`-`1.20.6` | 与各节点同名 | 由各节点的 `mod.mc_targets` 声明 |
+| `1.21`-`1.21.11` | 与各节点同名 | 由各节点的 `mod.mc_targets` 声明 |
+| `26.1` | `26.1.2` | `26.1`-`26.1.2` |
+| `26.2` | `26.2` | `26.2` |
 
-> 说明：26.1 版本节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。
+仅当运行 Gradle 的 JVM 为 Java 25 或更高版本时，`settings.gradle.kts` 才会把 26.1/26.2 加入当前项目矩阵。这两个条件节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。旧版 1.16.5-1.18 不受支持。
 
 ## 常用 Gradle 命令
 
@@ -11,13 +18,16 @@
 ```bash
 ./gradlew buildAndCollect
 ```
-构建完成后，所有版本的模组文件将存放在 `build/libs/2.0.0/` 目录下。
+构建完成后，所有版本的模组文件将存放在 `build/libs/2.1.0/` 目录下。
 
-**构建特定版本：**
+**提交前代表性构建矩阵：**
 ```bash
 ./gradlew :1.19:build
 ./gradlew :1.20.6:build
 ./gradlew :1.21.11:build
+# 仅在运行 Gradle 的 JVM 为 Java 25+ 时执行
+./gradlew :26.1:build
+./gradlew :26.2:build
 ```
 
 **运行特定版本：**
@@ -65,7 +75,9 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 │   ├── 1.19/            # 版本组: 实际构建版本 1.19.4
 │   ├── 1.20/
 │   ├── ...
-│   └── 1.21.11/
+│   ├── 1.21.11/
+│   ├── 26.1/            # Java 25+ 条件节点: 实际构建版本 26.1.2
+│   └── 26.2/            # Java 25+ 条件节点: 实际构建版本 26.2
 ├── build.gradle.kts        # 构建模板（应用于所有版本）
 ├── stonecutter.gradle.kts  # Stonecutter 控制器配置
 └── settings.gradle.kts     # 项目设置和版本定义
@@ -80,10 +92,11 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 - 保持单一共享 `build.gradle.kts`，将版本差异收敛到 `versions/<mc-version>/gradle.properties`。
 - 继续使用 `setActiveVersion` + `resetActiveVersion` 的开发与提交闭环，减少临时状态进入 Git。
 
-关于版本组（`version(project=..., version=...)`）的说明：
+关于项目节点、编译目标与发布范围的说明：
 
-- 当前已对历史版本启用版本组：`1.19 -> 1.19.4`。
+- 当前使用两组节点到实际编译目标的映射：`1.19 -> 1.19.4`，以及 Java 25+ 时的 `26.1 -> 26.1.2`。
 - Stonecutter 中 `project` 用于 Gradle 子项目名（产物维度），`version` 用于实际编译的 Minecraft 版本（依赖维度）。
+- `mod.mc_targets` 只描述发布平台上的兼容版本范围，不会改变 Gradle 项目节点或实际编译目标。
 - 新增版本时，优先按“API 差异 + 发布策略”判断是否分组；若同一小版本段 API 与依赖一致，可复用一个版本组节点。
 
 ## 注意事项
@@ -108,12 +121,15 @@ Stonecutter 使用"活动版本"机制来管理源代码：
    - 使用 Stonecutter 条件注释处理版本差异
    - 运行测试验证功能
 
-3. **验证所有版本**
+3. **验证代表性版本**
    ```bash
-   # 构建所有支持版本（建议至少覆盖每个大版本分组）
+   # 覆盖每个受支持的大版本分组
    ./gradlew :1.19:build
    ./gradlew :1.20.6:build
    ./gradlew :1.21.11:build
+   # 仅在运行 Gradle 的 JVM 为 Java 25+ 时执行
+   ./gradlew :26.1:build
+   ./gradlew :26.2:build
    ```
 
 4. **提交前检查**
@@ -145,7 +161,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 脚本将执行以下检查：
 1. 工作区状态检查
-2. 全版本构建验证（覆盖每个版本组与最新小版本）
+2. 代表性版本构建验证（始终验证 1.19、1.20.6、1.21.11；Java 25+ 时再验证 26.1、26.2）
 3. resetActiveVersion 执行
 4. Stonecutter 状态验证
 
