@@ -1,0 +1,289 @@
+# Review package: 564d8fb..HEAD
+
+## Commits
+9b0a6f9 fix(core): 修复懒加载单例安全发布
+
+## Files changed
+ src/main/java/com/riceawa/llm/config/LLMChatConfig.java           | 2 +-
+ src/main/java/com/riceawa/llm/context/ChatContextManager.java     | 2 +-
+ src/main/java/com/riceawa/llm/core/ConcurrencyManager.java        | 2 +-
+ src/main/java/com/riceawa/llm/function/FunctionRegistry.java      | 2 +-
+ src/main/java/com/riceawa/llm/history/ChatHistory.java            | 2 +-
+ src/main/java/com/riceawa/llm/service/LLMServiceManager.java      | 2 +-
+ src/main/java/com/riceawa/llm/service/ProviderHealthChecker.java  | 2 +-
+ src/main/java/com/riceawa/llm/service/TitleGenerationService.java | 2 +-
+ src/main/java/com/riceawa/llm/template/PromptTemplateManager.java | 2 +-
+ src/main/java/com/riceawa/llm/template/TemplateEditor.java        | 2 +-
+ 10 files changed, 10 insertions(+), 10 deletions(-)
+
+## Diff
+diff --git a/src/main/java/com/riceawa/llm/config/LLMChatConfig.java b/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
+index 2ce8b22..4798305 100644
+--- a/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
++++ b/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
+@@ -13,21 +13,21 @@ import java.nio.file.Path;
+ import java.nio.file.StandardCopyOption;
+ import java.util.ArrayList;
+ import java.util.HashSet;
+ import java.util.List;
+ import java.util.Set;
+ 
+ /**
+  * LLM聊天配置管理
+  */
+ public class LLMChatConfig {
+-    private static LLMChatConfig instance;
++    private static volatile LLMChatConfig instance;
+     private final Gson gson;
+     private final Path configFile;
+     private boolean isInitializing = false;
+     private ProviderManager providerManager;
+ 
+     // 配置版本
+     private static final String CURRENT_CONFIG_VERSION = "2.0.0";
+ 
+     // 配置项 - 使用ConfigDefaults中的默认值
+     private String configVersion = CURRENT_CONFIG_VERSION;
+diff --git a/src/main/java/com/riceawa/llm/context/ChatContextManager.java b/src/main/java/com/riceawa/llm/context/ChatContextManager.java
+index 10218c3..29260c3 100644
+--- a/src/main/java/com/riceawa/llm/context/ChatContextManager.java
++++ b/src/main/java/com/riceawa/llm/context/ChatContextManager.java
+@@ -12,21 +12,21 @@ import java.util.Map;
+ import java.util.UUID;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.Executors;
+ import java.util.concurrent.ScheduledExecutorService;
+ import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * 聊天上下文管理器，管理所有玩家的聊天上下文
+  */
+ public class ChatContextManager {
+-    private static ChatContextManager instance;
++    private static volatile ChatContextManager instance;
+     private final Map<UUID, ChatContext> contexts;
+     private final ScheduledExecutorService scheduler;
+     private final long contextTimeoutMs;
+ 
+     private ChatContextManager() {
+         this.contexts = new ConcurrentHashMap<>();
+         this.scheduler = Executors.newScheduledThreadPool(1);
+         this.contextTimeoutMs = TimeUnit.HOURS.toMillis(2); // 2小时超时
+         
+         // 启动清理任务
+diff --git a/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java b/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java
+index 5958b54..d1dda37 100644
+--- a/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java
++++ b/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java
+@@ -4,21 +4,21 @@ import com.riceawa.llm.logging.LogManager;
+ 
+ import java.util.concurrent.*;
+ import java.util.concurrent.atomic.AtomicInteger;
+ import java.util.concurrent.atomic.AtomicLong;
+ import java.util.function.Supplier;
+ 
+ /**
+  * 并发管理器 - 管理LLM请求的并发执行和资源控制
+  */
+ public class ConcurrencyManager {
+-    private static ConcurrencyManager instance;
++    private static volatile ConcurrencyManager instance;
+     
+     // 配置参数
+     private final int maxConcurrentRequests;
+     private final int queueCapacity;
+     private final long requestTimeoutMs;
+     private final int corePoolSize;
+     private final int maximumPoolSize;
+     private final long keepAliveTimeMs;
+     private final boolean loggingEnabled;
+     
+diff --git a/src/main/java/com/riceawa/llm/function/FunctionRegistry.java b/src/main/java/com/riceawa/llm/function/FunctionRegistry.java
+index c60dde6..39367ef 100644
+--- a/src/main/java/com/riceawa/llm/function/FunctionRegistry.java
++++ b/src/main/java/com/riceawa/llm/function/FunctionRegistry.java
+@@ -7,21 +7,21 @@ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.world.entity.player.Player;
+ 
+ import java.util.*;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.stream.Collectors;
+ 
+ /**
+  * Function注册表，管理所有可用的LLM函数
+  */
+ public class FunctionRegistry {
+-    private static FunctionRegistry instance;
++    private static volatile FunctionRegistry instance;
+     private final Map<String, LLMFunction> functions;
+     private final Map<String, Set<String>> categoryFunctions;
+ 
+     private FunctionRegistry() {
+         this.functions = new ConcurrentHashMap<>();
+         this.categoryFunctions = new ConcurrentHashMap<>();
+         registerDefaultFunctions();
+     }
+ 
+     public static FunctionRegistry getInstance() {
+diff --git a/src/main/java/com/riceawa/llm/history/ChatHistory.java b/src/main/java/com/riceawa/llm/history/ChatHistory.java
+index 7b49aa6..dbf6bad 100644
+--- a/src/main/java/com/riceawa/llm/history/ChatHistory.java
++++ b/src/main/java/com/riceawa/llm/history/ChatHistory.java
+@@ -15,21 +15,21 @@ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.time.LocalDateTime;
+ import java.time.format.DateTimeFormatter;
+ import java.util.*;
+ import java.util.concurrent.ConcurrentHashMap;
+ 
+ /**
+  * 聊天历史记录管理器
+  */
+ public class ChatHistory {
+-    private static ChatHistory instance;
++    private static volatile ChatHistory instance;
+     private final Gson gson;
+     private final Path historyDir;
+     private final Map<UUID, List<ChatSession>> playerHistories;
+     private final int maxSessionsPerPlayer;
+ 
+     private ChatHistory() {
+         this.gson = new GsonBuilder()
+                 .setPrettyPrinting()
+                 .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
+                 .create();
+diff --git a/src/main/java/com/riceawa/llm/service/LLMServiceManager.java b/src/main/java/com/riceawa/llm/service/LLMServiceManager.java
+index a291aef..59bf2ad 100644
+--- a/src/main/java/com/riceawa/llm/service/LLMServiceManager.java
++++ b/src/main/java/com/riceawa/llm/service/LLMServiceManager.java
+@@ -8,21 +8,21 @@ import com.riceawa.llm.config.ConcurrencySettings;
+ 
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.Set;
+ 
+ /**
+  * LLM服务管理器
+  */
+ public class LLMServiceManager {
+-    private static LLMServiceManager instance;
++    private static volatile LLMServiceManager instance;
+     private final Map<String, LLMService> services;
+     private String defaultServiceName;
+ 
+     private LLMServiceManager() {
+         this.services = new HashMap<>();
+         initializeServices();
+     }
+ 
+     public static LLMServiceManager getInstance() {
+         if (instance == null) {
+diff --git a/src/main/java/com/riceawa/llm/service/ProviderHealthChecker.java b/src/main/java/com/riceawa/llm/service/ProviderHealthChecker.java
+index dace4e8..6b8caa1 100644
+--- a/src/main/java/com/riceawa/llm/service/ProviderHealthChecker.java
++++ b/src/main/java/com/riceawa/llm/service/ProviderHealthChecker.java
+@@ -14,21 +14,21 @@ import java.util.Map;
+ import java.util.concurrent.CompletableFuture;
+ import java.util.concurrent.ConcurrentHashMap;
+ import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * Provider健康检查器
+  * 负责异步检测provider的可用性，缓存检测结果
+  */
+ public class ProviderHealthChecker {
+     
+-    private static ProviderHealthChecker instance;
++    private static volatile ProviderHealthChecker instance;
+     private final Map<String, HealthStatus> healthCache = new ConcurrentHashMap<>();
+     private final long CACHE_DURATION_MS = TimeUnit.MINUTES.toMillis(5); // 5分钟缓存
+     
+     private ProviderHealthChecker() {}
+     
+     public static ProviderHealthChecker getInstance() {
+         if (instance == null) {
+             synchronized (ProviderHealthChecker.class) {
+                 if (instance == null) {
+                     instance = new ProviderHealthChecker();
+diff --git a/src/main/java/com/riceawa/llm/service/TitleGenerationService.java b/src/main/java/com/riceawa/llm/service/TitleGenerationService.java
+index d5f5171..1c188a7 100644
+--- a/src/main/java/com/riceawa/llm/service/TitleGenerationService.java
++++ b/src/main/java/com/riceawa/llm/service/TitleGenerationService.java
+@@ -12,21 +12,21 @@ import com.riceawa.llm.logging.LogManager;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.concurrent.CompletableFuture;
+ import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * 对话标题生成服务
+  * 使用LLM为对话会话生成简洁的标题
+  */
+ public class TitleGenerationService {
+-    private static TitleGenerationService instance;
++    private static volatile TitleGenerationService instance;
+     private static final String TITLE_GENERATION_PROMPT = 
+         "请为以下对话生成一个简洁的中文标题（10-20字），概括对话的主要内容：\n\n%s\n\n" +
+         "要求：\n" +
+         "- 标题要简洁明了，突出重点\n" +
+         "- 使用中文\n" +
+         "- 长度控制在10-20字\n" +
+         "- 不要包含标点符号\n" +
+         "- 直接返回标题，不要其他内容";
+ 
+     private TitleGenerationService() {
+diff --git a/src/main/java/com/riceawa/llm/template/PromptTemplateManager.java b/src/main/java/com/riceawa/llm/template/PromptTemplateManager.java
+index d8eae10..a7b2043 100644
+--- a/src/main/java/com/riceawa/llm/template/PromptTemplateManager.java
++++ b/src/main/java/com/riceawa/llm/template/PromptTemplateManager.java
+@@ -9,21 +9,21 @@ import java.io.*;
+ import java.lang.reflect.Type;
+ import java.nio.file.Files;
+ import java.nio.file.Path;
+ import java.util.*;
+ import java.util.concurrent.ConcurrentHashMap;
+ 
+ /**
+  * 提示词模板管理器
+  */
+ public class PromptTemplateManager {
+-    private static PromptTemplateManager instance;
++    private static volatile PromptTemplateManager instance;
+     private final Map<String, PromptTemplate> templates;
+     private final Gson gson;
+     private final Path templatesFile;
+ 
+     private PromptTemplateManager() {
+         this.templates = new ConcurrentHashMap<>();
+         this.gson = new GsonBuilder().setPrettyPrinting().create();
+         
+         Path configDir = FabricLoader.getInstance().getConfigDir().resolve("lumichat");
+         this.templatesFile = configDir.resolve("prompt_templates.json");
+diff --git a/src/main/java/com/riceawa/llm/template/TemplateEditor.java b/src/main/java/com/riceawa/llm/template/TemplateEditor.java
+index f8b71fe..5804585 100644
+--- a/src/main/java/com/riceawa/llm/template/TemplateEditor.java
++++ b/src/main/java/com/riceawa/llm/template/TemplateEditor.java
+@@ -8,21 +8,21 @@ import net.minecraft.world.entity.player.Player;
+ 
+ import java.util.Map;
+ import java.util.UUID;
+ import java.util.concurrent.ConcurrentHashMap;
+ 
+ /**
+  * 提示词模板编辑器
+  * 管理玩家的模板编辑会话
+  */
+ public class TemplateEditor {
+-    private static TemplateEditor instance;
++    private static volatile TemplateEditor instance;
+     private final Map<UUID, EditSession> editSessions;
+ 
+     private TemplateEditor() {
+         this.editSessions = new ConcurrentHashMap<>();
+     }
+ 
+     public static TemplateEditor getInstance() {
+         if (instance == null) {
+             synchronized (TemplateEditor.class) {
+                 if (instance == null) {

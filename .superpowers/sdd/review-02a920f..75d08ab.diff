@@ -1,0 +1,402 @@
+# Review package: 02a920f..HEAD
+
+## Commits
+75d08ab fix(core): 修复并发许可与队列统计
+
+## Files changed
+ .../com/riceawa/llm/core/ConcurrencyManager.java   |  56 +++--
+ .../riceawa/llm/core/ConcurrencyManagerTest.java   | 233 +++++++++++++++++++++
+ 2 files changed, 266 insertions(+), 23 deletions(-)
+
+## Diff
+diff --git a/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java b/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java
+index c5b24e3..afb5602 100644
+--- a/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java
++++ b/src/main/java/com/riceawa/llm/core/ConcurrencyManager.java
+@@ -54,40 +54,44 @@ public class ConcurrencyManager {
+             new LinkedBlockingQueue<>(queueCapacity),
+             new ThreadFactory() {
+                 private final AtomicInteger threadNumber = new AtomicInteger(1);
+                 @Override
+                 public Thread newThread(Runnable r) {
+                     Thread t = new Thread(r, "LLM-Worker-" + threadNumber.getAndIncrement());
+                     t.setDaemon(true);
+                     return t;
+                 }
+             },
+-            new ThreadPoolExecutor.CallerRunsPolicy() // 当队列满时，在调用者线程中执行
++            new ThreadPoolExecutor.AbortPolicy()
+         );
+         
+         // 创建信号量来控制并发请求数
+         this.requestSemaphore = new Semaphore(maxConcurrentRequests, true);
+         
+         LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.INFO, "system",
+             "ConcurrencyManager initialized with config: " +
+             "maxConcurrent=" + maxConcurrentRequests +
+             ", queueCapacity=" + queueCapacity +
+             ", corePoolSize=" + corePoolSize +
+             ", maxPoolSize=" + maximumPoolSize);
+     }
+     
+     public static synchronized void initialize(ConcurrencyConfig config) {
+         if (instance != null) {
+             instance.shutdown();
+         }
+         instance = new ConcurrencyManager(config);
+     }
++
++    static ConcurrencyManager createForTest(ConcurrencyConfig config) {
++        return new ConcurrencyManager(config);
++    }
+     
+     public static ConcurrencyManager getInstance() {
+         if (instance == null) {
+             synchronized (ConcurrencyManager.class) {
+                 if (instance == null) {
+                     // 使用默认配置初始化
+                     initialize(ConcurrencyConfig.createDefault());
+                 }
+             }
+         }
+@@ -95,73 +99,79 @@ public class ConcurrencyManager {
+     }
+     
+     /**
+      * 提交一个LLM请求任务
+      */
+     public <T> CompletableFuture<T> submitRequest(Supplier<T> task, String requestId) {
+         totalRequests.incrementAndGet();
+         
+         CompletableFuture<T> future = new CompletableFuture<>();
+         
+-        // 检查是否可以获取信号量（非阻塞）
+-        if (!requestSemaphore.tryAcquire()) {
+-            // 如果无法立即获取信号量，说明已达到最大并发数
+-            queuedRequests.incrementAndGet();
+-            LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.DEBUG, "system",
+-                "Request queued due to concurrency limit: " + requestId);
+-        }
+-        
+         try {
+             executorService.submit(() -> {
+                 long startTime = System.currentTimeMillis();
++                boolean acquired = false;
++                boolean queued = false;
++                boolean active = false;
+                 try {
+-                    // 获取信号量（如果之前没有获取到）
+-                    if (!requestSemaphore.tryAcquire(requestTimeoutMs, TimeUnit.MILLISECONDS)) {
+-                        future.completeExceptionally(new TimeoutException("Request timeout waiting for concurrency slot"));
+-                        failedRequests.incrementAndGet();
+-                        return;
++                    acquired = requestSemaphore.tryAcquire();
++                    if (!acquired) {
++                        queued = true;
++                        queuedRequests.incrementAndGet();
++                        LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.DEBUG, "system",
++                            "Request queued due to concurrency limit: " + requestId);
++                        acquired = requestSemaphore.tryAcquire(requestTimeoutMs, TimeUnit.MILLISECONDS);
+                     }
+-                    
++                    if (!acquired) {
++                        throw new TimeoutException("Request timeout waiting for concurrency slot");
++                    }
++
+                     activeRequests.incrementAndGet();
+-                    queuedRequests.decrementAndGet();
++                    active = true;
+                     
+                     LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.DEBUG, "system",
+                         "Starting LLM request: " + requestId +
+                         " (active: " + activeRequests.get() + "/" + maxConcurrentRequests + ")");
+                     
+                     // 执行实际任务
+                     T result = task.get();
+-                    future.complete(result);
+                     completedRequests.incrementAndGet();
++                    future.complete(result);
+                     
+                     long duration = System.currentTimeMillis() - startTime;
+                     LogManager.getInstance().performance("LLM request completed: " + requestId,
+                         java.util.Map.of(
+                             "duration_ms", duration,
+                             "active_requests", activeRequests.get(),
+                             "queued_requests", queuedRequests.get()
+                         ));
+                     
+-                } catch (Exception e) {
+-                    future.completeExceptionally(e);
++                } catch (Throwable throwable) {
+                     failedRequests.incrementAndGet();
+-                    LogManager.getInstance().error("LLM request failed: " + requestId, e);
++                    future.completeExceptionally(throwable);
++                    LogManager.getInstance().error("LLM request failed: " + requestId, throwable);
+                 } finally {
+-                    activeRequests.decrementAndGet();
+-                    requestSemaphore.release();
++                    if (queued) {
++                        queuedRequests.decrementAndGet();
++                    }
++                    if (active) {
++                        activeRequests.decrementAndGet();
++                    }
++                    if (acquired) {
++                        requestSemaphore.release();
++                    }
+                 }
+             });
+         } catch (RejectedExecutionException e) {
+             // 线程池队列已满
+             future.completeExceptionally(new RuntimeException("Request rejected: thread pool queue is full", e));
+             failedRequests.incrementAndGet();
+-            requestSemaphore.release(); // 释放可能已获取的信号量
+         }
+         
+         return future;
+     }
+     
+     /**
+      * 记录token使用情况
+      */
+     public void recordTokenUsage(int promptTokens, int completionTokens, int totalTokensUsed) {
+         if (promptTokens > 0) {
+diff --git a/src/test/java/com/riceawa/llm/core/ConcurrencyManagerTest.java b/src/test/java/com/riceawa/llm/core/ConcurrencyManagerTest.java
+new file mode 100644
+index 0000000..2086e0f
+--- /dev/null
++++ b/src/test/java/com/riceawa/llm/core/ConcurrencyManagerTest.java
+@@ -0,0 +1,233 @@
++package com.riceawa.llm.core;
++
++import org.junit.jupiter.api.BeforeAll;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.io.TempDir;
++
++import java.lang.reflect.Field;
++import java.nio.file.Path;
++import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.ExecutionException;
++import java.util.concurrent.TimeUnit;
++import java.util.concurrent.TimeoutException;
++import java.util.function.BooleanSupplier;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertInstanceOf;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++import static org.junit.jupiter.api.Assertions.fail;
++
++class ConcurrencyManagerTest {
++
++    @TempDir
++    static Path gameDirectory;
++
++    @BeforeAll
++    static void initializeFabricDirectories() throws ReflectiveOperationException {
++        Class<?> loaderClass = Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl");
++        Field instanceField = loaderClass.getDeclaredField("INSTANCE");
++        Object loader = instanceField.get(null);
++        Field configDirField = loaderClass.getDeclaredField("configDir");
++        configDirField.setAccessible(true);
++        configDirField.set(loader, gameDirectory.resolve("config"));
++    }
++
++    @Test
++    void doesNotLeakPermitsAfterImmediateAcquire() throws Exception {
++        ConcurrencyManager manager = ConcurrencyManager.createForTest(
++                new ConcurrencyManager.ConcurrencyConfig(1, 1, 100, 1, 1, 1000));
++        CountDownLatch entered = new CountDownLatch(1);
++        CountDownLatch release = new CountDownLatch(1);
++
++        try {
++            CompletableFuture<String> first = manager.submitRequest(() -> {
++                entered.countDown();
++                await(release);
++                return "first";
++            }, "first");
++
++            assertTrue(entered.await(1, TimeUnit.SECONDS));
++            release.countDown();
++            assertEquals("first", first.get(1, TimeUnit.SECONDS));
++            assertEquals("second", manager.submitRequest(() -> "second", "second")
++                    .get(1, TimeUnit.SECONDS));
++            assertTrue(awaitCondition(() -> manager.getStats().activeRequests == 0
++                    && manager.getStats().queuedRequests == 0, 1, TimeUnit.SECONDS));
++        } finally {
++            release.countDown();
++            manager.shutdown();
++        }
++    }
++
++    @Test
++    void queuedCountReturnsToZeroAfterWait() throws Exception {
++        ConcurrencyManager manager = ConcurrencyManager.createForTest(
++                new ConcurrencyManager.ConcurrencyConfig(1, 2, 1000, 2, 2, 1000));
++        CountDownLatch firstEntered = new CountDownLatch(1);
++        CountDownLatch releaseFirst = new CountDownLatch(1);
++        CountDownLatch secondEntered = new CountDownLatch(1);
++
++        try {
++            CompletableFuture<String> first = manager.submitRequest(() -> {
++                firstEntered.countDown();
++                await(releaseFirst);
++                return "first";
++            }, "first");
++            assertTrue(firstEntered.await(1, TimeUnit.SECONDS));
++
++            CompletableFuture<String> second = manager.submitRequest(() -> {
++                secondEntered.countDown();
++                return "second";
++            }, "second");
++            assertTrue(awaitCondition(() -> manager.getStats().queuedRequests == 1,
++                    1, TimeUnit.SECONDS));
++
++            releaseFirst.countDown();
++            assertEquals("first", first.get(1, TimeUnit.SECONDS));
++            assertTrue(secondEntered.await(1, TimeUnit.SECONDS));
++            assertEquals("second", second.get(1, TimeUnit.SECONDS));
++            assertTrue(awaitCondition(() -> manager.getStats().activeRequests == 0
++                    && manager.getStats().queuedRequests == 0, 1, TimeUnit.SECONDS));
++        } finally {
++            releaseFirst.countDown();
++            manager.shutdown();
++        }
++    }
++
++    @Test
++    void timeoutDoesNotReleaseUnownedPermit() throws Exception {
++        ConcurrencyManager manager = ConcurrencyManager.createForTest(
++                new ConcurrencyManager.ConcurrencyConfig(1, 2, 150, 3, 3, 1000));
++        CountDownLatch firstEntered = new CountDownLatch(1);
++        CountDownLatch releaseFirst = new CountDownLatch(1);
++        CountDownLatch thirdEntered = new CountDownLatch(1);
++
++        try {
++            CompletableFuture<String> first = manager.submitRequest(() -> {
++                firstEntered.countDown();
++                await(releaseFirst);
++                return "first";
++            }, "first");
++            assertTrue(firstEntered.await(1, TimeUnit.SECONDS));
++
++            CompletableFuture<String> timedOut = manager.submitRequest(() -> "unexpected", "timeout");
++            assertFutureFailure(timedOut, TimeoutException.class);
++            assertTrue(awaitCondition(() -> manager.getStats().queuedRequests == 0,
++                    1, TimeUnit.SECONDS));
++
++            CompletableFuture<String> third = manager.submitRequest(() -> {
++                thirdEntered.countDown();
++                return "third";
++            }, "third");
++            assertTrue(awaitCondition(() -> manager.getStats().queuedRequests == 1,
++                    1, TimeUnit.SECONDS));
++            assertFalse(thirdEntered.await(50, TimeUnit.MILLISECONDS));
++
++            releaseFirst.countDown();
++            assertEquals("first", first.get(1, TimeUnit.SECONDS));
++            assertEquals("third", third.get(1, TimeUnit.SECONDS));
++        } finally {
++            releaseFirst.countDown();
++            manager.shutdown();
++        }
++    }
++
++    @Test
++    void rejectionDoesNotReleaseUnownedPermit() throws Exception {
++        ConcurrencyManager manager = ConcurrencyManager.createForTest(
++                new ConcurrencyManager.ConcurrencyConfig(1, 1, 1000, 1, 2, 1000));
++        CountDownLatch firstEntered = new CountDownLatch(1);
++        CountDownLatch releaseFirst = new CountDownLatch(1);
++        CountDownLatch secondEntered = new CountDownLatch(1);
++        CountDownLatch thirdEntered = new CountDownLatch(1);
++
++        try {
++            CompletableFuture<String> first = manager.submitRequest(() -> {
++                firstEntered.countDown();
++                await(releaseFirst);
++                return "first";
++            }, "first");
++            assertTrue(firstEntered.await(1, TimeUnit.SECONDS));
++
++            CompletableFuture<String> second = manager.submitRequest(() -> {
++                secondEntered.countDown();
++                return "second";
++            }, "second");
++            CompletableFuture<String> third = manager.submitRequest(() -> {
++                thirdEntered.countDown();
++                return "third";
++            }, "third");
++            assertTrue(awaitCondition(() -> manager.getStats().queuedRequests == 1,
++                    1, TimeUnit.SECONDS));
++
++            CompletableFuture<String> rejected = manager.submitRequest(() -> "rejected", "rejected");
++            assertFutureFailure(rejected, RuntimeException.class);
++            assertFalse(thirdEntered.await(100, TimeUnit.MILLISECONDS));
++
++            releaseFirst.countDown();
++            assertEquals("first", first.get(1, TimeUnit.SECONDS));
++            assertEquals("third", third.get(1, TimeUnit.SECONDS));
++            assertTrue(secondEntered.await(1, TimeUnit.SECONDS));
++            assertEquals("second", second.get(1, TimeUnit.SECONDS));
++            assertTrue(awaitCondition(() -> manager.getStats().activeRequests == 0
++                    && manager.getStats().queuedRequests == 0, 1, TimeUnit.SECONDS));
++        } finally {
++            releaseFirst.countDown();
++            manager.shutdown();
++        }
++    }
++
++    @Test
++    void taskFailureReleasesPermit() throws Exception {
++        ConcurrencyManager manager = ConcurrencyManager.createForTest(
++                new ConcurrencyManager.ConcurrencyConfig(1, 1, 1000, 1, 1, 1000));
++        CountDownLatch failureEntered = new CountDownLatch(1);
++
++        try {
++            CompletableFuture<String> failed = manager.submitRequest(() -> {
++                failureEntered.countDown();
++                throw new AssertionError("task failed");
++            }, "failed");
++
++            assertTrue(failureEntered.await(1, TimeUnit.SECONDS));
++            assertFutureFailure(failed, AssertionError.class);
++            assertEquals("recovered", manager.submitRequest(() -> "recovered", "recovered")
++                    .get(1, TimeUnit.SECONDS));
++            assertTrue(awaitCondition(() -> manager.getStats().activeRequests == 0
++                    && manager.getStats().queuedRequests == 0, 1, TimeUnit.SECONDS));
++        } finally {
++            manager.shutdown();
++        }
++    }
++
++    private static void await(CountDownLatch latch) {
++        try {
++            latch.await();
++        } catch (InterruptedException exception) {
++            Thread.currentThread().interrupt();
++            throw new RuntimeException(exception);
++        }
++    }
++
++    private static boolean awaitCondition(BooleanSupplier condition, long timeout, TimeUnit unit)
++            throws InterruptedException {
++        long deadline = System.nanoTime() + unit.toNanos(timeout);
++        CountDownLatch pollInterval = new CountDownLatch(1);
++        while (!condition.getAsBoolean() && System.nanoTime() < deadline) {
++            pollInterval.await(1, TimeUnit.MILLISECONDS);
++        }
++        return condition.getAsBoolean();
++    }
++
++    private static void assertFutureFailure(CompletableFuture<?> future,
++                                            Class<? extends Throwable> expectedCause) throws Exception {
++        try {
++            future.get(2, TimeUnit.SECONDS);
++            fail("Expected future to fail with " + expectedCause.getSimpleName());
++        } catch (ExecutionException exception) {
++            assertInstanceOf(expectedCause, exception.getCause());
++        }
++    }
++}
