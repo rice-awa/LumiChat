@@ -1,19 +1,52 @@
 package com.riceawa.llm.function;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.ServerThreadCompat;
 import com.riceawa.llm.core.LLMConfig;
+import com.riceawa.llm.function.impl.WikiBatchPagesFunction;
+import com.riceawa.llm.function.impl.WikiPageFunction;
+import com.riceawa.llm.function.impl.WikiSearchFunction;
+import com.riceawa.llm.logging.LogManager;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
  * Function注册表，管理所有可用的LLM函数
  */
 public class FunctionRegistry {
+    private static final int IO_THREADS = 2;
+    private static final int IO_QUEUE_CAPACITY = 64;
+    private static final AtomicInteger IO_THREAD_COUNTER = new AtomicInteger();
+    private static final Set<String> AUDITED_ASYNC_FUNCTIONS = Set.of(
+            "wiki_search", "wiki_page", "wiki_batch_pages");
+    private static final Set<Class<? extends LLMFunction>> AUDITED_ASYNC_FUNCTION_TYPES = Set.of(
+            WikiSearchFunction.class, WikiPageFunction.class, WikiBatchPagesFunction.class);
+    private static final ThreadPoolExecutor TOOL_IO_EXECUTOR = new ThreadPoolExecutor(
+            IO_THREADS,
+            IO_THREADS,
+            30L,
+            TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(IO_QUEUE_CAPACITY),
+            runnable -> {
+                Thread thread = new Thread(runnable,
+                        "LumiChat-Tool-IO-" + IO_THREAD_COUNTER.incrementAndGet());
+                thread.setDaemon(true);
+                return thread;
+            },
+            new ThreadPoolExecutor.AbortPolicy());
+
     private static volatile FunctionRegistry instance;
     private final Map<String, LLMFunction> functions;
     private final Map<String, Set<String>> categoryFunctions;
@@ -169,8 +202,14 @@ public class FunctionRegistry {
     /**
      * 执行工具调用
      */
-    public LLMFunction.FunctionResult executeFunction(String functionName, Player player,
-                                                     JsonObject arguments) {
+    LLMFunction.FunctionResult executeFunction(String functionName, Player player,
+                                               JsonObject arguments) {
+        Objects.requireNonNull(player, "player");
+        net.minecraft.server.MinecraftServer server = EntityHelper.getServerSafe(player);
+        if (server == null || !server.isSameThread()) {
+            throw new IllegalStateException("Minecraft function must run on server thread");
+        }
+
         LLMFunction function = getFunction(functionName);
         if (function == null) {
             return LLMFunction.FunctionResult.error("函数不存在: " + functionName);
@@ -183,12 +222,126 @@ public class FunctionRegistry {
         if (!function.hasPermission(player)) {
             return LLMFunction.FunctionResult.error("没有权限调用函数: " + functionName);
         }
+
+        if (function.executionMode() != LLMFunction.ExecutionMode.SERVER_THREAD) {
+            return LLMFunction.FunctionResult.error("异步函数不能通过同步接口执行: " + functionName);
+        }
         
         try {
-            return function.execute(player, EntityHelper.getServerSafe(player), arguments);
+            JsonObject argumentsSnapshot = arguments == null ? new JsonObject() : arguments.deepCopy();
+            auditExecution(functionName, player, function.executionMode());
+            return function.execute(player, server, argumentsSnapshot);
         } catch (Exception e) {
+            logExecutionFailure(functionName, player, function.executionMode());
             return LLMFunction.FunctionResult.error("函数执行失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * Validates a tool call on the server thread, then dispatches it to its declared executor.
+     */
+    public CompletableFuture<LLMFunction.FunctionResult> executeFunctionAsync(
+            String functionName, ServerPlayer player, JsonObject arguments) {
+        Objects.requireNonNull(functionName, "functionName");
+        Objects.requireNonNull(player, "player");
+
+        net.minecraft.server.MinecraftServer server = EntityHelper.getServer(player);
+        CompletableFuture<LLMFunction.FunctionResult> resultFuture = new CompletableFuture<>();
+
+        ServerThreadCompat.execute(server, () -> {
+            if (!server.isSameThread()) {
+                throw new IllegalStateException("Minecraft function must run on server thread");
+            }
+
+            LLMFunction function = getFunction(functionName);
+            if (function == null) {
+                resultFuture.complete(LLMFunction.FunctionResult.error("函数不存在: " + functionName));
+                return;
+            }
+            if (!function.isEnabled()) {
+                resultFuture.complete(LLMFunction.FunctionResult.error("函数已禁用: " + functionName));
+                return;
+            }
+            if (!function.hasPermission(player)) {
+                resultFuture.complete(LLMFunction.FunctionResult.error("没有权限调用函数: " + functionName));
+                return;
+            }
+
+            JsonObject argumentsSnapshot = arguments == null ? new JsonObject() : arguments.deepCopy();
+            LLMFunction.ExecutionMode mode = function.executionMode();
+            if (mode == LLMFunction.ExecutionMode.SERVER_THREAD) {
+                resultFuture.complete(executeFunction(functionName, player, argumentsSnapshot));
+                return;
+            }
+
+            if (!AUDITED_ASYNC_FUNCTIONS.contains(functionName)
+                    || !AUDITED_ASYNC_FUNCTION_TYPES.contains(function.getClass())) {
+                resultFuture.complete(LLMFunction.FunctionResult.error(
+                        "函数未获准异步执行: " + functionName));
+                return;
+            }
+
+            auditExecution(functionName, player, mode);
+            UUID playerId = player.getUUID();
+            try {
+                TOOL_IO_EXECUTOR.execute(() -> executeAsyncFunction(
+                        functionName, playerId, function, argumentsSnapshot, resultFuture));
+            } catch (RejectedExecutionException exception) {
+                logExecutionFailure(functionName, playerId, mode);
+                resultFuture.complete(LLMFunction.FunctionResult.error("函数执行失败: 工具执行队列已满"));
+            }
+        }).whenComplete((ignored, throwable) -> {
+            if (throwable != null) {
+                resultFuture.completeExceptionally(unwrapCompletionException(throwable));
+            }
+        });
+
+        return resultFuture;
+    }
+
+    private void executeAsyncFunction(String functionName, UUID playerId, LLMFunction function,
+                                      JsonObject argumentsSnapshot,
+                                      CompletableFuture<LLMFunction.FunctionResult> resultFuture) {
+        try {
+            // Audited ASYNC functions receive no Minecraft objects and only a detached argument tree.
+            resultFuture.complete(function.execute(null, null, argumentsSnapshot));
+        } catch (Throwable throwable) {
+            logExecutionFailure(functionName, playerId, function.executionMode());
+            resultFuture.complete(LLMFunction.FunctionResult.error(
+                    "函数执行失败: " + throwable.getMessage()));
+        }
+    }
+
+    private static Throwable unwrapCompletionException(Throwable throwable) {
+        if (throwable instanceof java.util.concurrent.CompletionException
+                && throwable.getCause() != null) {
+            return throwable.getCause();
+        }
+        return throwable;
+    }
+
+    private static void auditExecution(String functionName, Player player,
+                                       LLMFunction.ExecutionMode mode) {
+        auditExecution(functionName, player.getUUID(), mode);
+    }
+
+    private static void auditExecution(String functionName, UUID playerId,
+                                       LLMFunction.ExecutionMode mode) {
+        LogManager.getInstance().audit("Tool execution", Map.of(
+                "function", functionName,
+                "player_uuid", playerId.toString(),
+                "mode", mode.name()));
+    }
+
+    private static void logExecutionFailure(String functionName, Player player,
+                                            LLMFunction.ExecutionMode mode) {
+        logExecutionFailure(functionName, player.getUUID(), mode);
+    }
+
+    private static void logExecutionFailure(String functionName, UUID playerId,
+                                            LLMFunction.ExecutionMode mode) {
+        LogManager.getInstance().error("Tool execution failed [function=" + functionName
+                + ", player_uuid=" + playerId + ", mode=" + mode.name() + "]");
     }
 
     /**

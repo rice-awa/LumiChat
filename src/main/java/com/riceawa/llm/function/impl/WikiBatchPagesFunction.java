@@ -315,6 +315,11 @@ public class WikiBatchPagesFunction implements LLMFunction {
             return FunctionResult.error("批量页面处理失败: " + e.getMessage());
         }
     }
+
+    @Override
+    public ExecutionMode executionMode() {
+        return ExecutionMode.ASYNC;
+    }
     
     @Override
     public boolean hasPermission(Player player) {
