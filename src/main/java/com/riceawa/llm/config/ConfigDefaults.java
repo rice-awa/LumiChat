@@ -17,7 +17,7 @@ public class ConfigDefaults {
     public static final int DEFAULT_MAX_TOKENS = 8192;
     public static final int DEFAULT_MAX_CONTEXT_CHARACTERS = 60000;
     public static final boolean DEFAULT_ENABLE_HISTORY = true;
-    public static final boolean DEFAULT_ENABLE_FUNCTION_CALLING = false;
+    public static final boolean DEFAULT_ENABLE_TOOL_CALL = true;
     public static final boolean DEFAULT_ENABLE_BROADCAST = false;
     public static final int DEFAULT_HISTORY_RETENTION_DAYS = 30;
     
@@ -45,10 +45,10 @@ public class ConfigDefaults {
     // Wiki API 配置默认值
     public static final String DEFAULT_WIKI_API_URL = "https://mcwiki.rice-awa.top";
 
-    // 多轮函数调用配置默认值
-    public static final boolean DEFAULT_ENABLE_RECURSIVE_FUNCTION_CALLS = true;
-    public static final int DEFAULT_MAX_FUNCTION_CALL_DEPTH = 5;
-    public static final int DEFAULT_FUNCTION_CALL_TIMEOUT_MS = 30000; // 30秒
+    // 多轮工具调用配置默认值
+    public static final boolean DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS = true;
+    public static final int DEFAULT_MAX_TOOL_CALL_DEPTH = 25;
+    public static final int DEFAULT_TOOL_CALL_TIMEOUT_MS = 30000; // 30秒
 
     // API密钥占位符（用于检测无效密钥）
     public static final String API_KEY_PLACEHOLDER = "your-api-key-here";
@@ -144,7 +144,7 @@ public class ConfigDefaults {
             case "defaultTemperature": return "默认温度";
             case "defaultMaxTokens": return "默认最大Token数";
             case "enableHistory": return "启用历史记录";
-            case "enableFunctionCalling": return "启用函数调用";
+            case "enableToolCall": return "启用工具调用";
             case "enableBroadcast": return "启用广播";
             case "compressionModel": return "压缩模型";
             case "enableCompressionNotification": return "启用压缩通知";
@@ -197,10 +197,10 @@ public class ConfigDefaults {
             case "defaultMaxTokens": return DEFAULT_MAX_TOKENS;
             case "maxContextCharacters": return DEFAULT_MAX_CONTEXT_CHARACTERS;
             case "enableHistory": return DEFAULT_ENABLE_HISTORY;
-            case "enableFunctionCalling": return DEFAULT_ENABLE_FUNCTION_CALLING;
-            case "enableRecursiveFunctionCalls": return DEFAULT_ENABLE_RECURSIVE_FUNCTION_CALLS;
-            case "maxFunctionCallDepth": return DEFAULT_MAX_FUNCTION_CALL_DEPTH;
-            case "functionCallTimeoutMs": return DEFAULT_FUNCTION_CALL_TIMEOUT_MS;
+            case "enableToolCall": return DEFAULT_ENABLE_TOOL_CALL;
+            case "enableRecursiveToolCalls": return DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
+            case "maxToolCallDepth": return DEFAULT_MAX_TOOL_CALL_DEPTH;
+            case "toolCallTimeoutMs": return DEFAULT_TOOL_CALL_TIMEOUT_MS;
             case "enableBroadcast": return DEFAULT_ENABLE_BROADCAST;
             case "historyRetentionDays": return DEFAULT_HISTORY_RETENTION_DAYS;
             case "compressionModel": return DEFAULT_COMPRESSION_MODEL;

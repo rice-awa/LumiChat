@@ -22,7 +22,7 @@ LLM Chat 模组提供了智能的配置检查和用户引导功能，让首次�
 在开始使用之前，需要配置AI服务提供商的API密钥。
 
 📋 配置步骤：
-1. 打开配置文件: config/lllmchat/config.json
+1. 打开配置文件: config/lumichat/config.json
 2. 选择一个AI服务提供商（OpenAI、OpenRouter、DeepSeek等）
 3. 将对应的 'apiKey' 字段替换为您的真实API密钥
 4. 使用 /llmchat reload 重新加载配置
@@ -54,7 +54,7 @@ LLM Chat 模组提供了智能的配置检查和用户引导功能，让首次�
 • 当前服务提供商 'openai' 的API密钥仍为默认占位符，需要设置真实的API密钥
 
 📋 配置文件位置:
-config/lllmchat/config.json
+config/lumichat/config.json
 
 🔧 可用的服务提供商:
 • openai - ❌ 需要配置API密钥
@@ -139,7 +139,7 @@ config/lllmchat/config.json
    ```
 
 2. **编辑配置文件**
-   - 打开 `config/lllmchat/config.json`
+   - 打开 `config/lumichat/config.json`
    - 选择一个服务提供商（如 OpenAI）
    - 替换对应的API密钥
 

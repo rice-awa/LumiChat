@@ -81,7 +81,7 @@
 
 ### 日志文件目录
 ```
-config/lllmchat/logs/
+config/lumichat/logs/
 ├── system.log          # 系统日志
 ├── chat.log            # 聊天日志
 ├── error.log           # 错误日志
@@ -92,7 +92,7 @@ config/lllmchat/logs/
 
 ### 导出文件目录
 ```
-config/lllmchat/exports/
+config/lumichat/exports/
 └── *.{json,csv,txt,html} # 导出的历史记录
 ```
 

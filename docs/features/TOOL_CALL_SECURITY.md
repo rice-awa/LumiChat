@@ -1,8 +1,8 @@
-# LLM Chat Mod - Function Call 安全指南
+# LLM Chat Mod - Tool Call 安全指南
 
 ## 概述
 
-本文档详细说明了LLM Chat Mod中Function Call功能的安全机制和权限控制系统。
+本文档详细说明了LLM Chat Mod中Tool Call功能的安全机制和权限控制系统。
 
 ## 新增功能
 
@@ -197,7 +197,7 @@
 ### 生产环境
 - 确保只有可信任的玩家拥有OP权限
 - 定期审查OP玩家列表
-- 监控LLM函数调用日志
+- 监控LLM工具调用日志
 - 考虑添加额外的审计日志
 
 ### 开发环境

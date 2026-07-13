@@ -121,8 +121,8 @@ public class LLMMessage {
         @SerializedName("model")
         private String model;
         
-        @SerializedName("function_call")
-        private FunctionCall functionCall;
+        @SerializedName("tool_call")
+        private ToolCall toolCall;
 
         public MessageMetadata() {}
 
@@ -142,19 +142,19 @@ public class LLMMessage {
             this.model = model;
         }
 
-        public FunctionCall getFunctionCall() {
-            return functionCall;
+        public ToolCall getToolCall() {
+            return toolCall;
         }
 
-        public void setFunctionCall(FunctionCall functionCall) {
-            this.functionCall = functionCall;
+        public void setToolCall(ToolCall toolCall) {
+            this.toolCall = toolCall;
         }
     }
 
     /**
-     * Function Call 数据结构
+     * Tool Call 数据结构
      */
-    public static class FunctionCall {
+    public static class ToolCall {
         @SerializedName("name")
         private String name;
 
@@ -164,14 +164,14 @@ public class LLMMessage {
         @SerializedName("tool_call_id")
         private String toolCallId;
 
-        public FunctionCall() {}
+        public ToolCall() {}
 
-        public FunctionCall(String name, String arguments) {
+        public ToolCall(String name, String arguments) {
             this.name = name;
             this.arguments = arguments;
         }
 
-        public FunctionCall(String name, String arguments, String toolCallId) {
+        public ToolCall(String name, String arguments, String toolCallId) {
             this.name = name;
             this.arguments = arguments;
             this.toolCallId = toolCallId;

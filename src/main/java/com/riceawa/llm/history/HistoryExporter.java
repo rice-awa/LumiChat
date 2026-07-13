@@ -31,7 +31,7 @@ public class HistoryExporter {
         
         this.exportDir = FabricLoader.getInstance()
                 .getConfigDir()
-                .resolve("lllmchat")
+                .resolve("lumichat")
                 .resolve("exports");
         
         try {

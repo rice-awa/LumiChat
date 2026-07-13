@@ -6,7 +6,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 
 ## 📁 配置文件位置
 
-配置文件位于：`config/lllmchat/config.json`
+配置文件位于：`config/lumichat/config.json`
 
 ## 🚀 快速开始
 
@@ -32,7 +32,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
   "defaultMaxTokens": 8192,
   "maxContextCharacters": 60000,
   "enableHistory": true,
-  "enableFunctionCalling": false,
+  "enableToolCall": true,
   "enableBroadcast": false,
   "historyRetentionDays": 30,
   "compressionModel": "",
@@ -113,7 +113,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 | 配置项 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `enableHistory` | Boolean | `true` | 启用历史记录保存 |
-| `enableFunctionCalling` | Boolean | `false` | 启用Function Calling |
+| `enableToolCall` | Boolean | `true` | 启用Tool Call |
 | `enableBroadcast` | Boolean | `false` | 启用AI聊天广播 |
 | `enableGlobalContext` | Boolean | `true` | 启用全局上下文信息 |
 
@@ -332,7 +332,7 @@ Provider配置状态: 2/5 有效
 ### 🔒 安全配置策略
 ```json
 {
-  "enableFunctionCalling": false,        // 谨慎启用Function Calling
+  "enableToolCall": true,        // 谨慎启用Tool Call
   "enableBroadcast": false,              // 默认关闭广播保护隐私
   "broadcastPlayers": [],                // 空列表=全局广播，有内容=特定玩家
   "enableGlobalContext": true            // 启用上下文信息
@@ -427,10 +427,10 @@ Provider配置状态: 2/5 有效
 #### 方案3: 完全重置
 ```bash
 # 1. 备份配置（可选）
-cp config/lllmchat/config.json config/lllmchat/config.json.backup
+cp config/lumichat/config.json config/lumichat/config.json.backup
 
 # 2. 删除配置文件
-rm config/lllmchat/config.json
+rm config/lumichat/config.json
 
 # 3. 重新加载（会生成默认配置）
 /llmchat reload
@@ -439,7 +439,7 @@ rm config/lllmchat/config.json
 ### 🆘 紧急恢复
 如果系统完全无法工作：
 1. **停止服务器**
-2. **删除整个配置目录**: `rm -rf config/lllmchat/`
+2. **删除整个配置目录**: `rm -rf config/lumichat/`
 3. **重启服务器**
 4. **系统会自动生成全新的默认配置**
 5. **重新设置API密钥**

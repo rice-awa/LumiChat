@@ -35,13 +35,13 @@ public class ChatHistory {
                 .create();
 
         // 检查是否有测试目录设置
-        String testHistoryDir = System.getProperty("lllmchat.history.dir");
+        String testHistoryDir = System.getProperty("lumichat.history.dir");
         if (testHistoryDir != null) {
             this.historyDir = Path.of(testHistoryDir);
         } else {
             this.historyDir = FabricLoader.getInstance()
                     .getConfigDir()
-                    .resolve("lllmchat")
+                    .resolve("lumichat")
                     .resolve("history");
         }
 

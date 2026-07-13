@@ -25,7 +25,7 @@ public class PromptTemplateManager {
         this.templates = new ConcurrentHashMap<>();
         this.gson = new GsonBuilder().setPrettyPrinting().create();
         
-        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("lllmchat");
+        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("lumichat");
         this.templatesFile = configDir.resolve("prompt_templates.json");
         
         // 确保配置目录存在

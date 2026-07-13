@@ -4,7 +4,7 @@
   "defaultMaxTokens": 8192,
   "maxContextLength": 8192,
   "enableHistory": true,
-  "enableFunctionCalling": false,
+  "enableToolCall": true,
   "enableBroadcast": false,
   "broadcastPlayers": [],
   "historyRetentionDays": 30,

@@ -71,8 +71,8 @@
 /llmchat 你好，请介绍一下Minecraft的基本玩法
 ```
 
-### Function Calling 智能交互
-启用Function Calling后，AI可以主动调用游戏API获取实时信息：
+### Tool Call 智能交互
+启用Tool Call后，AI可以主动调用游戏API获取实时信息：
 
 ```bash
 /llmchat 帮我查看一下当前的游戏状态
@@ -193,9 +193,9 @@
 - 配置文件重载
 - 日志系统管理
 - 历史记录管理
-- Function Calling中的管理员功能
+- Tool Call中的管理员功能
 
-### Function Calling权限
+### Tool Call权限
 - **基础信息查询**: 所有玩家可用
 - **查询其他玩家信息**: 需要OP权限或查询自己
 - **服务器性能信息**: 需要OP权限
@@ -207,5 +207,5 @@
 1. **resume命令限制**: 只能在当前对话为空时使用，如果当前有对话需要先clear
 2. **广播功能**: 会增加聊天频道消息量，建议合理使用
 3. **管理员命令**: 需要OP权限，请谨慎使用
-4. **Function Calling**: 某些功能需要特定权限，请查看具体说明
+4. **Tool Call**: 某些功能需要特定权限，请查看具体说明
 5. **配置重载**: 修改配置后建议使用reload命令应用更改

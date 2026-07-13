@@ -13,7 +13,7 @@
 ## 配置说明
 
 ### 配置文件位置
-`config/lllmchat/config.json`
+`config/lumichat/config.json`
 
 ### 新增配置项
 

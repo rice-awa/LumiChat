@@ -157,25 +157,25 @@ llmService.chat(messages, config, context)
 ### 1. 按时间范围查询
 ```bash
 # 查询今天的LLM请求日志
-grep "$(date +%Y-%m-%d)" config/lllmchat/logs/llm_request.log
+grep "$(date +%Y-%m-%d)" config/lumichat/logs/llm_request.log
 ```
 
 ### 2. 按玩家查询
 ```bash
 # 查询特定玩家的请求
-grep "\"player_name\":\"PlayerName\"" config/lllmchat/logs/llm_request.log
+grep "\"player_name\":\"PlayerName\"" config/lumichat/logs/llm_request.log
 ```
 
 ### 3. 按模型查询
 ```bash
 # 查询使用特定模型的请求
-grep "\"model\":\"gpt-3.5-turbo\"" config/lllmchat/logs/llm_request.log
+grep "\"model\":\"gpt-3.5-turbo\"" config/lumichat/logs/llm_request.log
 ```
 
 ### 4. 统计token使用
 ```bash
 # 提取token使用信息
-grep -o "\"total_tokens\":[0-9]*" config/lllmchat/logs/llm_request.log
+grep -o "\"total_tokens\":[0-9]*" config/lumichat/logs/llm_request.log
 ```
 
 ## 性能优化建议
@@ -217,19 +217,19 @@ grep -o "\"total_tokens\":[0-9]*" config/lllmchat/logs/llm_request.log
 ### 1. 日志文件大小监控
 ```bash
 # 监控日志文件大小
-du -h config/lllmchat/logs/llm_request.log
+du -h config/lumichat/logs/llm_request.log
 ```
 
 ### 2. 错误率监控
 ```bash
 # 统计失败的请求
-grep "\"success\":false" config/lllmchat/logs/llm_request.log | wc -l
+grep "\"success\":false" config/lumichat/logs/llm_request.log | wc -l
 ```
 
 ### 3. 响应时间监控
 ```bash
 # 提取响应时间信息
-grep -o "\"response_time_ms\":[0-9]*" config/lllmchat/logs/llm_request.log
+grep -o "\"response_time_ms\":[0-9]*" config/lumichat/logs/llm_request.log
 ```
 
 这些配置和使用示例可以帮助你根据具体需求优化LLM日志记录功能。

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概览
 
-LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecraft 版本构建。模组提供 `/llmchat` 聊天命令、OpenAI 兼容 Provider、提示词模板、Function Calling、历史记录、日志、上下文压缩和游戏内广播等功能。
+LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecraft 版本构建。模组提供 `/llmchat` 聊天命令、OpenAI 兼容 Provider、提示词模板、Tool Call、历史记录、日志、上下文压缩和游戏内广播等功能。
 
 当前构建矩阵在 `settings.gradle.kts` 中定义：历史版本组覆盖 1.16.5/1.17/1.18/1.19，独立节点覆盖 1.20-1.20.6、1.21-1.21.11；如果本机 Java 支持 25，也会启用 26.1 节点。`vcsVersion` 和默认 active 版本都是 `1.21.11`。
 
@@ -78,14 +78,14 @@ LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecr
 - `src/client/java/com/riceawa/LllmchatClient.java` 是客户端入口，初始化客户端侧配置、模板、函数与服务管理。
 - `src/main/resources/fabric.mod.json` 声明 Fabric entrypoints、mixin 配置和资源占位符；资源占位符由 `build.gradle.kts` 的 `processResources` 展开。
 - `src/main/java/com/riceawa/llm/command/` 负责命令层：`LLMChatCommand` 注册 `/llmchat` 主命令及 provider/model/template/broadcast/resume/setup/stats 等子命令，`LogCommand` 注册 `/llmlog`，`HistoryCommand` 注册 `/llmhistory`。
-- `src/main/java/com/riceawa/llm/config/` 管理运行时配置与 Provider：`LLMChatConfig` 读写 Fabric config 目录中的 `lllmchat/config.json`，`ProviderManager` 处理 Provider 校验、自动修复、健康状态与模型选择。
+- `src/main/java/com/riceawa/llm/config/` 管理运行时配置与 Provider：`LLMChatConfig` 读写 Fabric config 目录中的 `lumichat/config.json`，`ProviderManager` 处理 Provider 校验、自动修复、健康状态与模型选择。
 - `src/main/java/com/riceawa/llm/service/` 是 Provider 服务层：`LLMServiceManager` 维护 OpenAI 兼容服务实例，`OpenAIService` 通过 OkHttp 调用 `/chat/completions`，`ProviderHealthChecker` 做健康检查，`TitleGenerationService` 生成会话标题。
 - `src/main/java/com/riceawa/llm/core/` 定义 LLM 请求/响应/消息/上下文 DTO、`LLMService` 接口和 `ConcurrencyManager` 并发控制。
 - `src/main/java/com/riceawa/llm/context/` 管理每个玩家的聊天上下文、上下文长度限制、压缩和过期清理。
-- `src/main/java/com/riceawa/llm/history/` 管理持久化历史，默认写入 Fabric config 目录下的 `lllmchat/history`；测试可通过 `lllmchat.history.dir` 系统属性覆盖目录。
+- `src/main/java/com/riceawa/llm/history/` 管理持久化历史，默认写入 Fabric config 目录下的 `lumichat/history`；测试可通过 `lumichat.history.dir` 系统属性覆盖目录。
 - `src/main/java/com/riceawa/llm/template/` 管理提示词模板和游戏内热编辑流程，内置模板包括 default、meow、creative、survival、redstone、mod。
-- `src/main/java/com/riceawa/llm/function/` 定义 Function Calling 接口、注册表和权限辅助；`function/impl/` 包含世界/玩家/背包/实体/服务器信息、消息发送、传送、执行命令、方块、实体生成、天气/时间控制和 Wiki 查询等实现。
-- `src/main/java/com/riceawa/llm/logging/` 提供异步分类日志、文件轮转和 LLM 请求/响应结构化日志，默认写入 `lllmchat/logs`。
+- `src/main/java/com/riceawa/llm/function/` 定义 Tool Call 接口、注册表和权限辅助；`function/impl/` 包含世界/玩家/背包/实体/服务器信息、消息发送、传送、执行命令、方块、实体生成、天气/时间控制和 Wiki 查询等实现。
+- `src/main/java/com/riceawa/llm/logging/` 提供异步分类日志、文件轮转和 LLM 请求/响应结构化日志，默认写入 `lumichat/logs`。
 - `src/main/java/com/riceawa/llm/compat/` 封装跨 Minecraft 版本差异。涉及 API 差异时优先补充或使用这里的兼容层，而不是在业务代码中散落大量条件注释。
 - `src/main/java/com/riceawa/mixin/` 与 `src/client/java/com/riceawa/mixin/client/` 放置 mixin/accessor，mixin 配置分别在 `lumichat.mixins.json` 和 `lumichat.client.mixins.json`。
 - `versions/<mc-version>/gradle.properties` 保存版本节点的 Minecraft/Fabric API/依赖范围等元数据；通常不要直接修改 Stonecutter 生成的版本源码。
@@ -155,14 +155,14 @@ method(/*? if >=1.20 {*/ param /*?}*/);
 
 自动化测试以基础单元测试为主，复杂交互以游戏内实际验证为准。当前测试入口是 `src/test/java/com/riceawa/llm/template/PromptTemplateTest.java`，覆盖提示词和 global context 的拼接逻辑。
 
-修改纯逻辑后至少运行相关 `./gradlew test --tests ...`；修改跨版本、Mixin、Minecraft API、资源或构建脚本后，至少构建受影响版本节点，并优先覆盖代表性节点 `:1.19:build`、`:1.20.6:build`、`:1.21.11:build`。修改命令交互、Provider、Function Calling、上下文或历史行为后，除测试/构建外，应使用对应 `runClient` 或 `runServer` 做游戏内验证。
+修改纯逻辑后至少运行相关 `./gradlew test --tests ...`；修改跨版本、Mixin、Minecraft API、资源或构建脚本后，至少构建受影响版本节点，并优先覆盖代表性节点 `:1.19:build`、`:1.20.6:build`、`:1.21.11:build`。修改命令交互、Provider、Tool Call、上下文或历史行为后，除测试/构建外，应使用对应 `runClient` 或 `runServer` 做游戏内验证。
 
 ## 文档与规则来源
 
 - `README.md` 包含用户功能、命令和文档导航。
 - `multiversionbuild.md` 记录 Stonecutter 多版本构建流程。
 - `docs/TESTING_GUIDE.md` 记录测试策略和游戏内回归检查。
-- `docs/features/FUNCTION_CALL_SECURITY.md`、`docs/features/FUNCTION_CALLING_DEVELOPMENT.md`、`docs/features/CONTEXT_MANAGEMENT.md`、`docs/features/LOGGING_AND_HISTORY.md` 等记录关键子系统设计。
+- `docs/features/TOOL_CALL_SECURITY.md`、`docs/features/TOOL_CALL_DEVELOPMENT.md`、`docs/features/CONTEXT_MANAGEMENT.md`、`docs/features/LOGGING_AND_HISTORY.md` 等记录关键子系统设计。
 - `AGENTS.md` 是通用代理规范；本文件吸收其中与 Claude Code 相关的约定。
 
 ## 提交与 PR 约定

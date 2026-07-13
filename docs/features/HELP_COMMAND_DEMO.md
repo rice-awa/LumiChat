@@ -55,7 +55,7 @@
 💡 说明:
   • 提示词模板定义了AI的角色和行为风格
   • 内置模板包括: default, creative, survival, redstone, mod等
-  • 可在 config/lllmchat/prompt_templates.json 中自定义模板
+  • 可在 config/lumichat/prompt_templates.json 中自定义模板
 ```
 
 #### Provider模块帮助

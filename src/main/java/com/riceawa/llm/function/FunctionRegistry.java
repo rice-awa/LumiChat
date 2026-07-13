@@ -167,7 +167,7 @@ public class FunctionRegistry {
     }
 
     /**
-     * 执行函数调用
+     * 执行工具调用
      */
     public LLMFunction.FunctionResult executeFunction(String functionName, Player player,
                                                      JsonObject arguments) {
