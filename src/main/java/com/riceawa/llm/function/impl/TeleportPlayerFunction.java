@@ -15,7 +15,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 传送玩家的函数
- * 权限：OP可传送任何玩家，普通玩家只能传送自己
+ * 权限：仅OP可使用
  */
 public class TeleportPlayerFunction implements LLMFunction {
     
@@ -26,7 +26,7 @@ public class TeleportPlayerFunction implements LLMFunction {
     
     @Override
     public String getDescription() {
-        return "传送玩家到指定位置或其他玩家身边";
+        return "传送玩家到指定位置或其他玩家身边（仅OP）";
     }
     
     @Override
@@ -230,9 +230,13 @@ public class TeleportPlayerFunction implements LLMFunction {
         }
     }
     
+    public static boolean isOperatorOnly(boolean operator) {
+        return operator;
+    }
+
     @Override
     public boolean hasPermission(Player player) {
-        return true; // 所有玩家都可以传送自己，OP可以传送其他玩家
+        return isOperatorOnly(PermissionHelper.isOperator(player));
     }
     
     @Override

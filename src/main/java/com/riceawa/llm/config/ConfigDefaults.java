@@ -46,6 +46,7 @@ public class ConfigDefaults {
 
     // Wiki API 配置默认值
     public static final String DEFAULT_WIKI_API_URL = "https://mcwiki.rice-awa.top";
+    public static final Set<String> DEFAULT_WIKI_ALLOWED_HOSTS = Set.of("mcwiki.rice-awa.top");
 
     // 多轮工具调用配置默认值
     public static final boolean DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS = true;
@@ -118,6 +119,10 @@ public class ConfigDefaults {
      */
     public static Set<String> createDefaultBroadcastPlayers() {
         return new HashSet<>();
+    }
+
+    public static Set<String> createDefaultWikiAllowedHosts() {
+        return new HashSet<>(DEFAULT_WIKI_ALLOWED_HOSTS);
     }
 
     /**
@@ -230,6 +235,7 @@ public class ConfigDefaults {
             case "enableTitleGeneration": return DEFAULT_ENABLE_TITLE_GENERATION;
             case "titleGenerationModel": return DEFAULT_TITLE_GENERATION_MODEL;
             case "wikiApiUrl": return DEFAULT_WIKI_API_URL;
+            case "wikiAllowedHosts": return createDefaultWikiAllowedHosts();
             case "currentProvider": return EMPTY_STRING;
             case "currentModel": return EMPTY_STRING;
             default: return null;

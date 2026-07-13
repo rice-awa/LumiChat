@@ -5,8 +5,10 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.function.LLMFunction;
+import com.riceawa.llm.function.WikiEndpointPolicy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.MinecraftServer;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -19,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class WikiPageFunction implements LLMFunction {
     
-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
+    private static final OkHttpClient httpClient = WikiEndpointPolicy.newSecureClientBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
@@ -112,15 +114,17 @@ public class WikiPageFunction implements LLMFunction {
             if (maxLength < 0) maxLength = 5000;
             if (maxLength > 11000) maxLength = 11000;
             
-            // 构建API请求URL
-            String wikiBaseUrl = LLMChatConfig.getInstance().getWikiApiUrl();
-            StringBuilder urlBuilder = new StringBuilder(wikiBaseUrl + "/api/page/");
-            urlBuilder.append(java.net.URLEncoder.encode(pageName, "UTF-8"));
-            urlBuilder.append("?format=").append(format);
-            urlBuilder.append("&includeMetadata=").append(includeMetadata);
-            
-            String url = urlBuilder.toString();
-            
+            // 构建经允许的Wiki API请求URL
+            HttpUrl url = WikiEndpointPolicy.validate(
+                    LLMChatConfig.getInstance().getWikiApiUrl(),
+                    LLMChatConfig.getInstance().getWikiAllowedHosts())
+                    .newBuilder()
+                    .addPathSegments("api/page")
+                    .addPathSegment(pageName)
+                    .addQueryParameter("format", format)
+                    .addQueryParameter("includeMetadata", String.valueOf(includeMetadata))
+                    .build();
+
             // 发送HTTP请求
             Request request = new Request.Builder()
                     .url(url)

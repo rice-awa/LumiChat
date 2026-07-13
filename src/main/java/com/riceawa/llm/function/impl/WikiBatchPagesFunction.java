@@ -6,8 +6,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.function.LLMFunction;
+import com.riceawa.llm.function.WikiEndpointPolicy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.MinecraftServer;
+import okhttp3.HttpUrl;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -24,7 +26,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class WikiBatchPagesFunction implements LLMFunction {
     
-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
+    private static final OkHttpClient httpClient = WikiEndpointPolicy.newSecureClientBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)  // 批量请求需要更长时间
             .build();
@@ -162,8 +164,12 @@ public class WikiBatchPagesFunction implements LLMFunction {
             requestBody.addProperty("concurrency", concurrency);
             requestBody.addProperty("useCache", useCache);
             
-            String wikiBaseUrl = LLMChatConfig.getInstance().getWikiApiUrl();
-            String url = wikiBaseUrl + "/api/pages";
+            HttpUrl url = WikiEndpointPolicy.validate(
+                    LLMChatConfig.getInstance().getWikiApiUrl(),
+                    LLMChatConfig.getInstance().getWikiAllowedHosts())
+                    .newBuilder()
+                    .addPathSegments("api/pages")
+                    .build();
             String requestBodyString = gson.toJson(requestBody);
             
             // 发送HTTP POST请求

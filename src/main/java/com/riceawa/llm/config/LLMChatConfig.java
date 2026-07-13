@@ -62,6 +62,7 @@ public class LLMChatConfig {
 
     // Wiki API 配置
     private String wikiApiUrl = ConfigDefaults.DEFAULT_WIKI_API_URL;
+    private Set<String> wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
     
     // 多轮工具调用配置
     private boolean enableRecursiveToolCalls = ConfigDefaults.DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
@@ -308,6 +309,8 @@ public class LLMChatConfig {
 
         // 处理Wiki API配置
         this.wikiApiUrl = data.wikiApiUrl != null ? data.wikiApiUrl : (String) ConfigDefaults.getDefaultValue("wikiApiUrl");
+        this.wikiAllowedHosts = data.wikiAllowedHosts != null
+                ? new HashSet<>(data.wikiAllowedHosts) : ConfigDefaults.createDefaultWikiAllowedHosts();
 
         // 处理多轮工具调用配置
         this.enableRecursiveToolCalls = data.enableRecursiveToolCalls != null ? data.enableRecursiveToolCalls : (Boolean) ConfigDefaults.getDefaultValue("enableRecursiveToolCalls");
@@ -370,6 +373,10 @@ public class LLMChatConfig {
             this.executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
             needsSave = true;
         }
+        if (this.wikiAllowedHosts == null) {
+            this.wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
+            needsSave = true;
+        }
 
         // 验证和修复Provider配置
         ProviderManager.ProviderModelResult result = providerManager.fixCurrentConfiguration(
@@ -428,6 +435,7 @@ public class LLMChatConfig {
 
         // Wiki API 配置
         data.wikiApiUrl = this.wikiApiUrl;
+        data.wikiAllowedHosts = new HashSet<>(this.wikiAllowedHosts);
         
         // 多轮工具调用配置
         data.enableRecursiveToolCalls = this.enableRecursiveToolCalls;
@@ -998,6 +1006,10 @@ public class LLMChatConfig {
             executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
             updated = true;
         }
+        if (wikiAllowedHosts == null) {
+            wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
+            updated = true;
+        }
         if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", executeCommandMaxLength)) {
             executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
             updated = true;
@@ -1030,6 +1042,22 @@ public class LLMChatConfig {
      */
     public void setWikiApiUrl(String wikiApiUrl) {
         this.wikiApiUrl = wikiApiUrl != null ? wikiApiUrl : ConfigDefaults.DEFAULT_WIKI_API_URL;
+        saveConfig();
+    }
+
+    /**
+     * 获取Wiki API允许的主机名。
+     */
+    public Set<String> getWikiAllowedHosts() {
+        return new HashSet<>(wikiAllowedHosts);
+    }
+
+    /**
+     * 设置Wiki API允许的主机名。
+     */
+    public void setWikiAllowedHosts(Set<String> wikiAllowedHosts) {
+        this.wikiAllowedHosts = wikiAllowedHosts != null
+                ? new HashSet<>(wikiAllowedHosts) : ConfigDefaults.createDefaultWikiAllowedHosts();
         saveConfig();
     }
 
@@ -1110,7 +1138,8 @@ public class LLMChatConfig {
 
         // Wiki API 配置
         String wikiApiUrl;
-        
+        Set<String> wikiAllowedHosts;
+
         // 多轮工具调用配置
         Boolean enableRecursiveToolCalls;
         Integer maxToolCallDepth;

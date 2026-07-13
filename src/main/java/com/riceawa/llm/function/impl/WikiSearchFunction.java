@@ -6,8 +6,10 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.function.LLMFunction;
+import com.riceawa.llm.function.WikiEndpointPolicy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.server.MinecraftServer;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -20,7 +22,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class WikiSearchFunction implements LLMFunction {
     
-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
+    private static final OkHttpClient httpClient = WikiEndpointPolicy.newSecureClientBuilder()
             .connectTimeout(10, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build();
@@ -95,17 +97,19 @@ public class WikiSearchFunction implements LLMFunction {
             String namespaces = arguments.has("namespaces") ? 
                     arguments.get("namespaces").getAsString() : null;
             
-            // 构建API请求URL
-            String wikiBaseUrl = LLMChatConfig.getInstance().getWikiApiUrl();
-            StringBuilder urlBuilder = new StringBuilder(wikiBaseUrl + "/api/search");
-            urlBuilder.append("?q=").append(java.net.URLEncoder.encode(query, "UTF-8"));
-            urlBuilder.append("&limit=").append(limit);
+            // 构建经允许的Wiki API请求URL
+            HttpUrl.Builder urlBuilder = WikiEndpointPolicy.validate(
+                    LLMChatConfig.getInstance().getWikiApiUrl(),
+                    LLMChatConfig.getInstance().getWikiAllowedHosts())
+                    .newBuilder()
+                    .addPathSegments("api/search")
+                    .addQueryParameter("q", query)
+                    .addQueryParameter("limit", String.valueOf(limit));
             if (namespaces != null && !namespaces.trim().isEmpty()) {
-                urlBuilder.append("&namespaces=").append(java.net.URLEncoder.encode(namespaces, "UTF-8"));
+                urlBuilder.addQueryParameter("namespaces", namespaces);
             }
-            
-            String url = urlBuilder.toString();
-            
+            HttpUrl url = urlBuilder.build();
+
             // 发送HTTP请求
             Request request = new Request.Builder()
                     .url(url)
