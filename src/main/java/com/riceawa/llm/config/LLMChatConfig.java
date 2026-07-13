@@ -39,6 +39,9 @@ public class LLMChatConfig {
     private boolean enableToolCall = ConfigDefaults.DEFAULT_ENABLE_TOOL_CALL;
     private boolean enableBroadcast = ConfigDefaults.DEFAULT_ENABLE_BROADCAST;
     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
+    private boolean enableExecuteCommand = ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
+    private Set<String> executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+    private int executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
     private int historyRetentionDays = ConfigDefaults.DEFAULT_HISTORY_RETENTION_DAYS;
 
     // 上下文压缩配置
@@ -284,6 +287,13 @@ public class LLMChatConfig {
         this.enableToolCall = data.enableToolCall != null ? data.enableToolCall : (Boolean) ConfigDefaults.getDefaultValue("enableToolCall");
         this.enableBroadcast = data.enableBroadcast != null ? data.enableBroadcast : (Boolean) ConfigDefaults.getDefaultValue("enableBroadcast");
         this.broadcastPlayers = data.broadcastPlayers != null ? new HashSet<>(data.broadcastPlayers) : ConfigDefaults.createDefaultBroadcastPlayers();
+        this.enableExecuteCommand = data.enableExecuteCommand != null
+                ? data.enableExecuteCommand : ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
+        this.executeCommandAllowlist = data.executeCommandAllowlist != null
+                ? new HashSet<>(data.executeCommandAllowlist)
+                : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+        this.executeCommandMaxLength = data.executeCommandMaxLength != null
+                ? data.executeCommandMaxLength : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
         this.historyRetentionDays = data.historyRetentionDays != null ? data.historyRetentionDays : (Integer) ConfigDefaults.getDefaultValue("historyRetentionDays");
         this.enableGlobalContext = data.enableGlobalContext != null ? data.enableGlobalContext : (Boolean) ConfigDefaults.getDefaultValue("enableGlobalContext");
         this.globalContextPrompt = data.globalContextPrompt != null ? data.globalContextPrompt : (String) ConfigDefaults.getDefaultValue("globalContextPrompt");
@@ -350,6 +360,17 @@ public class LLMChatConfig {
             needsSave = true;
         }
 
+        if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", this.executeCommandMaxLength)) {
+            System.out.println("Invalid executeCommandMaxLength (" + this.executeCommandMaxLength
+                    + "), resetting to default");
+            this.executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+            needsSave = true;
+        }
+        if (this.executeCommandAllowlist == null) {
+            this.executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+            needsSave = true;
+        }
+
         // 验证和修复Provider配置
         ProviderManager.ProviderModelResult result = providerManager.fixCurrentConfiguration(
             this.currentProvider, this.currentModel);
@@ -392,6 +413,9 @@ public class LLMChatConfig {
         data.enableToolCall = this.enableToolCall;
         data.enableBroadcast = this.enableBroadcast;
         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
+        data.enableExecuteCommand = this.enableExecuteCommand;
+        data.executeCommandAllowlist = new HashSet<>(this.executeCommandAllowlist);
+        data.executeCommandMaxLength = this.executeCommandMaxLength;
         data.historyRetentionDays = this.historyRetentionDays;
 
         // 全局上下文配置
@@ -509,6 +533,37 @@ public class LLMChatConfig {
 
     public void setEnableBroadcast(boolean enableBroadcast) {
         this.enableBroadcast = enableBroadcast;
+        saveConfig();
+    }
+
+    public boolean isEnableExecuteCommand() {
+        return enableExecuteCommand;
+    }
+
+    public void setEnableExecuteCommand(boolean enableExecuteCommand) {
+        this.enableExecuteCommand = enableExecuteCommand;
+        saveConfig();
+    }
+
+    public Set<String> getExecuteCommandAllowlist() {
+        return new HashSet<>(executeCommandAllowlist);
+    }
+
+    public void setExecuteCommandAllowlist(Set<String> executeCommandAllowlist) {
+        this.executeCommandAllowlist = executeCommandAllowlist != null
+                ? new HashSet<>(executeCommandAllowlist)
+                : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+        saveConfig();
+    }
+
+    public int getExecuteCommandMaxLength() {
+        return executeCommandMaxLength;
+    }
+
+    public void setExecuteCommandMaxLength(int executeCommandMaxLength) {
+        this.executeCommandMaxLength = ConfigDefaults.isValidConfigValue(
+                "executeCommandMaxLength", executeCommandMaxLength)
+                ? executeCommandMaxLength : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
         saveConfig();
     }
 
@@ -939,6 +994,14 @@ public class LLMChatConfig {
             broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
             updated = true;
         }
+        if (executeCommandAllowlist == null) {
+            executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+            updated = true;
+        }
+        if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", executeCommandMaxLength)) {
+            executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+            updated = true;
+        }
 
         // 如果有更新，保存配置
         if (updated) {
@@ -1032,6 +1095,9 @@ public class LLMChatConfig {
         Boolean enableToolCall;
         Boolean enableBroadcast;
         Set<String> broadcastPlayers;
+        Boolean enableExecuteCommand;
+        Set<String> executeCommandAllowlist;
+        Integer executeCommandMaxLength;
         Integer historyRetentionDays;
 
         // 全局上下文配置

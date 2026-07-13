@@ -19,6 +19,8 @@ public class ConfigDefaults {
     public static final boolean DEFAULT_ENABLE_HISTORY = true;
     public static final boolean DEFAULT_ENABLE_TOOL_CALL = true;
     public static final boolean DEFAULT_ENABLE_BROADCAST = false;
+    public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = false;
+    public static final int DEFAULT_EXECUTE_COMMAND_MAX_LENGTH = 256;
     public static final int DEFAULT_HISTORY_RETENTION_DAYS = 30;
     
     // 上下文压缩配置默认值
@@ -117,6 +119,13 @@ public class ConfigDefaults {
     public static Set<String> createDefaultBroadcastPlayers() {
         return new HashSet<>();
     }
+
+    /**
+     * 创建默认的可执行命令允许列表。
+     */
+    public static Set<String> createDefaultExecuteCommandAllowlist() {
+        return new HashSet<>();
+    }
     
     /**
      * 检查API密钥是否为占位符（无效）
@@ -146,6 +155,8 @@ public class ConfigDefaults {
             case "enableHistory": return "启用历史记录";
             case "enableToolCall": return "启用工具调用";
             case "enableBroadcast": return "启用广播";
+            case "enableExecuteCommand": return "启用命令执行";
+            case "executeCommandMaxLength": return "命令执行最大长度";
             case "compressionModel": return "压缩模型";
             case "enableCompressionNotification": return "启用压缩通知";
             case "enableGlobalContext": return "启用全局上下文";
@@ -172,6 +183,13 @@ public class ConfigDefaults {
                 if (value instanceof Number) {
                     int num = ((Number) value).intValue();
                     return num > 0 && num <= 1000000; // 合理的上限
+                }
+                return false;
+
+            case "executeCommandMaxLength":
+                if (value instanceof Number) {
+                    int num = ((Number) value).intValue();
+                    return num > 0 && num <= DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
                 }
                 return false;
 
@@ -202,6 +220,8 @@ public class ConfigDefaults {
             case "maxToolCallDepth": return DEFAULT_MAX_TOOL_CALL_DEPTH;
             case "toolCallTimeoutMs": return DEFAULT_TOOL_CALL_TIMEOUT_MS;
             case "enableBroadcast": return DEFAULT_ENABLE_BROADCAST;
+            case "enableExecuteCommand": return DEFAULT_ENABLE_EXECUTE_COMMAND;
+            case "executeCommandMaxLength": return DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
             case "historyRetentionDays": return DEFAULT_HISTORY_RETENTION_DAYS;
             case "compressionModel": return DEFAULT_COMPRESSION_MODEL;
             case "enableCompressionNotification": return DEFAULT_ENABLE_COMPRESSION_NOTIFICATION;
