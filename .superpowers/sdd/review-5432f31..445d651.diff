@@ -1,0 +1,973 @@
+# Review package: 5432f31..HEAD
+
+## Commits
+445d651 fix(functions): 收紧玩家交互与Wiki端点安全
+
+## Files changed
+ .../com/riceawa/llm/config/ConfigDefaults.java     |   6 ++
+ .../java/com/riceawa/llm/config/LLMChatConfig.java |  31 +++++-
+ .../riceawa/llm/function/WikiEndpointPolicy.java   | 109 +++++++++++++++++++
+ .../llm/function/impl/SendMessageFunction.java     |  56 +++++++---
+ .../llm/function/impl/TeleportPlayerFunction.java  |  10 +-
+ .../llm/function/impl/WikiBatchPagesFunction.java  |  12 ++-
+ .../llm/function/impl/WikiPageFunction.java        |  24 +++--
+ .../llm/function/impl/WikiSearchFunction.java      |  24 +++--
+ .../llm/function/WikiEndpointPolicyTest.java       | 118 +++++++++++++++++++++
+ 9 files changed, 350 insertions(+), 40 deletions(-)
+
+## Diff
+diff --git a/src/main/java/com/riceawa/llm/config/ConfigDefaults.java b/src/main/java/com/riceawa/llm/config/ConfigDefaults.java
+index 3ccb6d8..3b322a2 100644
+--- a/src/main/java/com/riceawa/llm/config/ConfigDefaults.java
++++ b/src/main/java/com/riceawa/llm/config/ConfigDefaults.java
+@@ -39,20 +39,21 @@ public class ConfigDefaults {
+         "当前时间：{{current_time}}\n" +
+         "在线玩家（{{player_count}}人）：{{online_players}}\n" +
+         "游戏版本：{{game_version}}";
+ 
+     // 标题生成配置默认值
+     public static final boolean DEFAULT_ENABLE_TITLE_GENERATION = true;
+     public static final String DEFAULT_TITLE_GENERATION_MODEL = ""; // 空字符串表示使用当前模型
+ 
+     // Wiki API 配置默认值
+     public static final String DEFAULT_WIKI_API_URL = "https://mcwiki.rice-awa.top";
++    public static final Set<String> DEFAULT_WIKI_ALLOWED_HOSTS = Set.of("mcwiki.rice-awa.top");
+ 
+     // 多轮工具调用配置默认值
+     public static final boolean DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS = true;
+     public static final int DEFAULT_MAX_TOOL_CALL_DEPTH = 25;
+     public static final int DEFAULT_TOOL_CALL_TIMEOUT_MS = 30000; // 30秒
+ 
+     // API密钥占位符（用于检测无效密钥）
+     public static final String API_KEY_PLACEHOLDER = "your-api-key-here";
+ 
+     // 空字符串默认值（用于Provider和Model）
+@@ -113,20 +114,24 @@ public class ConfigDefaults {
+         return providers;
+     }
+     
+     /**
+      * 创建默认的广播玩家集合
+      */
+     public static Set<String> createDefaultBroadcastPlayers() {
+         return new HashSet<>();
+     }
+ 
++    public static Set<String> createDefaultWikiAllowedHosts() {
++        return new HashSet<>(DEFAULT_WIKI_ALLOWED_HOSTS);
++    }
++
+     /**
+      * 创建默认的可执行命令允许列表。
+      */
+     public static Set<String> createDefaultExecuteCommandAllowlist() {
+         return new HashSet<>();
+     }
+     
+     /**
+      * 检查API密钥是否为占位符（无效）
+      */
+@@ -223,16 +228,17 @@ public class ConfigDefaults {
+             case "enableExecuteCommand": return DEFAULT_ENABLE_EXECUTE_COMMAND;
+             case "executeCommandMaxLength": return DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+             case "historyRetentionDays": return DEFAULT_HISTORY_RETENTION_DAYS;
+             case "compressionModel": return DEFAULT_COMPRESSION_MODEL;
+             case "enableCompressionNotification": return DEFAULT_ENABLE_COMPRESSION_NOTIFICATION;
+             case "enableGlobalContext": return DEFAULT_ENABLE_GLOBAL_CONTEXT;
+             case "globalContextPrompt": return DEFAULT_GLOBAL_CONTEXT_PROMPT;
+             case "enableTitleGeneration": return DEFAULT_ENABLE_TITLE_GENERATION;
+             case "titleGenerationModel": return DEFAULT_TITLE_GENERATION_MODEL;
+             case "wikiApiUrl": return DEFAULT_WIKI_API_URL;
++            case "wikiAllowedHosts": return createDefaultWikiAllowedHosts();
+             case "currentProvider": return EMPTY_STRING;
+             case "currentModel": return EMPTY_STRING;
+             default: return null;
+         }
+     }
+ }
+diff --git a/src/main/java/com/riceawa/llm/config/LLMChatConfig.java b/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
+index 2ba32f6..6e97aea 100644
+--- a/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
++++ b/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
+@@ -55,20 +55,21 @@ public class LLMChatConfig {
+     // 全局上下文配置
+     private boolean enableGlobalContext = ConfigDefaults.DEFAULT_ENABLE_GLOBAL_CONTEXT;
+     private String globalContextPrompt = ConfigDefaults.DEFAULT_GLOBAL_CONTEXT_PROMPT;
+ 
+     // 标题生成配置
+     private boolean enableTitleGeneration = ConfigDefaults.DEFAULT_ENABLE_TITLE_GENERATION;
+     private String titleGenerationModel = ConfigDefaults.DEFAULT_TITLE_GENERATION_MODEL;
+ 
+     // Wiki API 配置
+     private String wikiApiUrl = ConfigDefaults.DEFAULT_WIKI_API_URL;
++    private Set<String> wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
+     
+     // 多轮工具调用配置
+     private boolean enableRecursiveToolCalls = ConfigDefaults.DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
+     private int maxToolCallDepth = ConfigDefaults.DEFAULT_MAX_TOOL_CALL_DEPTH;
+     private int toolCallTimeoutMs = ConfigDefaults.DEFAULT_TOOL_CALL_TIMEOUT_MS;
+ 
+     // 并发配置
+     private ConcurrencySettings concurrencySettings = ConcurrencySettings.createDefault();
+ 
+     // 日志配置
+@@ -301,20 +302,22 @@ public class LLMChatConfig {
+         // 处理上下文压缩配置
+         this.compressionModel = data.compressionModel != null ? data.compressionModel : (String) ConfigDefaults.getDefaultValue("compressionModel");
+         this.enableCompressionNotification = data.enableCompressionNotification != null ? data.enableCompressionNotification : (Boolean) ConfigDefaults.getDefaultValue("enableCompressionNotification");
+ 
+         // 处理标题生成配置
+         this.enableTitleGeneration = data.enableTitleGeneration != null ? data.enableTitleGeneration : (Boolean) ConfigDefaults.getDefaultValue("enableTitleGeneration");
+         this.titleGenerationModel = data.titleGenerationModel != null ? data.titleGenerationModel : (String) ConfigDefaults.getDefaultValue("titleGenerationModel");
+ 
+         // 处理Wiki API配置
+         this.wikiApiUrl = data.wikiApiUrl != null ? data.wikiApiUrl : (String) ConfigDefaults.getDefaultValue("wikiApiUrl");
++        this.wikiAllowedHosts = data.wikiAllowedHosts != null
++                ? new HashSet<>(data.wikiAllowedHosts) : ConfigDefaults.createDefaultWikiAllowedHosts();
+ 
+         // 处理多轮工具调用配置
+         this.enableRecursiveToolCalls = data.enableRecursiveToolCalls != null ? data.enableRecursiveToolCalls : (Boolean) ConfigDefaults.getDefaultValue("enableRecursiveToolCalls");
+         this.maxToolCallDepth = data.maxToolCallDepth != null ? data.maxToolCallDepth : (Integer) ConfigDefaults.getDefaultValue("maxToolCallDepth");
+         this.toolCallTimeoutMs = data.toolCallTimeoutMs != null ? data.toolCallTimeoutMs : (Integer) ConfigDefaults.getDefaultValue("toolCallTimeoutMs");
+ 
+         // 处理并发配置
+         this.concurrencySettings = data.concurrencySettings != null ? data.concurrencySettings : ConcurrencySettings.createDefault();
+ 
+         // 处理日志配置
+@@ -363,20 +366,24 @@ public class LLMChatConfig {
+         if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", this.executeCommandMaxLength)) {
+             System.out.println("Invalid executeCommandMaxLength (" + this.executeCommandMaxLength
+                     + "), resetting to default");
+             this.executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+             needsSave = true;
+         }
+         if (this.executeCommandAllowlist == null) {
+             this.executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+             needsSave = true;
+         }
++        if (this.wikiAllowedHosts == null) {
++            this.wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
++            needsSave = true;
++        }
+ 
+         // 验证和修复Provider配置
+         ProviderManager.ProviderModelResult result = providerManager.fixCurrentConfiguration(
+             this.currentProvider, this.currentModel);
+ 
+         if (result.isSuccess()) {
+             if (!result.getProviderName().equals(this.currentProvider) ||
+                 !result.getModelName().equals(this.currentModel)) {
+                 this.currentProvider = result.getProviderName();
+                 this.currentModel = result.getModelName();
+@@ -421,20 +428,21 @@ public class LLMChatConfig {
+         // 全局上下文配置
+         data.enableGlobalContext = this.enableGlobalContext;
+         data.globalContextPrompt = this.globalContextPrompt;
+ 
+         // 压缩和标题生成功能配置
+         data.enableCompressionNotification = this.enableCompressionNotification;
+         data.enableTitleGeneration = this.enableTitleGeneration;
+ 
+         // Wiki API 配置
+         data.wikiApiUrl = this.wikiApiUrl;
++        data.wikiAllowedHosts = new HashSet<>(this.wikiAllowedHosts);
+         
+         // 多轮工具调用配置
+         data.enableRecursiveToolCalls = this.enableRecursiveToolCalls;
+         data.maxToolCallDepth = this.maxToolCallDepth;
+         data.toolCallTimeoutMs = this.toolCallTimeoutMs;
+ 
+         // 系统配置
+         data.concurrencySettings = this.concurrencySettings;
+         data.logConfig = this.logConfig;
+         data.providers = this.providers;
+@@ -991,20 +999,24 @@ public class LLMChatConfig {
+         }
+ 
+         if (broadcastPlayers == null) {
+             broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
+             updated = true;
+         }
+         if (executeCommandAllowlist == null) {
+             executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+             updated = true;
+         }
++        if (wikiAllowedHosts == null) {
++            wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
++            updated = true;
++        }
+         if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", executeCommandMaxLength)) {
+             executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+             updated = true;
+         }
+ 
+         // 如果有更新，保存配置
+         if (updated) {
+             saveConfig();
+         }
+ 
+@@ -1026,20 +1038,36 @@ public class LLMChatConfig {
+     }
+ 
+     /**
+      * 设置Wiki API URL
+      */
+     public void setWikiApiUrl(String wikiApiUrl) {
+         this.wikiApiUrl = wikiApiUrl != null ? wikiApiUrl : ConfigDefaults.DEFAULT_WIKI_API_URL;
+         saveConfig();
+     }
+ 
++    /**
++     * 获取Wiki API允许的主机名。
++     */
++    public Set<String> getWikiAllowedHosts() {
++        return new HashSet<>(wikiAllowedHosts);
++    }
++
++    /**
++     * 设置Wiki API允许的主机名。
++     */
++    public void setWikiAllowedHosts(Set<String> wikiAllowedHosts) {
++        this.wikiAllowedHosts = wikiAllowedHosts != null
++                ? new HashSet<>(wikiAllowedHosts) : ConfigDefaults.createDefaultWikiAllowedHosts();
++        saveConfig();
++    }
++
+     /**
+      * 获取是否启用递归工具调用
+      */
+     public boolean isEnableRecursiveToolCalls() {
+         return enableRecursiveToolCalls;
+     }
+ 
+     /**
+      * 设置是否启用递归工具调用
+      */
+@@ -1103,21 +1131,22 @@ public class LLMChatConfig {
+         // 全局上下文配置
+         Boolean enableGlobalContext;
+         String globalContextPrompt;
+ 
+         // 压缩和标题生成功能配置
+         Boolean enableCompressionNotification;
+         Boolean enableTitleGeneration;
+ 
+         // Wiki API 配置
+         String wikiApiUrl;
+-        
++        Set<String> wikiAllowedHosts;
++
+         // 多轮工具调用配置
+         Boolean enableRecursiveToolCalls;
+         Integer maxToolCallDepth;
+         Integer toolCallTimeoutMs;
+ 
+         // 系统配置
+         ConcurrencySettings concurrencySettings;
+         LogConfig logConfig;
+         List<Provider> providers;
+ 
+diff --git a/src/main/java/com/riceawa/llm/function/WikiEndpointPolicy.java b/src/main/java/com/riceawa/llm/function/WikiEndpointPolicy.java
+new file mode 100644
+index 0000000..f12de1d
+--- /dev/null
++++ b/src/main/java/com/riceawa/llm/function/WikiEndpointPolicy.java
+@@ -0,0 +1,109 @@
++package com.riceawa.llm.function;
++
++import okhttp3.HttpUrl;
++import okhttp3.OkHttpClient;
++
++import java.net.IDN;
++import java.util.HashSet;
++import java.util.Locale;
++import java.util.Set;
++
++/**
++ * Validates configured Wiki API endpoints before the mod sends a request.
++ */
++public final class WikiEndpointPolicy {
++
++    private WikiEndpointPolicy() {
++    }
++
++    /**
++     * Parses and validates a Wiki API base URL against the administrator allowlist.
++     *
++     * @throws IllegalArgumentException when the endpoint is not a permitted HTTPS origin
++     */
++    public static HttpUrl validate(String baseUrl, Set<String> allowedHosts) {
++        if (allowedHosts == null || allowedHosts.isEmpty()) {
++            throw rejectedEndpoint();
++        }
++
++        HttpUrl endpoint = HttpUrl.parse(baseUrl);
++        if (endpoint == null
++                || !endpoint.isHttps()
++                || !endpoint.encodedUsername().isEmpty()
++                || !endpoint.encodedPassword().isEmpty()
++                || endpoint.port() != 443) {
++            throw rejectedEndpoint();
++        }
++
++        String host = normalizeHost(endpoint.host());
++        if (host == null || isIpLiteral(host) || !normalizeAllowedHosts(allowedHosts).contains(host)) {
++            throw rejectedEndpoint();
++        }
++
++        return endpoint;
++    }
++
++    /**
++     * Creates an HTTP client that cannot follow a redirect to another origin.
++     */
++    public static OkHttpClient.Builder newSecureClientBuilder() {
++        return new OkHttpClient.Builder()
++                .followRedirects(false)
++                .followSslRedirects(false);
++    }
++
++    private static Set<String> normalizeAllowedHosts(Set<String> allowedHosts) {
++        Set<String> normalized = new HashSet<>();
++        for (String allowedHost : allowedHosts) {
++            String host = normalizeHost(allowedHost);
++            if (host != null && !isIpLiteral(host)) {
++                normalized.add(host);
++            }
++        }
++        return normalized;
++    }
++
++    private static String normalizeHost(String host) {
++        if (host == null || host.isEmpty()) {
++            return null;
++        }
++        try {
++            return IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES).toLowerCase(Locale.ROOT);
++        } catch (IllegalArgumentException exception) {
++            return null;
++        }
++    }
++
++    private static boolean isIpLiteral(String host) {
++        if (host.indexOf(':') >= 0) {
++            return true;
++        }
++
++        String[] octets = host.split("\\.", -1);
++        if (octets.length != 4) {
++            return false;
++        }
++        for (String octet : octets) {
++            if (octet.isEmpty() || octet.length() > 3) {
++                return false;
++            }
++            for (int index = 0; index < octet.length(); index++) {
++                if (!Character.isDigit(octet.charAt(index))) {
++                    return false;
++                }
++            }
++            try {
++                if (Integer.parseInt(octet) > 255) {
++                    return false;
++                }
++            } catch (NumberFormatException exception) {
++                return false;
++            }
++        }
++        return true;
++    }
++
++    private static IllegalArgumentException rejectedEndpoint() {
++        return new IllegalArgumentException("Wiki endpoint is not permitted");
++    }
++}
+diff --git a/src/main/java/com/riceawa/llm/function/impl/SendMessageFunction.java b/src/main/java/com/riceawa/llm/function/impl/SendMessageFunction.java
+index 4c69df9..af85aa6 100644
+--- a/src/main/java/com/riceawa/llm/function/impl/SendMessageFunction.java
++++ b/src/main/java/com/riceawa/llm/function/impl/SendMessageFunction.java
+@@ -1,12 +1,13 @@
+ package com.riceawa.llm.function.impl;
+ 
++import com.google.gson.JsonArray;
+ import com.google.gson.JsonObject;
+ import com.riceawa.llm.compat.MessageCompat;
+ import com.riceawa.llm.function.LLMFunction;
+ import com.riceawa.llm.function.PermissionHelper;
+ import net.minecraft.network.chat.Component;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.ChatFormatting;
+ 
+@@ -29,97 +30,126 @@ public class SendMessageFunction implements LLMFunction {
+     public JsonObject getParametersSchema() {
+         JsonObject schema = new JsonObject();
+         schema.addProperty("type", "object");
+         JsonObject properties = new JsonObject();
+         JsonObject required = new JsonObject();
+         
+         // 必需参数：消息内容
+         JsonObject message = new JsonObject();
+         message.addProperty("type", "string");
+         message.addProperty("description", "要发送的消息内容");
++        message.addProperty("minLength", 1);
++        message.addProperty("maxLength", 512);
+         properties.add("message", message);
+         
+         // 可选参数：目标玩家
+         JsonObject target = new JsonObject();
+         target.addProperty("type", "string");
+-        target.addProperty("description", "目标玩家名称，不填则发送给所有玩家（需要OP权限）");
++        target.addProperty("description", "目标玩家名称；不填则发送给自己，all表示向所有玩家广播（需要OP权限）");
+         properties.add("target", target);
+         
+         // 可选参数：消息类型
+         JsonObject messageType = new JsonObject();
+         messageType.addProperty("type", "string");
+         messageType.addProperty("description", "消息类型：chat(聊天), system(系统消息), actionbar(动作栏)");
++        JsonArray messageTypes = new JsonArray();
++        messageTypes.add("chat");
++        messageTypes.add("system");
++        messageTypes.add("actionbar");
++        messageType.add("enum", messageTypes);
+         messageType.addProperty("default", "chat");
+         properties.add("message_type", messageType);
+         
+         schema.add("properties", properties);
+         schema.add("required", new com.google.gson.JsonArray());
+         schema.getAsJsonArray("required").add("message");
+         
+         return schema;
+     }
+     
+     @Override
+     public FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments) {
+         try {
+             // 获取必需参数
+             if (!arguments.has("message")) {
+                 return FunctionResult.error("缺少必需参数: message");
+             }
+             
+             String messageContent = arguments.get("message").getAsString();
+-            if (messageContent.trim().isEmpty()) {
+-                return FunctionResult.error("消息内容不能为空");
++            if (!isValidMessageContent(messageContent)) {
++                return FunctionResult.error("消息长度必须在1到512个字符之间");
+             }
+             
+             String target = arguments.has("target") ? 
+                 arguments.get("target").getAsString() : null;
+-            String messageType = arguments.has("message_type") ? 
++            String messageType = arguments.has("message_type") ?
+                 arguments.get("message_type").getAsString() : "chat";
++            if (!isSupportedMessageType(messageType)) {
++                return FunctionResult.error("不支持的消息类型");
++            }
+             
+             // 构建消息
+             Component messageComponent = buildMessage(player, messageContent, messageType);
+             
+-            if (target == null || target.trim().isEmpty()) {
+-                // 发送给所有玩家 - 需要OP权限
++            if ("all".equals(target)) {
++                // 向所有在线玩家发送消息 - 需要OP权限
+                 if (!PermissionHelper.canSendBroadcast(player)) {
+                     return FunctionResult.error(PermissionHelper.getPermissionErrorMessage("向所有玩家发送消息"));
+                 }
+-                
+-                // 发送给所有在线玩家
++
+                 for (ServerPlayer onlinePlayer : server.getPlayerList().getPlayers()) {
+                     sendMessageToPlayer(onlinePlayer, messageComponent, messageType);
+                 }
+-                
+-                return FunctionResult.success("消息已发送给所有在线玩家 (" + 
++
++                return FunctionResult.success("消息已发送给所有在线玩家 (" +
+                     server.getPlayerCount() + " 人)");
+-                
++
++            } else if (target == null || target.trim().isEmpty()) {
++                sendMessageToPlayer((ServerPlayer) player, messageComponent, messageType);
++                return FunctionResult.success("消息已发送给自己");
++
+             } else {
+                 // 发送给指定玩家
+                 //? >=1.21.11 {
+                 ServerPlayer targetPlayer = server.getPlayerList().getPlayer(target);
+                 //?} else {
+                 /*ServerPlayer targetPlayer = server.getPlayerList().getPlayerByName(target);
+                 *//*?}*/
+                 if (targetPlayer == null) {
+-                    return FunctionResult.error("找不到玩家: " + target);
++                    return FunctionResult.error("目标玩家不可用");
++                }
++                if (!canSendToTarget(PermissionHelper.isOperator(player), targetPlayer.equals(player))) {
++                    return FunctionResult.error(PermissionHelper.getPermissionErrorMessage("向其他玩家发送消息"));
+                 }
+-                
++
+                 sendMessageToPlayer(targetPlayer, messageComponent, messageType);
+                 return FunctionResult.success("消息已发送给 " + target);
+             }
+             
+         } catch (Exception e) {
+             return FunctionResult.error("发送消息失败: " + e.getMessage());
+         }
+     }
+     
++    public static boolean isValidMessageContent(String messageContent) {
++        return messageContent != null && messageContent.length() >= 1 && messageContent.length() <= 512;
++    }
++
++    public static boolean isSupportedMessageType(String messageType) {
++        return "chat".equals(messageType) || "system".equals(messageType)
++                || "actionbar".equals(messageType);
++    }
++
++    public static boolean canSendToTarget(boolean operator, boolean targetIsSender) {
++        return operator || targetIsSender;
++    }
++
+     private Component buildMessage(Player sender, String content, String messageType) {
+         String senderName = sender.getName().getString();
+         
+         switch (messageType.toLowerCase()) {
+             case "system":
+                 return Component.literal("[系统] " + content).withStyle(ChatFormatting.YELLOW);
+             case "actionbar":
+                 return Component.literal(content).withStyle(ChatFormatting.AQUA);
+             case "chat":
+             default:
+diff --git a/src/main/java/com/riceawa/llm/function/impl/TeleportPlayerFunction.java b/src/main/java/com/riceawa/llm/function/impl/TeleportPlayerFunction.java
+index 3c5ea7e..b45d147 100644
+--- a/src/main/java/com/riceawa/llm/function/impl/TeleportPlayerFunction.java
++++ b/src/main/java/com/riceawa/llm/function/impl/TeleportPlayerFunction.java
+@@ -8,32 +8,32 @@ import com.riceawa.llm.util.EntityHelper;
+ import net.minecraft.network.chat.Component;
+ import net.minecraft.server.MinecraftServer;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.server.level.ServerPlayer;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.world.level.Level;
+ import net.minecraft.world.phys.Vec3;
+ 
+ /**
+  * 传送玩家的函数
+- * 权限：OP可传送任何玩家，普通玩家只能传送自己
++ * 权限：仅OP可使用
+  */
+ public class TeleportPlayerFunction implements LLMFunction {
+     
+     @Override
+     public String getName() {
+         return "teleport_player";
+     }
+     
+     @Override
+     public String getDescription() {
+-        return "传送玩家到指定位置或其他玩家身边";
++        return "传送玩家到指定位置或其他玩家身边（仅OP）";
+     }
+     
+     @Override
+     public JsonObject getParametersSchema() {
+         JsonObject schema = new JsonObject();
+         schema.addProperty("type", "object");
+         
+         JsonObject properties = new JsonObject();
+         
+         // 目标玩家名称（可选，默认为自己）
+@@ -223,23 +223,27 @@ public class TeleportPlayerFunction implements LLMFunction {
+                 return "主世界";
+             case "minecraft:the_nether":
+                 return "下界";
+             case "minecraft:the_end":
+                 return "末地";
+             default:
+                 return dimensionId;
+         }
+     }
+     
++    public static boolean isOperatorOnly(boolean operator) {
++        return operator;
++    }
++
+     @Override
+     public boolean hasPermission(Player player) {
+-        return true; // 所有玩家都可以传送自己，OP可以传送其他玩家
++        return isOperatorOnly(PermissionHelper.isOperator(player));
+     }
+     
+     @Override
+     public boolean isEnabled() {
+         return true;
+     }
+     
+     @Override
+     public String getCategory() {
+         return "player";
+diff --git a/src/main/java/com/riceawa/llm/function/impl/WikiBatchPagesFunction.java b/src/main/java/com/riceawa/llm/function/impl/WikiBatchPagesFunction.java
+index be197e9..ec3caf9 100644
+--- a/src/main/java/com/riceawa/llm/function/impl/WikiBatchPagesFunction.java
++++ b/src/main/java/com/riceawa/llm/function/impl/WikiBatchPagesFunction.java
+@@ -1,37 +1,39 @@
+ package com.riceawa.llm.function.impl;
+ 
+ import com.google.gson.Gson;
+ import com.google.gson.JsonArray;
+ import com.google.gson.JsonElement;
+ import com.google.gson.JsonObject;
+ import com.riceawa.llm.config.LLMChatConfig;
+ import com.riceawa.llm.function.LLMFunction;
++import com.riceawa.llm.function.WikiEndpointPolicy;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.server.MinecraftServer;
++import okhttp3.HttpUrl;
+ import okhttp3.MediaType;
+ import okhttp3.OkHttpClient;
+ import okhttp3.Request;
+ import okhttp3.RequestBody;
+ import okhttp3.Response;
+ 
+ import java.io.IOException;
+ import java.util.ArrayList;
+ import java.util.List;
+ import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * Wiki批量页面获取函数，用于同时获取多个Wiki页面的内容
+  */
+ public class WikiBatchPagesFunction implements LLMFunction {
+     
+-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
++    private static final OkHttpClient httpClient = WikiEndpointPolicy.newSecureClientBuilder()
+             .connectTimeout(15, TimeUnit.SECONDS)
+             .readTimeout(60, TimeUnit.SECONDS)  // 批量请求需要更长时间
+             .build();
+     
+     private static final Gson gson = new Gson();
+     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+     
+     @Override
+     public String getName() {
+         return "wiki_batch_pages";
+@@ -155,22 +157,26 @@ public class WikiBatchPagesFunction implements LLMFunction {
+             if (maxLength < 0) maxLength = 1000;
+             if (maxLength > 8000) maxLength = 8000;
+             
+             // 构建请求体
+             JsonObject requestBody = new JsonObject();
+             requestBody.add("pages", pagesArray);
+             requestBody.addProperty("format", format);
+             requestBody.addProperty("concurrency", concurrency);
+             requestBody.addProperty("useCache", useCache);
+             
+-            String wikiBaseUrl = LLMChatConfig.getInstance().getWikiApiUrl();
+-            String url = wikiBaseUrl + "/api/pages";
++            HttpUrl url = WikiEndpointPolicy.validate(
++                    LLMChatConfig.getInstance().getWikiApiUrl(),
++                    LLMChatConfig.getInstance().getWikiAllowedHosts())
++                    .newBuilder()
++                    .addPathSegments("api/pages")
++                    .build();
+             String requestBodyString = gson.toJson(requestBody);
+             
+             // 发送HTTP POST请求
+             RequestBody body = RequestBody.create(requestBodyString, JSON);
+             Request request = new Request.Builder()
+                     .url(url)
+                     .post(body)
+                     .addHeader("User-Agent", "Luminous-LLMChat-Mod/1.0")
+                     .addHeader("Content-Type", "application/json")
+                     .build();
+diff --git a/src/main/java/com/riceawa/llm/function/impl/WikiPageFunction.java b/src/main/java/com/riceawa/llm/function/impl/WikiPageFunction.java
+index ae67d9b..2929c0f 100644
+--- a/src/main/java/com/riceawa/llm/function/impl/WikiPageFunction.java
++++ b/src/main/java/com/riceawa/llm/function/impl/WikiPageFunction.java
+@@ -1,32 +1,34 @@
+ package com.riceawa.llm.function.impl;
+ 
+ import com.google.gson.Gson;
+ import com.google.gson.JsonArray;
+ import com.google.gson.JsonObject;
+ import com.riceawa.llm.config.LLMChatConfig;
+ import com.riceawa.llm.function.LLMFunction;
++import com.riceawa.llm.function.WikiEndpointPolicy;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.server.MinecraftServer;
++import okhttp3.HttpUrl;
+ import okhttp3.OkHttpClient;
+ import okhttp3.Request;
+ import okhttp3.Response;
+ 
+ import java.io.IOException;
+ import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * Wiki页面内容获取函数，用于获取指定Wiki页面的详细内容
+  */
+ public class WikiPageFunction implements LLMFunction {
+     
+-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
++    private static final OkHttpClient httpClient = WikiEndpointPolicy.newSecureClientBuilder()
+             .connectTimeout(10, TimeUnit.SECONDS)
+             .readTimeout(30, TimeUnit.SECONDS)
+             .build();
+     
+     private static final Gson gson = new Gson();
+     
+     @Override
+     public String getName() {
+         return "wiki_page";
+     }
+@@ -105,29 +107,31 @@ public class WikiPageFunction implements LLMFunction {
+             }
+             
+             boolean includeMetadata = arguments.has("include_metadata") && 
+                                     arguments.get("include_metadata").getAsBoolean();
+             
+             int maxLength = arguments.has("max_length") ? 
+                     arguments.get("max_length").getAsInt() : 5000;
+             if (maxLength < 0) maxLength = 5000;
+             if (maxLength > 11000) maxLength = 11000;
+             
+-            // 构建API请求URL
+-            String wikiBaseUrl = LLMChatConfig.getInstance().getWikiApiUrl();
+-            StringBuilder urlBuilder = new StringBuilder(wikiBaseUrl + "/api/page/");
+-            urlBuilder.append(java.net.URLEncoder.encode(pageName, "UTF-8"));
+-            urlBuilder.append("?format=").append(format);
+-            urlBuilder.append("&includeMetadata=").append(includeMetadata);
+-            
+-            String url = urlBuilder.toString();
+-            
++            // 构建经允许的Wiki API请求URL
++            HttpUrl url = WikiEndpointPolicy.validate(
++                    LLMChatConfig.getInstance().getWikiApiUrl(),
++                    LLMChatConfig.getInstance().getWikiAllowedHosts())
++                    .newBuilder()
++                    .addPathSegments("api/page")
++                    .addPathSegment(pageName)
++                    .addQueryParameter("format", format)
++                    .addQueryParameter("includeMetadata", String.valueOf(includeMetadata))
++                    .build();
++
+             // 发送HTTP请求
+             Request request = new Request.Builder()
+                     .url(url)
+                     .addHeader("User-Agent", "Luminous-LLMChat-Mod/1.0")
+                     .build();
+             
+             try (Response response = httpClient.newCall(request).execute()) {
+                 // 使用统一的HTTP响应处理
+                 WikiErrorHandler.HttpResponseResult httpResult = WikiErrorHandler.handleHttpResponse(response, pageName);
+                 if (!httpResult.isSuccess()) {
+diff --git a/src/main/java/com/riceawa/llm/function/impl/WikiSearchFunction.java b/src/main/java/com/riceawa/llm/function/impl/WikiSearchFunction.java
+index f337325..e5964f0 100644
+--- a/src/main/java/com/riceawa/llm/function/impl/WikiSearchFunction.java
++++ b/src/main/java/com/riceawa/llm/function/impl/WikiSearchFunction.java
+@@ -1,33 +1,35 @@
+ package com.riceawa.llm.function.impl;
+ 
+ import com.google.gson.Gson;
+ import com.google.gson.JsonArray;
+ import com.google.gson.JsonElement;
+ import com.google.gson.JsonObject;
+ import com.riceawa.llm.config.LLMChatConfig;
+ import com.riceawa.llm.function.LLMFunction;
++import com.riceawa.llm.function.WikiEndpointPolicy;
+ import net.minecraft.world.entity.player.Player;
+ import net.minecraft.server.MinecraftServer;
++import okhttp3.HttpUrl;
+ import okhttp3.OkHttpClient;
+ import okhttp3.Request;
+ import okhttp3.Response;
+ 
+ import java.io.IOException;
+ import java.util.concurrent.TimeUnit;
+ 
+ /**
+  * Wiki搜索函数，用于搜索Minecraft Wiki内容
+  */
+ public class WikiSearchFunction implements LLMFunction {
+     
+-    private static final OkHttpClient httpClient = new OkHttpClient.Builder()
++    private static final OkHttpClient httpClient = WikiEndpointPolicy.newSecureClientBuilder()
+             .connectTimeout(10, TimeUnit.SECONDS)
+             .readTimeout(30, TimeUnit.SECONDS)
+             .build();
+     
+     private static final Gson gson = new Gson();
+     
+     @Override
+     public String getName() {
+         return "wiki_search";
+     }
+@@ -88,31 +90,33 @@ public class WikiSearchFunction implements LLMFunction {
+             }
+             
+             int limit = arguments.has("limit") ? arguments.get("limit").getAsInt() : 5;
+             if (limit < 1 || limit > 20) {
+                 limit = Math.max(1, Math.min(20, limit));
+             }
+             
+             String namespaces = arguments.has("namespaces") ? 
+                     arguments.get("namespaces").getAsString() : null;
+             
+-            // 构建API请求URL
+-            String wikiBaseUrl = LLMChatConfig.getInstance().getWikiApiUrl();
+-            StringBuilder urlBuilder = new StringBuilder(wikiBaseUrl + "/api/search");
+-            urlBuilder.append("?q=").append(java.net.URLEncoder.encode(query, "UTF-8"));
+-            urlBuilder.append("&limit=").append(limit);
++            // 构建经允许的Wiki API请求URL
++            HttpUrl.Builder urlBuilder = WikiEndpointPolicy.validate(
++                    LLMChatConfig.getInstance().getWikiApiUrl(),
++                    LLMChatConfig.getInstance().getWikiAllowedHosts())
++                    .newBuilder()
++                    .addPathSegments("api/search")
++                    .addQueryParameter("q", query)
++                    .addQueryParameter("limit", String.valueOf(limit));
+             if (namespaces != null && !namespaces.trim().isEmpty()) {
+-                urlBuilder.append("&namespaces=").append(java.net.URLEncoder.encode(namespaces, "UTF-8"));
++                urlBuilder.addQueryParameter("namespaces", namespaces);
+             }
+-            
+-            String url = urlBuilder.toString();
+-            
++            HttpUrl url = urlBuilder.build();
++
+             // 发送HTTP请求
+             Request request = new Request.Builder()
+                     .url(url)
+                     .addHeader("User-Agent", "Luminous-LLMChat-Mod/1.0")
+                     .build();
+             
+             try (Response response = httpClient.newCall(request).execute()) {
+                 // 使用统一的HTTP响应处理
+                 WikiErrorHandler.HttpResponseResult httpResult = WikiErrorHandler.handleHttpResponse(response, query);
+                 if (!httpResult.isSuccess()) {
+diff --git a/src/test/java/com/riceawa/llm/function/WikiEndpointPolicyTest.java b/src/test/java/com/riceawa/llm/function/WikiEndpointPolicyTest.java
+new file mode 100644
+index 0000000..8793287
+--- /dev/null
++++ b/src/test/java/com/riceawa/llm/function/WikiEndpointPolicyTest.java
+@@ -0,0 +1,118 @@
++package com.riceawa.llm.function;
++
++import com.riceawa.llm.config.ConfigDefaults;
++import com.riceawa.llm.function.impl.SendMessageFunction;
++import com.riceawa.llm.function.impl.TeleportPlayerFunction;
++import com.riceawa.llm.function.impl.WikiErrorHandler;
++import okhttp3.Protocol;
++import okhttp3.Request;
++import okhttp3.Response;
++import okhttp3.ResponseBody;
++import org.junit.jupiter.api.Test;
++
++import java.util.Collections;
++import java.util.Set;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertThrows;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class WikiEndpointPolicyTest {
++
++    private static final Set<String> ALLOWED_HOSTS = Set.of("mcwiki.rice-awa.top");
++
++    @Test
++    void usesOnlyTheDefaultWikiHost() {
++        assertEquals(Set.of("mcwiki.rice-awa.top"), ConfigDefaults.DEFAULT_WIKI_ALLOWED_HOSTS);
++        assertEquals(Set.of("mcwiki.rice-awa.top"), ConfigDefaults.createDefaultWikiAllowedHosts());
++    }
++
++    @Test
++    void acceptsAllowedHttpsHost() {
++        assertEquals(
++                "https://mcwiki.rice-awa.top/",
++                WikiEndpointPolicy.validate("https://mcwiki.rice-awa.top", ALLOWED_HOSTS).toString());
++    }
++
++    @Test
++    void normalizesIdnHostsForExactMatching() {
++        assertEquals(
++                "https://xn--bcher-kva.example/",
++                WikiEndpointPolicy.validate("https://bücher.example", Set.of("bücher.example")).toString());
++    }
++
++    @Test
++    void rejectsUnsafeOrUnapprovedEndpoints() {
++        assertRejected("http://mcwiki.rice-awa.top", ALLOWED_HOSTS);
++        assertRejected("https://user:password@mcwiki.rice-awa.top", ALLOWED_HOSTS);
++        assertRejected("https://127.0.0.1", Set.of("127.0.0.1"));
++        assertRejected("https://[::1]", Set.of("::1"));
++        assertRejected("https://mcwiki.rice-awa.top:8443", ALLOWED_HOSTS);
++        assertRejected("https://mcwiki.rice-awa.top.evil.test", ALLOWED_HOSTS);
++        assertRejected("https://unknown.example", ALLOWED_HOSTS);
++        assertRejected("https://mcwiki.rice-awa.top", Collections.emptySet());
++    }
++
++    @Test
++    void enforcesPlayerInteractionPolicyBoundaries() {
++        assertTrue(SendMessageFunction.isValidMessageContent("x"));
++        assertTrue(SendMessageFunction.isValidMessageContent("x".repeat(512)));
++        assertFalse(SendMessageFunction.isValidMessageContent(""));
++        assertFalse(SendMessageFunction.isValidMessageContent("x".repeat(513)));
++        assertTrue(SendMessageFunction.isSupportedMessageType("chat"));
++        assertTrue(SendMessageFunction.isSupportedMessageType("system"));
++        assertTrue(SendMessageFunction.isSupportedMessageType("actionbar"));
++        assertFalse(SendMessageFunction.isSupportedMessageType("title"));
++        assertTrue(SendMessageFunction.canSendToTarget(false, true));
++        assertFalse(SendMessageFunction.canSendToTarget(false, false));
++        assertTrue(SendMessageFunction.canSendToTarget(true, false));
++        assertFalse(TeleportPlayerFunction.isOperatorOnly(false));
++        assertTrue(TeleportPlayerFunction.isOperatorOnly(true));
++    }
++
++    @Test
++    void definesStrictInteractionParameterBoundaries() {
++        SendMessageFunction sendMessage = new SendMessageFunction();
++        assertEquals(1, sendMessage.getParametersSchema().getAsJsonObject("properties")
++                .getAsJsonObject("message").get("minLength").getAsInt());
++        assertEquals(512, sendMessage.getParametersSchema().getAsJsonObject("properties")
++                .getAsJsonObject("message").get("maxLength").getAsInt());
++        assertEquals(3, sendMessage.getParametersSchema().getAsJsonObject("properties")
++                .getAsJsonObject("message_type").getAsJsonArray("enum").size());
++        assertEquals("chat", sendMessage.getParametersSchema().getAsJsonObject("properties")
++                .getAsJsonObject("message_type").getAsJsonArray("enum").get(0).getAsString());
++        assertEquals("system", sendMessage.getParametersSchema().getAsJsonObject("properties")
++                .getAsJsonObject("message_type").getAsJsonArray("enum").get(1).getAsString());
++        assertEquals("actionbar", sendMessage.getParametersSchema().getAsJsonObject("properties")
++                .getAsJsonObject("message_type").getAsJsonArray("enum").get(2).getAsString());
++        assertTrue(new TeleportPlayerFunction().getDescription().contains("OP"));
++    }
++
++    @Test
++    void disablesRedirectFollowingAndReportsRedirectWithoutLocation() {
++        assertFalse(WikiEndpointPolicy.newSecureClientBuilder().build().followRedirects());
++        assertFalse(WikiEndpointPolicy.newSecureClientBuilder().build().followSslRedirects());
++
++        Response redirect = new Response.Builder()
++                .request(new Request.Builder().url("https://mcwiki.rice-awa.top/api/search").build())
++                .protocol(Protocol.HTTP_1_1)
++                .code(302)
++                .message("Found")
++                .header("Location", "https://169.254.169.254/latest/meta-data")
++                .body(ResponseBody.create("", null))
++                .build();
++
++        WikiErrorHandler.HttpResponseResult result = WikiErrorHandler.handleHttpResponse(redirect, "query");
++
++        assertFalse(result.isSuccess());
++        assertEquals("Wiki API请求失败: HTTP 302", result.errorResult.getError());
++        assertFalse(result.errorResult.getError().contains("169.254.169.254"));
++    }
++
++    private static void assertRejected(String baseUrl, Set<String> allowedHosts) {
++        assertThrows(IllegalArgumentException.class,
++                () -> WikiEndpointPolicy.validate(baseUrl, allowedHosts),
++                () -> "Expected endpoint to be rejected: " + baseUrl);
++    }
++}

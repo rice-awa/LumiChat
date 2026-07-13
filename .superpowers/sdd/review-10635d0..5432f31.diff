@@ -1,0 +1,249 @@
+# Review package: 10635d0..HEAD
+
+## Commits
+5432f31 fix(commands): 清理命令工具调用参数
+
+## Files changed
+ .superpowers/sdd/task-7-report.md                  | 70 ++++++++++++++++++++++
+ .../com/riceawa/llm/command/ToolCallHandler.java   |  9 ++-
+ .../riceawa/llm/command/ToolCallHandlerTest.java   | 54 +++++++++++++++++
+ 3 files changed, 132 insertions(+), 1 deletion(-)
+
+## Diff
+diff --git a/.superpowers/sdd/task-7-report.md b/.superpowers/sdd/task-7-report.md
+index c9c95c9..e79b828 100644
+--- a/.superpowers/sdd/task-7-report.md
++++ b/.superpowers/sdd/task-7-report.md
+@@ -158,10 +158,80 @@ Result: both representative builds were `BUILD SUCCESSFUL` (30 actions); `git di
+ 
+ ### Compatibility and log-safety reasoning
+ 
+ - The 1.21.11 Mojang API exposes `CommandSourceStack.withCallback(CommandResultCallback)` and void `Commands.performPrefixedCommand`. The callback supplies the real `(success, result)` result, so it replaces the prior unconditional synthetic `1`. Stonecutter conditionals keep `Atomic*` and callback code out of the 1.19 source; the 1.19 generated source continues to return Brigadier's `dispatcher.execute` code. Both nodes compiled in final validation.
+ - Raw output still exists only in the in-memory function result/data for the current player interaction. Before a recursive or legacy follow-up LLM request, the handler replaces it with `命令执行成功: <root> (返回码: <code>)`. The focused handler tests use `secret command output` and assert it is absent from the tool/context-safe content, while ordinary function results remain unchanged.
+ - The command-specific `execute_command` audit remains exactly `actor_uuid`, `command_root`, `command_sha256`, `result_code`, `duration_ms`, and `success`; generic `Tool execution` auditing is skipped solely for this function.
+ 
+ ### Remaining concerns
+ 
+ No in-game command smoke test was possible in this environment. The callback behavior is validated by API inspection, focused interpretation tests, and both representative builds; a live server check should still enable the feature, allowlist `list`, verify accepted and rejected commands, and inspect the six-field audit event.
++
++## 2026-07-13 Remediation 5: sanitize follow-up tool-call arguments
++
++### Finding addressed and data flow
++
++A successful `execute_command` result was already summarized before creating the TOOL response, but `appendToolExchange` still copied the original assistant-side `LLMMessage.ToolCall`. Its raw JSON `arguments` included the command. `callLLMWithFunctionResult` passes `chatContext.getMessages()` to `OpenAIService`, whose `buildRequestBody` serializes assistant `metadata.toolCall` as `tool_calls[].function.arguments`; that request body is also written as `raw_request_json` at INFO. Thus raw command text could persist in the recursive follow-up request and log even after TOOL result-content sanitization.
++
++`ToolCallHandler.appendToolExchange` now calls `safeFollowUpToolCall`. For `execute_command`, the stored assistant metadata retains the original function name and `tool_call_id`, but substitutes the fixed argument JSON `{}`. It neither retains the input JSON nor the command. Ordinary functions return their original `ToolCall` object unchanged, preserving existing request behavior and recursive tool-call protocol. This is intentionally a narrow context-boundary fix; it does not redesign Task 9's general logging behavior.
++
++### TDD evidence
++
++RED was run after adding the focused regression that invokes `appendToolExchange` and inspects the actual stored assistant context metadata:
++
++```bash
++JAVA_HOME=/tmp/gradle-init/temurin-21 \
++PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
++./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
++  --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
++  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
++```
++
++Result: `BUILD FAILED` as expected; 5 tests completed and `sanitizesExecuteCommandArgumentsInTheFollowUpToolExchange` failed at `ToolCallHandlerTest.java:47`, because the stored assistant metadata still contained the raw command arguments.
++
++GREEN after the minimal `safeFollowUpToolCall` implementation:
++
++```bash
++JAVA_HOME=/tmp/gradle-init/temurin-21 \
++PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
++./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
++  --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
++  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
++```
++
++Result: `BUILD SUCCESSFUL`; the suite passed 5/5. The regression uses `op SensitivePlayer --secret=never-log-this`, asserts that actual assistant context metadata contains the same name and ID with `{}`, and proves it does not retain the raw command. A companion regression verifies ordinary `get_time` arguments preserve the original `ToolCall`.
++
++### Final validation
++
++```bash
++JAVA_HOME=/tmp/gradle-init/temurin-21 \
++PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
++./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
++  --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
++  :1.21.11:test \
++  --tests com.riceawa.llm.command.ToolCallHandlerTest \
++  --tests com.riceawa.llm.function.CommandExecutionPolicyTest \
++  --tests com.riceawa.llm.compat.CommandCompatTest \
++  --tests com.riceawa.llm.function.FunctionRegistryAuditPolicyTest
++```
++
++Result: `BUILD SUCCESSFUL`; XML results were ToolCallHandler 5/5, CommandExecutionPolicy 9/9, CommandCompat 1/1, and FunctionRegistryAuditPolicy 1/1 (16 tests total, zero failures/errors/skips).
++
++```bash
++JAVA_HOME=/tmp/gradle-init/temurin-21 \
++PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
++./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
++  --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
++  :1.19:build :1.21.11:build
++
++git -C /workspaces/LumiChat/.worktrees/multiversion-remediation diff --check
++```
++
++Result: both representative builds were `BUILD SUCCESSFUL` (30 actionable tasks; 5 executed, 25 up-to-date); `git diff --check` passed. Java diagnostics were clean for the changed production and test files. The 1.19 build verifies the shared code remains Java 17 compatible.
++
++### Remaining limitation
++
++No in-game smoke test was available. A live server check should enable and allowlist `execute_command`/`list`, trigger a recursive command call containing sensitive arguments, then verify that the following INFO `raw_request_json` emits `{}` for the assistant tool-call arguments rather than the command text.
+diff --git a/src/main/java/com/riceawa/llm/command/ToolCallHandler.java b/src/main/java/com/riceawa/llm/command/ToolCallHandler.java
+index b33ffc1..3d0bbbd 100644
+--- a/src/main/java/com/riceawa/llm/command/ToolCallHandler.java
++++ b/src/main/java/com/riceawa/llm/command/ToolCallHandler.java
+@@ -338,32 +338,39 @@ public final class ToolCallHandler {
+                             .withStyle(ChatFormatting.RED), false);
+             return null;
+         }
+     }
+ 
+     private void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
+                                     String toolCallId, LLMFunction.FunctionResult result,
+                                     ChatContext chatContext) {
+         LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
+         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
+-        metadata.setToolCall(toolCall);
++        metadata.setToolCall(safeFollowUpToolCall(toolCall));
+         toolCallMessage.setMetadata(metadata);
+         chatContext.addMessage(toolCallMessage);
+ 
+         String resultContent = toolResultContent(functionName, result);
+         LLMMessage toolResponseMessage = new LLMMessage(
+                 LLMMessage.MessageRole.TOOL, resultContent);
+         toolResponseMessage.setName(functionName);
+         toolResponseMessage.setToolCallId(toolCallId);
+         chatContext.addMessage(toolResponseMessage);
+     }
+ 
++    static LLMMessage.ToolCall safeFollowUpToolCall(LLMMessage.ToolCall toolCall) {
++        if (!"execute_command".equals(toolCall.getName())) {
++            return toolCall;
++        }
++        return new LLMMessage.ToolCall(toolCall.getName(), "{}", toolCall.getToolCallId());
++    }
++
+     static String toolResultContent(String functionName, LLMFunction.FunctionResult result) {
+         if (!result.isSuccess()) {
+             return "错误: " + result.getError();
+         }
+         if ("execute_command".equals(functionName)) {
+             return commandExecutionSummary(result);
+         }
+         return result.getResult();
+     }
+ 
+diff --git a/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java b/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java
+index fd20f48..0fec2c5 100644
+--- a/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java
++++ b/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java
+@@ -1,48 +1,102 @@
+ package com.riceawa.llm.command;
+ 
+ import com.google.gson.JsonObject;
++import com.riceawa.llm.context.ChatContext;
++import com.riceawa.llm.context.ContextCompressor;
++import com.riceawa.llm.core.LLMMessage;
+ import com.riceawa.llm.function.LLMFunction;
+ import org.junit.jupiter.api.Test;
+ 
++import java.lang.reflect.Constructor;
++import java.lang.reflect.Method;
++import java.util.UUID;
++import java.util.concurrent.Executor;
++
+ import static org.junit.jupiter.api.Assertions.assertEquals;
+ import static org.junit.jupiter.api.Assertions.assertFalse;
+ 
+ class ToolCallHandlerTest {
+ 
+     @Test
+     void sanitizesExecuteCommandOutputBeforeItCanBecomeAToolMessage() {
+         JsonObject data = new JsonObject();
+         data.addProperty("command_root", "list");
+         data.addProperty("result_code", 1);
+         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
+                 "命令执行成功: list (返回码: 1)\nsecret command output", data);
+ 
+         String toolContent = toolMessageContent("execute_command", result);
+ 
+         assertEquals("命令执行成功: list (返回码: 1)", toolContent);
+         assertFalse(toolContent.contains("secret command output"));
+     }
+ 
++    @Test
++    void sanitizesExecuteCommandArgumentsInTheFollowUpToolExchange() throws Exception {
++        String secretCommand = "op SensitivePlayer --secret=never-log-this";
++        LLMMessage.ToolCall original = new LLMMessage.ToolCall(
++                "execute_command", "{\"command\":\"" + secretCommand + "\"}", "call-command-1");
++        ChatContext context = newContext();
++
++        appendToolExchange(original, "execute_command", "call-command-1", context);
++
++        LLMMessage.ToolCall followUp = context.getMessages().get(0).getMetadata().getToolCall();
++        assertEquals("execute_command", followUp.getName());
++        assertEquals("call-command-1", followUp.getToolCallId());
++        assertEquals("{}", followUp.getArguments());
++        assertFalse(followUp.getArguments().contains(secretCommand));
++    }
++
++    @Test
++    void preservesOtherFunctionToolCallArgumentsForFollowUp() throws Exception {
++        LLMMessage.ToolCall original = new LLMMessage.ToolCall(
++                "get_time", "{\"timezone\":\"UTC\"}", "call-time-1");
++        ChatContext context = newContext();
++
++        appendToolExchange(original, "get_time", "call-time-1", context);
++
++        assertEquals(original, context.getMessages().get(0).getMetadata().getToolCall());
++    }
++
+     @Test
+     void preservesOtherFunctionResultsForToolMessages() {
+         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success("safe result");
+ 
+         assertEquals("safe result", toolMessageContent("get_time", result));
+     }
+ 
+     @Test
+     void usesTheSafeExecuteCommandSummaryForLegacyContext() {
+         JsonObject data = new JsonObject();
+         data.addProperty("command_root", "list");
+         data.addProperty("result_code", 1);
+         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
+                 "命令执行成功: list (返回码: 1)\nsecret command output", data);
+ 
+         assertEquals("命令执行成功: list (返回码: 1)",
+                 toolMessageContent("execute_command", result));
+     }
+ 
++    private static void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
++                                           String toolCallId, ChatContext context) throws Exception {
++        Method method = ToolCallHandler.class.getDeclaredMethod("appendToolExchange",
++                LLMMessage.ToolCall.class, String.class, String.class,
++                LLMFunction.FunctionResult.class, ChatContext.class);
++        method.setAccessible(true);
++        method.invoke(ToolCallHandler.getInstance(), toolCall, functionName, toolCallId,
++                LLMFunction.FunctionResult.success("safe result"), context);
++    }
++
++    private static ChatContext newContext() throws Exception {
++        Constructor<ChatContext> constructor = ChatContext.class.getDeclaredConstructor(UUID.class,
++                String.class, int.class, Executor.class, ContextCompressor.class);
++        constructor.setAccessible(true);
++        Executor directExecutor = Runnable::run;
++        return constructor.newInstance(UUID.randomUUID(), "default", 1024, directExecutor,
++                (ContextCompressor) messages -> "summary");
++    }
++
+     private static String toolMessageContent(String functionName, LLMFunction.FunctionResult result) {
+         return ToolCallHandler.toolResultContent(functionName, result);
+     }
+ }
