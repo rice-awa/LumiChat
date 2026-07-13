@@ -165,3 +165,73 @@ Result: both representative builds were `BUILD SUCCESSFUL` (30 actions); `git di
 ### Remaining concerns
 
 No in-game command smoke test was possible in this environment. The callback behavior is validated by API inspection, focused interpretation tests, and both representative builds; a live server check should still enable the feature, allowlist `list`, verify accepted and rejected commands, and inspect the six-field audit event.
+
+## 2026-07-13 Remediation 5: sanitize follow-up tool-call arguments
+
+### Finding addressed and data flow
+
+A successful `execute_command` result was already summarized before creating the TOOL response, but `appendToolExchange` still copied the original assistant-side `LLMMessage.ToolCall`. Its raw JSON `arguments` included the command. `callLLMWithFunctionResult` passes `chatContext.getMessages()` to `OpenAIService`, whose `buildRequestBody` serializes assistant `metadata.toolCall` as `tool_calls[].function.arguments`; that request body is also written as `raw_request_json` at INFO. Thus raw command text could persist in the recursive follow-up request and log even after TOOL result-content sanitization.
+
+`ToolCallHandler.appendToolExchange` now calls `safeFollowUpToolCall`. For `execute_command`, the stored assistant metadata retains the original function name and `tool_call_id`, but substitutes the fixed argument JSON `{}`. It neither retains the input JSON nor the command. Ordinary functions return their original `ToolCall` object unchanged, preserving existing request behavior and recursive tool-call protocol. This is intentionally a narrow context-boundary fix; it does not redesign Task 9's general logging behavior.
+
+### TDD evidence
+
+RED was run after adding the focused regression that invokes `appendToolExchange` and inspects the actual stored assistant context metadata:
+
+```bash
+JAVA_HOME=/tmp/gradle-init/temurin-21 \
+PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
+./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
+  --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
+  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
+```
+
+Result: `BUILD FAILED` as expected; 5 tests completed and `sanitizesExecuteCommandArgumentsInTheFollowUpToolExchange` failed at `ToolCallHandlerTest.java:47`, because the stored assistant metadata still contained the raw command arguments.
+
+GREEN after the minimal `safeFollowUpToolCall` implementation:
+
+```bash
+JAVA_HOME=/tmp/gradle-init/temurin-21 \
+PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
+./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
+  --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
+  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
+```
+
+Result: `BUILD SUCCESSFUL`; the suite passed 5/5. The regression uses `op SensitivePlayer --secret=never-log-this`, asserts that actual assistant context metadata contains the same name and ID with `{}`, and proves it does not retain the raw command. A companion regression verifies ordinary `get_time` arguments preserve the original `ToolCall`.
+
+### Final validation
+
+```bash
+JAVA_HOME=/tmp/gradle-init/temurin-21 \
+PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
+./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
+  --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
+  :1.21.11:test \
+  --tests com.riceawa.llm.command.ToolCallHandlerTest \
+  --tests com.riceawa.llm.function.CommandExecutionPolicyTest \
+  --tests com.riceawa.llm.compat.CommandCompatTest \
+  --tests com.riceawa.llm.function.FunctionRegistryAuditPolicyTest
+```
+
+Result: `BUILD SUCCESSFUL`; XML results were ToolCallHandler 5/5, CommandExecutionPolicy 9/9, CommandCompat 1/1, and FunctionRegistryAuditPolicy 1/1 (16 tests total, zero failures/errors/skips).
+
+```bash
+JAVA_HOME=/tmp/gradle-init/temurin-21 \
+PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
+./gradlew --project-dir /workspaces/LumiChat/.worktrees/multiversion-remediation \
+  --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/gradle-init/temurin-17,/tmp/gradle-init/temurin-21 \
+  :1.19:build :1.21.11:build
+
+git -C /workspaces/LumiChat/.worktrees/multiversion-remediation diff --check
+```
+
+Result: both representative builds were `BUILD SUCCESSFUL` (30 actionable tasks; 5 executed, 25 up-to-date); `git diff --check` passed. Java diagnostics were clean for the changed production and test files. The 1.19 build verifies the shared code remains Java 17 compatible.
+
+### Remaining limitation
+
+No in-game smoke test was available. A live server check should enable and allowlist `execute_command`/`list`, trigger a recursive command call containing sensitive arguments, then verify that the following INFO `raw_request_json` emits `{}` for the assistant tool-call arguments rather than the command text.

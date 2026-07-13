@@ -1,8 +1,16 @@
 package com.riceawa.llm.command;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.context.ChatContext;
+import com.riceawa.llm.context.ContextCompressor;
+import com.riceawa.llm.core.LLMMessage;
 import com.riceawa.llm.function.LLMFunction;
 import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.UUID;
+import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -24,6 +32,33 @@ class ToolCallHandlerTest {
     }
 
     @Test
+    void sanitizesExecuteCommandArgumentsInTheFollowUpToolExchange() throws Exception {
+        String secretCommand = "op SensitivePlayer --secret=never-log-this";
+        LLMMessage.ToolCall original = new LLMMessage.ToolCall(
+                "execute_command", "{\"command\":\"" + secretCommand + "\"}", "call-command-1");
+        ChatContext context = newContext();
+
+        appendToolExchange(original, "execute_command", "call-command-1", context);
+
+        LLMMessage.ToolCall followUp = context.getMessages().get(0).getMetadata().getToolCall();
+        assertEquals("execute_command", followUp.getName());
+        assertEquals("call-command-1", followUp.getToolCallId());
+        assertEquals("{}", followUp.getArguments());
+        assertFalse(followUp.getArguments().contains(secretCommand));
+    }
+
+    @Test
+    void preservesOtherFunctionToolCallArgumentsForFollowUp() throws Exception {
+        LLMMessage.ToolCall original = new LLMMessage.ToolCall(
+                "get_time", "{\"timezone\":\"UTC\"}", "call-time-1");
+        ChatContext context = newContext();
+
+        appendToolExchange(original, "get_time", "call-time-1", context);
+
+        assertEquals(original, context.getMessages().get(0).getMetadata().getToolCall());
+    }
+
+    @Test
     void preservesOtherFunctionResultsForToolMessages() {
         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success("safe result");
 
@@ -40,6 +75,25 @@ class ToolCallHandlerTest {
 
         assertEquals("命令执行成功: list (返回码: 1)",
                 toolMessageContent("execute_command", result));
+    }
+
+    private static void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
+                                           String toolCallId, ChatContext context) throws Exception {
+        Method method = ToolCallHandler.class.getDeclaredMethod("appendToolExchange",
+                LLMMessage.ToolCall.class, String.class, String.class,
+                LLMFunction.FunctionResult.class, ChatContext.class);
+        method.setAccessible(true);
+        method.invoke(ToolCallHandler.getInstance(), toolCall, functionName, toolCallId,
+                LLMFunction.FunctionResult.success("safe result"), context);
+    }
+
+    private static ChatContext newContext() throws Exception {
+        Constructor<ChatContext> constructor = ChatContext.class.getDeclaredConstructor(UUID.class,
+                String.class, int.class, Executor.class, ContextCompressor.class);
+        constructor.setAccessible(true);
+        Executor directExecutor = Runnable::run;
+        return constructor.newInstance(UUID.randomUUID(), "default", 1024, directExecutor,
+                (ContextCompressor) messages -> "summary");
     }
 
     private static String toolMessageContent(String functionName, LLMFunction.FunctionResult result) {

@@ -345,7 +345,7 @@ public final class ToolCallHandler {
                                     ChatContext chatContext) {
         LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
-        metadata.setToolCall(toolCall);
+        metadata.setToolCall(safeFollowUpToolCall(toolCall));
         toolCallMessage.setMetadata(metadata);
         chatContext.addMessage(toolCallMessage);
 
@@ -355,6 +355,13 @@ public final class ToolCallHandler {
         toolResponseMessage.setName(functionName);
         toolResponseMessage.setToolCallId(toolCallId);
         chatContext.addMessage(toolResponseMessage);
+    }
+
+    static LLMMessage.ToolCall safeFollowUpToolCall(LLMMessage.ToolCall toolCall) {
+        if (!"execute_command".equals(toolCall.getName())) {
+            return toolCall;
+        }
+        return new LLMMessage.ToolCall(toolCall.getName(), "{}", toolCall.getToolCallId());
     }
 
     static String toolResultContent(String functionName, LLMFunction.FunctionResult result) {
