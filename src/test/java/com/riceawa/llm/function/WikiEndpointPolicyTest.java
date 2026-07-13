@@ -55,6 +55,19 @@ class WikiEndpointPolicyTest {
     }
 
     @Test
+    void rejectsAlternateNumericIpv4RepresentationsEvenWhenAllowlisted() {
+        for (String numericHost : new String[]{
+                "127.1",
+                "127.0.1",
+                "2130706433",
+                "0x7f000001",
+                "017700000001",
+                "0377.0377.0377.0377"}) {
+            assertRejected("https://" + numericHost, Set.of(numericHost));
+        }
+    }
+
+    @Test
     void enforcesPlayerInteractionPolicyBoundaries() {
         assertTrue(SendMessageFunction.isValidMessageContent("x"));
         assertTrue(SendMessageFunction.isValidMessageContent("x".repeat(512)));

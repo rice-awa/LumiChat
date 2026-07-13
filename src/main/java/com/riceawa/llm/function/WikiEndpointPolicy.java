@@ -79,26 +79,68 @@ public final class WikiEndpointPolicy {
             return true;
         }
 
-        String[] octets = host.split("\\.", -1);
-        if (octets.length != 4) {
+        String numericHost = host;
+        while (numericHost.endsWith(".")) {
+            numericHost = numericHost.substring(0, numericHost.length() - 1);
+        }
+
+        String[] parts = numericHost.split("\\.", -1);
+        if (parts.length < 1 || parts.length > 4) {
             return false;
         }
-        for (String octet : octets) {
-            if (octet.isEmpty() || octet.length() > 3) {
+
+        long[] maximums;
+        switch (parts.length) {
+            case 1:
+                maximums = new long[]{0xFFFFFFFFL};
+                break;
+            case 2:
+                maximums = new long[]{0xFFL, 0xFFFFFFL};
+                break;
+            case 3:
+                maximums = new long[]{0xFFL, 0xFFL, 0xFFFFL};
+                break;
+            case 4:
+                maximums = new long[]{0xFFL, 0xFFL, 0xFFL, 0xFFL};
+                break;
+            default:
+                return false;
+        }
+
+        for (int index = 0; index < parts.length; index++) {
+            if (!isNumericIpv4Part(parts[index], maximums[index])) {
                 return false;
             }
-            for (int index = 0; index < octet.length(); index++) {
-                if (!Character.isDigit(octet.charAt(index))) {
-                    return false;
-                }
-            }
-            try {
-                if (Integer.parseInt(octet) > 255) {
-                    return false;
-                }
-            } catch (NumberFormatException exception) {
+        }
+        return true;
+    }
+
+    private static boolean isNumericIpv4Part(String part, long maximum) {
+        if (part.isEmpty()) {
+            return false;
+        }
+
+        int radix = 10;
+        int start = 0;
+        if (part.length() > 2 && part.charAt(0) == '0'
+                && (part.charAt(1) == 'x' || part.charAt(1) == 'X')) {
+            radix = 16;
+            start = 2;
+        } else if (part.length() > 1 && part.charAt(0) == '0') {
+            radix = 8;
+            start = 1;
+        }
+        if (start == part.length()) {
+            return false;
+        }
+
+        long value = 0;
+        for (int index = start; index < part.length(); index++) {
+            int digit = Character.digit(part.charAt(index), radix);
+            if (digit < 0 || value > (maximum - digit) / radix) {
                 return false;
             }
+            value = value * radix + digit;
         }
         return true;
     }
