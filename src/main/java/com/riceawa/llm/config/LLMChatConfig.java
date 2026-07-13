@@ -20,7 +20,7 @@ import java.util.Set;
  * LLM聊天配置管理
  */
 public class LLMChatConfig {
-    private static LLMChatConfig instance;
+    private static volatile LLMChatConfig instance;
     private final Gson gson;
     private final Path configFile;
     private boolean isInitializing = false;

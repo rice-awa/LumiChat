@@ -11,7 +11,7 @@ import java.util.function.Supplier;
  * 并发管理器 - 管理LLM请求的并发执行和资源控制
  */
 public class ConcurrencyManager {
-    private static ConcurrencyManager instance;
+    private static volatile ConcurrencyManager instance;
     
     // 配置参数
     private final int maxConcurrentRequests;

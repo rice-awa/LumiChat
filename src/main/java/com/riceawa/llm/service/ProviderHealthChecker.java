@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class ProviderHealthChecker {
     
-    private static ProviderHealthChecker instance;
+    private static volatile ProviderHealthChecker instance;
     private final Map<String, HealthStatus> healthCache = new ConcurrentHashMap<>();
     private final long CACHE_DURATION_MS = TimeUnit.MINUTES.toMillis(5); // 5分钟缓存
     

@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
  * Function注册表，管理所有可用的LLM函数
  */
 public class FunctionRegistry {
-    private static FunctionRegistry instance;
+    private static volatile FunctionRegistry instance;
     private final Map<String, LLMFunction> functions;
     private final Map<String, Set<String>> categoryFunctions;
 

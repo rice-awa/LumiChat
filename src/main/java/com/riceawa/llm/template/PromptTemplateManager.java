@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 提示词模板管理器
  */
 public class PromptTemplateManager {
-    private static PromptTemplateManager instance;
+    private static volatile PromptTemplateManager instance;
     private final Map<String, PromptTemplate> templates;
     private final Gson gson;
     private final Path templatesFile;

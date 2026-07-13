@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
  * 聊天上下文管理器，管理所有玩家的聊天上下文
  */
 public class ChatContextManager {
-    private static ChatContextManager instance;
+    private static volatile ChatContextManager instance;
     private final Map<UUID, ChatContext> contexts;
     private final ScheduledExecutorService scheduler;
     private final long contextTimeoutMs;

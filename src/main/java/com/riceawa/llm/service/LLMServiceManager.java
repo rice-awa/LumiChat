@@ -15,7 +15,7 @@ import java.util.Set;
  * LLM服务管理器
  */
 public class LLMServiceManager {
-    private static LLMServiceManager instance;
+    private static volatile LLMServiceManager instance;
     private final Map<String, LLMService> services;
     private String defaultServiceName;
 

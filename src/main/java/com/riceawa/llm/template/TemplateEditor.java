@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 管理玩家的模板编辑会话
  */
 public class TemplateEditor {
-    private static TemplateEditor instance;
+    private static volatile TemplateEditor instance;
     private final Map<UUID, EditSession> editSessions;
 
     private TemplateEditor() {

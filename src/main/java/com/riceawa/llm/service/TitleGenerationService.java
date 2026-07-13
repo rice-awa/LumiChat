@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit;
  * 使用LLM为对话会话生成简洁的标题
  */
 public class TitleGenerationService {
-    private static TitleGenerationService instance;
+    private static volatile TitleGenerationService instance;
     private static final String TITLE_GENERATION_PROMPT = 
         "请为以下对话生成一个简洁的中文标题（10-20字），概括对话的主要内容：\n\n%s\n\n" +
         "要求：\n" +
