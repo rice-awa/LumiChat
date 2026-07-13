@@ -8,7 +8,7 @@
 
 ## 配置项
 
-在 `config/lllmchat/config.json` 中新增了 `enableBroadcast` 和 `broadcastPlayers` 配置项：
+在 `config/lumichat/config.json` 中新增了 `enableBroadcast` 和 `broadcastPlayers` 配置项：
 
 ```json
 {
@@ -17,7 +17,7 @@
   "defaultMaxTokens": 8192,
   "maxContextLength": 8192,
   "enableHistory": true,
-  "enableFunctionCalling": true,
+  "enableToolCall": true,
   "enableBroadcast": false,
   "broadcastPlayers": [],
   "historyRetentionDays": 30,
@@ -130,5 +130,5 @@
 
 1. 广播功能会增加聊天频道的消息量
 2. 建议在合适的时机开启，避免刷屏
-3. Function Calling的结果不会被广播，只有AI的文本回复会被广播
+3. Tool Call的结果不会被广播，只有AI的文本回复会被广播
 4. 配置更改会立即生效并保存到配置文件

@@ -36,7 +36,7 @@ public class LLMChatConfig {
     private int defaultMaxTokens = ConfigDefaults.DEFAULT_MAX_TOKENS;
     private int maxContextCharacters = ConfigDefaults.DEFAULT_MAX_CONTEXT_CHARACTERS;
     private boolean enableHistory = ConfigDefaults.DEFAULT_ENABLE_HISTORY;
-    private boolean enableFunctionCalling = ConfigDefaults.DEFAULT_ENABLE_FUNCTION_CALLING;
+    private boolean enableToolCall = ConfigDefaults.DEFAULT_ENABLE_TOOL_CALL;
     private boolean enableBroadcast = ConfigDefaults.DEFAULT_ENABLE_BROADCAST;
     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
     private int historyRetentionDays = ConfigDefaults.DEFAULT_HISTORY_RETENTION_DAYS;
@@ -60,10 +60,10 @@ public class LLMChatConfig {
     // Wiki API 配置
     private String wikiApiUrl = ConfigDefaults.DEFAULT_WIKI_API_URL;
     
-    // 多轮函数调用配置
-    private boolean enableRecursiveFunctionCalls = ConfigDefaults.DEFAULT_ENABLE_RECURSIVE_FUNCTION_CALLS;
-    private int maxFunctionCallDepth = ConfigDefaults.DEFAULT_MAX_FUNCTION_CALL_DEPTH;
-    private int functionCallTimeoutMs = ConfigDefaults.DEFAULT_FUNCTION_CALL_TIMEOUT_MS;
+    // 多轮工具调用配置
+    private boolean enableRecursiveToolCalls = ConfigDefaults.DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
+    private int maxToolCallDepth = ConfigDefaults.DEFAULT_MAX_TOOL_CALL_DEPTH;
+    private int toolCallTimeoutMs = ConfigDefaults.DEFAULT_TOOL_CALL_TIMEOUT_MS;
 
     // 并发配置
     private ConcurrencySettings concurrencySettings = ConcurrencySettings.createDefault();
@@ -80,7 +80,7 @@ public class LLMChatConfig {
         this.isInitializing = true;
         this.gson = new GsonBuilder().setPrettyPrinting().create();
 
-        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("lllmchat");
+        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("lumichat");
         this.configFile = configDir.resolve("config.json");
 
         // 确保配置目录存在
@@ -281,7 +281,7 @@ public class LLMChatConfig {
         }
 
         this.enableHistory = data.enableHistory != null ? data.enableHistory : (Boolean) ConfigDefaults.getDefaultValue("enableHistory");
-        this.enableFunctionCalling = data.enableFunctionCalling != null ? data.enableFunctionCalling : (Boolean) ConfigDefaults.getDefaultValue("enableFunctionCalling");
+        this.enableToolCall = data.enableToolCall != null ? data.enableToolCall : (Boolean) ConfigDefaults.getDefaultValue("enableToolCall");
         this.enableBroadcast = data.enableBroadcast != null ? data.enableBroadcast : (Boolean) ConfigDefaults.getDefaultValue("enableBroadcast");
         this.broadcastPlayers = data.broadcastPlayers != null ? new HashSet<>(data.broadcastPlayers) : ConfigDefaults.createDefaultBroadcastPlayers();
         this.historyRetentionDays = data.historyRetentionDays != null ? data.historyRetentionDays : (Integer) ConfigDefaults.getDefaultValue("historyRetentionDays");
@@ -299,10 +299,10 @@ public class LLMChatConfig {
         // 处理Wiki API配置
         this.wikiApiUrl = data.wikiApiUrl != null ? data.wikiApiUrl : (String) ConfigDefaults.getDefaultValue("wikiApiUrl");
 
-        // 处理多轮函数调用配置
-        this.enableRecursiveFunctionCalls = data.enableRecursiveFunctionCalls != null ? data.enableRecursiveFunctionCalls : (Boolean) ConfigDefaults.getDefaultValue("enableRecursiveFunctionCalls");
-        this.maxFunctionCallDepth = data.maxFunctionCallDepth != null ? data.maxFunctionCallDepth : (Integer) ConfigDefaults.getDefaultValue("maxFunctionCallDepth");
-        this.functionCallTimeoutMs = data.functionCallTimeoutMs != null ? data.functionCallTimeoutMs : (Integer) ConfigDefaults.getDefaultValue("functionCallTimeoutMs");
+        // 处理多轮工具调用配置
+        this.enableRecursiveToolCalls = data.enableRecursiveToolCalls != null ? data.enableRecursiveToolCalls : (Boolean) ConfigDefaults.getDefaultValue("enableRecursiveToolCalls");
+        this.maxToolCallDepth = data.maxToolCallDepth != null ? data.maxToolCallDepth : (Integer) ConfigDefaults.getDefaultValue("maxToolCallDepth");
+        this.toolCallTimeoutMs = data.toolCallTimeoutMs != null ? data.toolCallTimeoutMs : (Integer) ConfigDefaults.getDefaultValue("toolCallTimeoutMs");
 
         // 处理并发配置
         this.concurrencySettings = data.concurrencySettings != null ? data.concurrencySettings : ConcurrencySettings.createDefault();
@@ -389,7 +389,7 @@ public class LLMChatConfig {
 
         // 功能开关配置
         data.enableHistory = this.enableHistory;
-        data.enableFunctionCalling = this.enableFunctionCalling;
+        data.enableToolCall = this.enableToolCall;
         data.enableBroadcast = this.enableBroadcast;
         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
         data.historyRetentionDays = this.historyRetentionDays;
@@ -405,10 +405,10 @@ public class LLMChatConfig {
         // Wiki API 配置
         data.wikiApiUrl = this.wikiApiUrl;
         
-        // 多轮函数调用配置
-        data.enableRecursiveFunctionCalls = this.enableRecursiveFunctionCalls;
-        data.maxFunctionCallDepth = this.maxFunctionCallDepth;
-        data.functionCallTimeoutMs = this.functionCallTimeoutMs;
+        // 多轮工具调用配置
+        data.enableRecursiveToolCalls = this.enableRecursiveToolCalls;
+        data.maxToolCallDepth = this.maxToolCallDepth;
+        data.toolCallTimeoutMs = this.toolCallTimeoutMs;
 
         // 系统配置
         data.concurrencySettings = this.concurrencySettings;
@@ -494,12 +494,12 @@ public class LLMChatConfig {
         saveConfig();
     }
 
-    public boolean isEnableFunctionCalling() {
-        return enableFunctionCalling;
+    public boolean isEnableToolCall() {
+        return enableToolCall;
     }
 
-    public void setEnableFunctionCalling(boolean enableFunctionCalling) {
-        this.enableFunctionCalling = enableFunctionCalling;
+    public void setEnableToolCall(boolean enableToolCall) {
+        this.enableToolCall = enableToolCall;
         saveConfig();
     }
 
@@ -971,47 +971,47 @@ public class LLMChatConfig {
     }
 
     /**
-     * 获取是否启用递归函数调用
+     * 获取是否启用递归工具调用
      */
-    public boolean isEnableRecursiveFunctionCalls() {
-        return enableRecursiveFunctionCalls;
+    public boolean isEnableRecursiveToolCalls() {
+        return enableRecursiveToolCalls;
     }
 
     /**
-     * 设置是否启用递归函数调用
+     * 设置是否启用递归工具调用
      */
-    public void setEnableRecursiveFunctionCalls(boolean enableRecursiveFunctionCalls) {
-        this.enableRecursiveFunctionCalls = enableRecursiveFunctionCalls;
+    public void setEnableRecursiveToolCalls(boolean enableRecursiveToolCalls) {
+        this.enableRecursiveToolCalls = enableRecursiveToolCalls;
         saveConfig();
     }
 
     /**
-     * 获取最大函数调用深度
+     * 获取最大工具调用深度
      */
-    public int getMaxFunctionCallDepth() {
-        return maxFunctionCallDepth;
+    public int getMaxToolCallDepth() {
+        return maxToolCallDepth;
     }
 
     /**
-     * 设置最大函数调用深度
+     * 设置最大工具调用深度
      */
-    public void setMaxFunctionCallDepth(int maxFunctionCallDepth) {
-        this.maxFunctionCallDepth = Math.max(1, Math.min(10, maxFunctionCallDepth)); // 限制在1-10之间
+    public void setMaxToolCallDepth(int maxToolCallDepth) {
+        this.maxToolCallDepth = Math.max(1, Math.min(25, maxToolCallDepth)); // 限制在1-25之间
         saveConfig();
     }
 
     /**
-     * 获取函数调用超时时间（毫秒）
+     * 获取工具调用超时时间（毫秒）
      */
-    public int getFunctionCallTimeoutMs() {
-        return functionCallTimeoutMs;
+    public int getToolCallTimeoutMs() {
+        return toolCallTimeoutMs;
     }
 
     /**
-     * 设置函数调用超时时间（毫秒）
+     * 设置工具调用超时时间（毫秒）
      */
-    public void setFunctionCallTimeoutMs(int functionCallTimeoutMs) {
-        this.functionCallTimeoutMs = Math.max(5000, Math.min(60000, functionCallTimeoutMs)); // 限制在5-60秒之间
+    public void setToolCallTimeoutMs(int toolCallTimeoutMs) {
+        this.toolCallTimeoutMs = Math.max(5000, Math.min(60000, toolCallTimeoutMs)); // 限制在5-60秒之间
         saveConfig();
     }
 
@@ -1029,7 +1029,7 @@ public class LLMChatConfig {
 
         // 功能开关配置
         Boolean enableHistory;
-        Boolean enableFunctionCalling;
+        Boolean enableToolCall;
         Boolean enableBroadcast;
         Set<String> broadcastPlayers;
         Integer historyRetentionDays;
@@ -1045,10 +1045,10 @@ public class LLMChatConfig {
         // Wiki API 配置
         String wikiApiUrl;
         
-        // 多轮函数调用配置
-        Boolean enableRecursiveFunctionCalls;
-        Integer maxFunctionCallDepth;
-        Integer functionCallTimeoutMs;
+        // 多轮工具调用配置
+        Boolean enableRecursiveToolCalls;
+        Integer maxToolCallDepth;
+        Integer toolCallTimeoutMs;
 
         // 系统配置
         ConcurrencySettings concurrencySettings;

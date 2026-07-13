@@ -149,7 +149,7 @@ LLMChat模组现在包含了完善的日志系统和增强的历史记录功能�
 ## 文件结构
 
 ```
-config/lllmchat/
+config/lumichat/
 ├── config.json              # 主配置文件（包含日志配置）
 ├── logs/                     # 日志文件目录
 │   ├── system.log           # 系统日志
@@ -202,13 +202,13 @@ config/lllmchat/
 使用标准工具分析JSON格式的日志：
 ```bash
 # 查看错误日志
-grep "ERROR" config/lllmchat/logs/error.log
+grep "ERROR" config/lumichat/logs/error.log
 
 # 分析性能日志
-jq '.response_time_ms' config/lllmchat/logs/performance.log
+jq '.response_time_ms' config/lumichat/logs/performance.log
 
 # 统计聊天频率
-grep -c "Chat request" config/lllmchat/logs/chat.log
+grep -c "Chat request" config/lumichat/logs/chat.log
 ```
 
 ## 开发者信息

@@ -345,21 +345,21 @@ public class OpenAIService implements LLMService {
                 }
             } else if (message.getRole() == LLMMessage.MessageRole.ASSISTANT &&
                       message.getMetadata() != null &&
-                      message.getMetadata().getFunctionCall() != null) {
+                      message.getMetadata().getToolCall() != null) {
                 // Assistant消息包含tool_calls
                 if (message.getContent() != null) {
                     messageObj.addProperty("content", message.getContent());
                 }
 
-                LLMMessage.FunctionCall functionCall = message.getMetadata().getFunctionCall();
+                LLMMessage.ToolCall toolCall = message.getMetadata().getToolCall();
                 JsonArray toolCallsArray = new JsonArray();
                 JsonObject toolCallObj = new JsonObject();
-                toolCallObj.addProperty("id", functionCall.getToolCallId());
+                toolCallObj.addProperty("id", toolCall.getToolCallId());
                 toolCallObj.addProperty("type", "function");
 
                 JsonObject functionObj = new JsonObject();
-                functionObj.addProperty("name", functionCall.getName());
-                functionObj.addProperty("arguments", functionCall.getArguments());
+                functionObj.addProperty("name", toolCall.getName());
+                functionObj.addProperty("arguments", toolCall.getArguments());
                 toolCallObj.add("function", functionObj);
 
                 toolCallsArray.add(toolCallObj);
@@ -479,23 +479,23 @@ public class OpenAIService implements LLMService {
                                     String functionArgs = functionObj.get("arguments").getAsString();
                                     String toolCallId = toolCallObj.get("id").getAsString();
 
-                                    LLMMessage.FunctionCall functionCall = new LLMMessage.FunctionCall(functionName, functionArgs);
-                                    functionCall.setToolCallId(toolCallId); // 添加tool_call_id支持
+                                    LLMMessage.ToolCall toolCall = new LLMMessage.ToolCall(functionName, functionArgs);
+                                    toolCall.setToolCallId(toolCallId); // 添加tool_call_id支持
                                     LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
-                                    metadata.setFunctionCall(functionCall);
+                                    metadata.setToolCall(toolCall);
                                     message.setMetadata(metadata);
                                 }
                             }
                         }
                         // 保持对旧格式的兼容性
-                        else if (messageObj.has("function_call")) {
-                            JsonObject functionCallObj = messageObj.getAsJsonObject("function_call");
-                            String functionName = functionCallObj.get("name").getAsString();
-                            String functionArgs = functionCallObj.get("arguments").getAsString();
+                        else if (messageObj.has("tool_call")) {
+                            JsonObject toolCallObj = messageObj.getAsJsonObject("tool_call");
+                            String functionName = toolCallObj.get("name").getAsString();
+                            String functionArgs = toolCallObj.get("arguments").getAsString();
 
-                            LLMMessage.FunctionCall functionCall = new LLMMessage.FunctionCall(functionName, functionArgs);
+                            LLMMessage.ToolCall toolCall = new LLMMessage.ToolCall(functionName, functionArgs);
                             LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
-                            metadata.setFunctionCall(functionCall);
+                            metadata.setToolCall(toolCall);
                             message.setMetadata(metadata);
                         }
 

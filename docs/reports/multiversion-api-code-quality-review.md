@@ -1,7 +1,7 @@
 # LumiChat 多版本构建、API 抽象与代码质量审查报告
 
 > 审查日期：2026-06-20  
-> 审查范围：Stonecutter/Gradle 多版本构建、跨版本 Minecraft API 抽象、核心 LLM 服务、命令与 Function Calling、安全/权限、测试覆盖。  
+> 审查范围：Stonecutter/Gradle 多版本构建、跨版本 Minecraft API 抽象、核心 LLM 服务、命令与 Tool Call、安全/权限、测试覆盖。  
 > 审查方式：只读审查；使用 4 个子代理并行审查构建矩阵、compat 抽象、核心服务、命令/函数层，并由主会话抽查高风险结论。  
 > 当前状态：未修改源码，未运行完整构建或测试。
 
@@ -236,7 +236,7 @@ Java 内存模型下，非 `volatile` 的 double-checked locking 可能让其他
 
 **风险：**
 
-如果模板创建/编辑/保存未被 handler 内部严格限制，普通玩家可能持久化修改全局提示词。即使函数调用权限会过滤普通玩家工具，污染后的模板也可能影响后续 OP 玩家对话。
+如果模板创建/编辑/保存未被 handler 内部严格限制，普通玩家可能持久化修改全局提示词。即使工具调用权限会过滤普通玩家工具，污染后的模板也可能影响后续 OP 玩家对话。
 
 **建议：**
 
@@ -440,7 +440,7 @@ LLM 产生错类型、多余字段或歧义参数时，容易进入异常路径�
 
 **证据：**
 
-`src/main/java/com/riceawa/llm/command/LLMChatCommand.java` 同时承载聊天处理、函数调用、模板、Provider、模型、广播、帮助文本等逻辑。
+`src/main/java/com/riceawa/llm/command/LLMChatCommand.java` 同时承载聊天处理、工具调用、模板、Provider、模型、广播、帮助文本等逻辑。
 
 **风险：**
 
@@ -455,7 +455,7 @@ LLM 产生错类型、多余字段或歧义参数时，容易进入异常路径�
 - `ProviderCommands`
 - `ModelCommands`
 - `BroadcastCommands`
-- `FunctionCallHandler`
+- `ToolCallHandler`
 - `CommandPermissionPolicy`
 
 ---
@@ -482,7 +482,7 @@ LLM 产生错类型、多余字段或歧义参数时，容易进入异常路径�
 
 - `multiversionbuild.md:3` 只写到 26.1，但实际矩阵已有 26.2。
 - `multiversionbuild.md:14` 仍写 `build/libs/2.0.0/`，而当前 `mod.version` 已是 2.1.0。
-- Function Calling 安全文档对子命令黑名单、参数名和测试覆盖的描述与当前代码不完全一致。
+- Tool Call 安全文档对子命令黑名单、参数名和测试覆盖的描述与当前代码不完全一致。
 
 **建议：**
 
@@ -491,7 +491,7 @@ LLM 产生错类型、多余字段或歧义参数时，容易进入异常路径�
 - 实际支持矩阵
 - 代表性构建命令
 - 26.x non-remap 规则
-- Function Calling 安全边界
+- Tool Call 安全边界
 - 当前真实测试覆盖
 
 ---
@@ -530,10 +530,10 @@ LLM 产生错类型、多余字段或歧义参数时，容易进入异常路径�
 ### 第三阶段：补齐测试与结构治理
 
 1. 增加并发、上下文压缩、Provider retry、日志脱敏测试。
-2. 增加 Function Calling 权限和安全命令测试。
+2. 增加 Tool Call 权限和安全命令测试。
 3. 增加代表性版本构建 CI。
 4. 拆分 `LLMChatCommand`。
-5. 同步 `multiversionbuild.md`、Function Calling 安全文档和 `CLAUDE.md`。
+5. 同步 `multiversionbuild.md`、Tool Call 安全文档和 `CLAUDE.md`。
 
 ---
 

@@ -418,7 +418,7 @@ public class PromptTemplate {
         // 模组版本信息
         try {
             String modVersion = FabricLoader.getInstance()
-                    .getModContainer("lllmchat")
+                    .getModContainer("lumichat")
                     .map(container -> container.getMetadata().getVersion().getFriendlyString())
                     .orElse("Unknown");
             contextVariables.put("mod_version", modVersion);

@@ -34,7 +34,7 @@
 
 ## 推荐游戏内回归检查
 
-1. 在 `config/lllmchat/config.json` 启用 `enableGlobalContext` 并设置 `globalContextPrompt`
+1. 在 `config/lumichat/config.json` 启用 `enableGlobalContext` 并设置 `globalContextPrompt`
 2. 进入游戏执行一次 `/llmchat 你好`
 3. 查看 LLM 请求日志，确认系统消息中包含：
    - 模板系统提示词

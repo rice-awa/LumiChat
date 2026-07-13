@@ -33,7 +33,7 @@ public class LogManager {
         this.config = config;
         this.logDirectory = FabricLoader.getInstance()
                 .getConfigDir()
-                .resolve("lllmchat")
+                .resolve("lumichat")
                 .resolve("logs");
         
         this.rotationManager = new FileRotationManager(logDirectory, config);

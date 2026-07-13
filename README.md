@@ -7,7 +7,7 @@
 - 🤖 **多LLM服务支持** - OpenAI、OpenRouter、DeepSeek等，可扩展架构，强制健康检查
 - 💬 **智能上下文管理** - 基于字符长度的精确控制，智能压缩，对话恢复
 - 📝 **热编辑提示词模板系统** - 内置多种预设，支持游戏内热编辑，内置变量系统
-- 🔧 **Function Calling** - 13个内置游戏API，智能权限控制
+- 🔧 **Tool Call** - 13个内置游戏API，智能权限控制
 - 📚 **历史记录管理** - 持久化存储，多格式导出，统计分析
 - 📊 **完善日志系统** - 多级别分类日志，异步处理，文件轮转
 - 📢 **AI聊天广播** - OP可控的全服广播功能
@@ -24,7 +24,7 @@
 1. 首次使用时，尝试发送任意消息：`/llmchat 你好`
 2. 系统会自动检测配置问题并显示详细的配置指导
 3. 使用 `/llmchat setup` 查看配置向导
-4. 编辑 `config/lllmchat/config.json` 文件，添加你的API密钥
+4. 编辑 `config/lumichat/config.json` 文件，添加你的API密钥
 5. 使用 `/llmchat reload` 重载配置（需要OP权限）
 
 > 📖 **详细配置指南**: 查看 [配置指南](docs/CONFIGURATION_GUIDE.md) 了解完整的配置选项和多Provider设置
@@ -84,18 +84,18 @@
 - 🔧 [热编辑模板系统](docs/features/TEMPLATE_HOT_EDITING_SYSTEM.md) - 游戏内模板编辑完整指南
 - 🔧 [内置变量系统](docs/features/BUILTIN_VARIABLES_SYSTEM_SUMMARY.md) - 15+内置变量详细说明
 - 🔍 [Provider健康检查](docs/features/PROVIDER_FORCE_CHECK_SYSTEM.md) - 强制检测和诊断系统
-- 🔧 [Function Calling开发](docs/features/FUNCTION_CALLING_DEVELOPMENT.md) - Function Calling功能详解
-- 🛡️ [Function Call安全](docs/features/FUNCTION_CALL_SECURITY.md) - 权限控制和安全机制
-- 🎮 [Function演示](docs/features/FUNCTION_DEMO.md) - 实际使用示例和效果展示
+- 🔧 [Tool Call开发](docs/features/TOOL_CALL_DEVELOPMENT.md) - Tool Call功能详解
+- 🛡️ [Tool Call安全](docs/features/TOOL_CALL_SECURITY.md) - 权限控制和安全机制
+- 🎮 [Tool 演示](docs/features/FUNCTION_DEMO.md) - 实际使用示例和效果展示
 - 📢 [广播功能](docs/features/BROADCAST_FEATURE.md) - AI聊天广播功能详解
 - 🧠 [上下文管理](docs/features/CONTEXT_MANAGEMENT.md) - 智能上下文管理和压缩
 - 📊 [日志和历史](docs/features/LOGGING_AND_HISTORY.md) - 日志系统和历史记录管理
 - 🧪 [测试指南](docs/TESTING_GUIDE.md) - 基础单元测试与游戏内验证流程
 - 🎯 [使用演示](docs/guides/DEMO_USAGE.md) - 实际使用场景和示例
 
-## 🔧 Function Calling 功能概览
+## 🔧 Tool Call 功能概览
 
-启用Function Calling后，AI可以主动调用游戏API获取实时信息和执行操作：
+启用Tool Call后，AI可以主动调用游戏API获取实时信息和执行操作：
 
 ### 主要功能类别
 - 🌍 **世界信息查询** - 获取世界状态、附近实体、天气时间等
@@ -131,7 +131,7 @@
 # 现在AI会根据你的个性化设置进行回复
 ```
 
-> 📖 **详细功能文档**: 查看 [Function演示](docs/features/FUNCTION_DEMO.md) 和 [Function Call安全](docs/features/FUNCTION_CALL_SECURITY.md) 了解完整功能列表和安全机制
+> 📖 **详细功能文档**: 查看 [Tool 演示](docs/features/FUNCTION_DEMO.md) 和 [Tool Call安全](docs/features/TOOL_CALL_SECURITY.md) 了解完整功能列表和安全机制
 
 ## 🧪 测试和开发
 
@@ -212,7 +212,7 @@
 ## 📝 更新日志
 
 ### v2.1.0 (2026-06-19) - 最新版本
-- 🔥 **迁移至 Mojang mappings** - 从 Yarn mappings 迁移到 Mojang/official mappings，覆盖命令、上下文、Function Calling、模板、Mixin 与兼容层等核心代码。
+- 🔥 **迁移至 Mojang mappings** - 从 Yarn mappings 迁移到 Mojang/official mappings，覆盖命令、上下文、Tool Call、模板、Mixin 与兼容层等核心代码。
 - 📦 **多版本构建恢复** - 恢复并验证 1.16.5/1.17/1.18/1.19 版本组、1.20-1.20.6、1.21-1.21.11，以及可选的 26.1 构建节点。
 - 🛠️ **构建工具升级** - Fabric Loom/remap 插件升级到 1.15-SNAPSHOT，Gradle Wrapper 升级到 9.4.0，并完善 Mojang mappings 与 26.1 unobfuscated 构建分流。
 - ☕ **Java 版本矩阵明确化** - 26.1 使用 Java 25，1.20.5+ 使用 Java 21，1.18+ 使用 Java 17，1.17 使用 Java 16，旧版本使用 Java 8。
@@ -227,7 +227,7 @@
 
 ### v2.0.0 (2026-02-21)
 - 🔥 **Stonecutter 多版本支持** - 使用 Stonecutter 框架支持 1.21-1.21.11 多版本构建
-- 🔥 **项目重构** - 模组ID从 `lllmchat` 统一为 `lumichat`，项目名统一为 `LumiChat`
+- 🔥 **项目重构** - 模组ID从 `lumichat` 统一为 `lumichat`，项目名统一为 `LumiChat`
 - 📚 **构建指南** - 新增多版本构建完整文档
 - ⚡ **架构升级** - 全面迁移至 Kotlin DSL 和 Stonecutter 多版本架构
 
@@ -238,11 +238,11 @@
 - ⚡ **依赖更新** - 更新所有依赖版本以匹配新平台
 
 ### v1.7.1 (2025-08-04)
-- 🔥 **函数调用提示信息显示修复** - 修复多轮函数调用时LLM提示信息未显示的问题
+- 🔥 **工具调用提示信息显示修复** - 修复多轮工具调用时LLM提示信息未显示的问题
 - ✨ **完善的交互体验** - AI执行函数前的思考过程现在会正确显示给玩家
 - 🎯 **符合OpenAI API规范** - 正确实现content和tool_calls的处理顺序
-- 🛡️ **保持向后兼容** - 不影响现有功能，支持递归和非递归函数调用场景
-- 📚 **详细修复文档** - 新增函数调用显示修复的完整技术文档
+- 🛡️ **保持向后兼容** - 不影响现有功能，支持递归和非递归工具调用场景
+- 📚 **详细修复文档** - 新增工具调用显示修复的完整技术文档
 
 ### v1.7.0 (2025-07-30)
 - 🔥 **热编辑提示词模板系统** - 游戏内实时创建和编辑提示词模板
@@ -273,7 +273,7 @@
 - 🛡️ 优化聊天逻辑和providers切换逻辑
 
 ### v1.5.0 (2025-07-25)
-- 🔥 **强大的管理员功能** - 6个新的管理员专用Function Calling功能
+- 🔥 **强大的管理员功能** - 6个新的管理员专用Tool Call功能
 - 🔥 **统一权限管理系统** - PermissionHelper工具类，多层安全保护
 - 🔥 **执行指令功能** - 安全地执行服务器指令，指令黑名单保护
 - ✨ 新增世界操作功能：设置方块、生成实体、传送玩家

@@ -1329,8 +1329,8 @@ public class LLMChatCommand {
         llmConfig.setTemperature(config.getDefaultTemperature());
         llmConfig.setMaxTokens(config.getDefaultMaxTokens());
 
-        // 如果启用了Function Calling，添加工具定义
-        if (config.isEnableFunctionCalling()) {
+        // 如果启用了Tool Call，添加工具定义
+        if (config.isEnableToolCall()) {
             FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
             List<LLMConfig.ToolDefinition> tools = functionRegistry.generateToolDefinitions(serverPlayer);
             if (!tools.isEmpty()) {
@@ -1408,7 +1408,7 @@ public class LLMChatCommand {
     }
 
     /**
-     * 处理LLM响应，包括function calling
+     * 处理LLM响应，包括tool_call
      */
     private static void handleLLMResponse(LLMResponse response, ServerPlayer player,
                                  ChatContext chatContext, LLMChatConfig config) {
@@ -1429,8 +1429,8 @@ public class LLMChatCommand {
         String content = message.getContent();
         boolean hasContent = content != null && !content.trim().isEmpty();
 
-        // 检查是否有函数调用
-        boolean hasFunctionCall = message.getMetadata() != null && message.getMetadata().getFunctionCall() != null;
+        // 检查是否有工具调用
+        boolean hasToolCall = message.getMetadata() != null && message.getMetadata().getToolCall() != null;
 
         if (hasContent) {
             // 显示LLM的提示信息
@@ -1445,15 +1445,15 @@ public class LLMChatCommand {
             }
         }
 
-        if (hasFunctionCall) {
+        if (hasToolCall) {
             // 如果有content，先将其添加到上下文
             if (hasContent) {
                 chatContext.addAssistantMessage(content);
             }
-            // 处理函数调用
-            handleFunctionCall(message.getMetadata().getFunctionCall(), player, chatContext, config);
+            // 处理工具调用
+            handleToolCall(message.getMetadata().getToolCall(), player, chatContext, config);
         } else {
-            // 没有函数调用，这是纯文本响应
+            // 没有工具调用，这是纯文本响应
             if (hasContent) {
                 chatContext.addAssistantMessage(content);
 
@@ -1495,12 +1495,12 @@ public class LLMChatCommand {
     /**
      * 处理function call（新的OpenAI API格式）
      */
-    private static void handleFunctionCall(LLMMessage.FunctionCall functionCall, ServerPlayer player,
+    private static void handleToolCall(LLMMessage.ToolCall toolCall, ServerPlayer player,
                                   ChatContext chatContext, LLMChatConfig config) {
         try {
-            String functionName = functionCall.getName();
-            String argumentsStr = functionCall.getArguments();
-            String toolCallId = functionCall.getToolCallId();
+            String functionName = toolCall.getName();
+            String argumentsStr = toolCall.getArguments();
+            String toolCallId = toolCall.getToolCallId();
 
             MessageCompat.displayClientMessage(player, Component.literal("正在执行函数: " + functionName).withStyle(ChatFormatting.YELLOW), false);
 
@@ -1524,7 +1524,7 @@ public class LLMChatCommand {
                 // 添加工具调用消息到上下文
                 LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
                 LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
-                metadata.setFunctionCall(functionCall);
+                metadata.setToolCall(toolCall);
                 toolCallMessage.setMetadata(metadata);
                 chatContext.addMessage(toolCallMessage);
 
@@ -1539,11 +1539,11 @@ public class LLMChatCommand {
                 callLLMWithFunctionResult(player, chatContext, config, 1); // 开始递归，深度为1
             } else {
                 // 兼容旧格式的处理方式
-                handleLegacyFunctionCall(result, functionName, player, chatContext, config);
+                handleLegacyToolCall(result, functionName, player, chatContext, config);
             }
 
         } catch (Exception e) {
-            MessageCompat.displayClientMessage(player, Component.literal("函数调用处理失败: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
+            MessageCompat.displayClientMessage(player, Component.literal("工具调用处理失败: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
         }
     }
 
@@ -1554,15 +1554,15 @@ public class LLMChatCommand {
                                                 LLMChatConfig config, int recursionDepth) {
         try {
             // 检查递归深度限制
-            if (!config.isEnableRecursiveFunctionCalls()) {
+            if (!config.isEnableRecursiveToolCalls()) {
                 // 如果禁用了递归调用，按原来的方式处理（只处理文本响应）
                 callLLMWithFunctionResultLegacy(player, chatContext, config);
                 return;
             }
 
-            if (recursionDepth > config.getMaxFunctionCallDepth()) {
-                MessageCompat.displayClientMessage(player, Component.literal("函数调用层次过深（" + recursionDepth + ">" +
-                    config.getMaxFunctionCallDepth() + "），已停止").withStyle(ChatFormatting.YELLOW), false);
+            if (recursionDepth > config.getMaxToolCallDepth()) {
+                MessageCompat.displayClientMessage(player, Component.literal("工具调用层次过深（" + recursionDepth + ">" +
+                    config.getMaxToolCallDepth() + "），已停止").withStyle(ChatFormatting.YELLOW), false);
                 return;
             }
 
@@ -1581,7 +1581,7 @@ public class LLMChatCommand {
             llmConfig.setMaxTokens(config.getDefaultMaxTokens());
 
             // 重要：重新添加工具定义，支持继续调用函数
-            if (config.isEnableFunctionCalling()) {
+            if (config.isEnableToolCall()) {
                 FunctionRegistry functionRegistry = FunctionRegistry.getInstance();
                 List<LLMConfig.ToolDefinition> tools = functionRegistry.generateToolDefinitions(player);
                 if (!tools.isEmpty()) {
@@ -1599,7 +1599,7 @@ public class LLMChatCommand {
                     .metadata("recursionDepth", String.valueOf(recursionDepth))
                     .build();
 
-            // 发送请求获取响应（可能包含新的函数调用）
+            // 发送请求获取响应（可能包含新的工具调用）
             llmService.chat(chatContext.getMessages(), llmConfig, llmContext)
                     .thenAccept(response -> {
                         if (response.isSuccess()) {
@@ -1620,7 +1620,7 @@ public class LLMChatCommand {
     }
 
     /**
-     * 递归处理LLM响应（支持多轮函数调用）
+     * 递归处理LLM响应（支持多轮工具调用）
      */
     private static void handleLLMResponseWithRecursion(LLMResponse response, ServerPlayer player,
                                                      ChatContext chatContext, LLMChatConfig config, int recursionDepth) {
@@ -1640,8 +1640,8 @@ public class LLMChatCommand {
         String content = message.getContent();
         boolean hasContent = content != null && !content.trim().isEmpty();
 
-        // 检查是否有函数调用
-        boolean hasFunctionCall = message.getMetadata() != null && message.getMetadata().getFunctionCall() != null;
+        // 检查是否有工具调用
+        boolean hasToolCall = message.getMetadata() != null && message.getMetadata().getToolCall() != null;
 
         if (hasContent) {
             // 显示LLM的提示信息
@@ -1656,15 +1656,15 @@ public class LLMChatCommand {
             }
         }
 
-        if (hasFunctionCall) {
+        if (hasToolCall) {
             // 如果有content，先将其添加到上下文
             if (hasContent) {
                 chatContext.addAssistantMessage(content);
             }
-            // 递归处理函数调用
-            handleFunctionCallWithRecursion(message.getMetadata().getFunctionCall(), player, chatContext, config, recursionDepth);
+            // 递归处理工具调用
+            handleToolCallWithRecursion(message.getMetadata().getToolCall(), player, chatContext, config, recursionDepth);
         } else {
-            // 没有函数调用，这是最终的文本响应
+            // 没有工具调用，这是最终的文本响应
             if (hasContent) {
                 chatContext.addAssistantMessage(content);
 
@@ -1682,14 +1682,14 @@ public class LLMChatCommand {
     }
 
     /**
-     * 递归处理函数调用
+     * 递归处理工具调用
      */
-    private static void handleFunctionCallWithRecursion(LLMMessage.FunctionCall functionCall, ServerPlayer player,
+    private static void handleToolCallWithRecursion(LLMMessage.ToolCall toolCall, ServerPlayer player,
                                                       ChatContext chatContext, LLMChatConfig config, int recursionDepth) {
         try {
-            String functionName = functionCall.getName();
-            String argumentsStr = functionCall.getArguments();
-            String toolCallId = functionCall.getToolCallId();
+            String functionName = toolCall.getName();
+            String argumentsStr = toolCall.getArguments();
+            String toolCallId = toolCall.getToolCallId();
 
             MessageCompat.displayClientMessage(player, Component.literal("正在执行函数: " + functionName + " (深度: " + recursionDepth + ")")
                 .withStyle(ChatFormatting.YELLOW), false);
@@ -1714,7 +1714,7 @@ public class LLMChatCommand {
                 // 添加工具调用消息
                 LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
                 LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
-                metadata.setFunctionCall(functionCall);
+                metadata.setToolCall(toolCall);
                 toolCallMessage.setMetadata(metadata);
                 chatContext.addMessage(toolCallMessage);
 
@@ -1729,11 +1729,11 @@ public class LLMChatCommand {
                 callLLMWithFunctionResult(player, chatContext, config, recursionDepth + 1);
             } else {
                 // 兼容旧格式的处理方式
-                handleLegacyFunctionCall(result, functionName, player, chatContext, config);
+                handleLegacyToolCall(result, functionName, player, chatContext, config);
             }
 
         } catch (Exception e) {
-            MessageCompat.displayClientMessage(player, Component.literal("递归函数调用处理失败: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
+            MessageCompat.displayClientMessage(player, Component.literal("递归工具调用处理失败: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
         }
     }
 
@@ -1806,15 +1806,15 @@ public class LLMChatCommand {
     }
 
     /**
-     * 处理旧格式的函数调用（向后兼容）
+     * 处理旧格式的工具调用（向后兼容）
      */
-    private static void handleLegacyFunctionCall(LLMFunction.FunctionResult result, String functionName,
+    private static void handleLegacyToolCall(LLMFunction.FunctionResult result, String functionName,
                                         ServerPlayer player, ChatContext chatContext, LLMChatConfig config) {
         if (result.isSuccess()) {
             String resultMessage = result.getResult();
             MessageCompat.displayClientMessage(player, Component.literal("[函数执行] " + resultMessage).withStyle(ChatFormatting.GREEN), false);
 
-            // 将函数调用和结果添加到上下文中
+            // 将工具调用和结果添加到上下文中
             chatContext.addAssistantMessage("调用了函数 " + functionName + "，结果：" + resultMessage);
 
             // 保存会话历史
@@ -2334,7 +2334,7 @@ public class LLMChatCommand {
         MessageCompat.displayClientMessage(player, Component.literal(""), false);
 
         MessageCompat.displayClientMessage(player, Component.literal("📋 配置步骤:").withStyle(ChatFormatting.AQUA), false);
-        MessageCompat.displayClientMessage(player, Component.literal("1. 打开配置文件: config/lllmchat/config.json").withStyle(ChatFormatting.WHITE), false);
+        MessageCompat.displayClientMessage(player, Component.literal("1. 打开配置文件: config/lumichat/config.json").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal("2. 选择一个AI服务提供商（OpenAI、OpenRouter、DeepSeek等）").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal("3. 将对应的 'apiKey' 字段替换为您的真实API密钥").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal("4. 使用 /llmchat reload 重新加载配置").withStyle(ChatFormatting.WHITE), false);
@@ -2371,7 +2371,7 @@ public class LLMChatCommand {
 
         MessageCompat.displayClientMessage(player, Component.literal(""), false);
         MessageCompat.displayClientMessage(player, Component.literal("📋 配置文件位置:").withStyle(ChatFormatting.AQUA), false);
-        MessageCompat.displayClientMessage(player, Component.literal("config/lllmchat/config.json").withStyle(ChatFormatting.WHITE), false);
+        MessageCompat.displayClientMessage(player, Component.literal("config/lumichat/config.json").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal(""), false);
 
         MessageCompat.displayClientMessage(player, Component.literal("🔧 可用的服务提供商:").withStyle(ChatFormatting.AQUA), false);

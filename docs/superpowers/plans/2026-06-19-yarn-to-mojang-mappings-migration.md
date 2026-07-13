@@ -986,7 +986,7 @@ Expected: 无 Stonecutter 生成的临时版本切换文件待提交。
 启动 `./gradlew :1.21.11:runServer`（Java 21），验证：
   - 模组加载无 Mixin 注入失败日志（重点 `ServerPlayerEntityAccessor` 的 `@Accessor` 命中）
   - `/llmchat` 命令注册成功、权限检查生效
-  - 触发一次 LLM 函数调用（如 `get_server_info`、`set_block`）确认 Mojang API 调用点运行正确
+  - 触发一次 LLM 工具调用（如 `get_server_info`、`set_block`）确认 Mojang API 调用点运行正确
 
 - [ ] **Step 2: 26.1 游戏内验证（Java 25）**
 
@@ -994,7 +994,7 @@ Expected: 无 Stonecutter 生成的临时版本切换文件待提交。
 
 - [ ] **Step 3: 记录测试结果到 `docs/reports/`**
 
-新增 `docs/reports/mojang-migration-verification.md`，记录两个版本的构建产物、Mixin 命中情况、函数调用实测结果。
+新增 `docs/reports/mojang-migration-verification.md`，记录两个版本的构建产物、Mixin 命中情况、工具调用实测结果。
 
 ---
 

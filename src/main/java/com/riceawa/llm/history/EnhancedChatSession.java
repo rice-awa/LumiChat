@@ -25,7 +25,7 @@ public class EnhancedChatSession {
     private final int totalTokensUsed;
     private final int promptTokens;
     private final int completionTokens;
-    private final boolean functionCallUsed;
+    private final boolean toolCallUsed;
     private final List<String> functionsUsed;
     private final Map<String, Object> additionalMetadata;
     private final String sessionStatus; // SUCCESS, ERROR, TIMEOUT, CANCELLED
@@ -49,7 +49,7 @@ public class EnhancedChatSession {
         this.totalTokensUsed = builder.totalTokensUsed;
         this.promptTokens = builder.promptTokens;
         this.completionTokens = builder.completionTokens;
-        this.functionCallUsed = builder.functionCallUsed;
+        this.toolCallUsed = builder.toolCallUsed;
         this.functionsUsed = new ArrayList<>(builder.functionsUsed);
         this.additionalMetadata = new HashMap<>(builder.additionalMetadata);
         this.sessionStatus = builder.sessionStatus;
@@ -81,7 +81,7 @@ public class EnhancedChatSession {
     public int getTotalTokensUsed() { return totalTokensUsed; }
     public int getPromptTokens() { return promptTokens; }
     public int getCompletionTokens() { return completionTokens; }
-    public boolean isFunctionCallUsed() { return functionCallUsed; }
+    public boolean isToolCallUsed() { return toolCallUsed; }
     public List<String> getFunctionsUsed() { return new ArrayList<>(functionsUsed); }
     public Map<String, Object> getAdditionalMetadata() { return new HashMap<>(additionalMetadata); }
     public String getSessionStatus() { return sessionStatus; }
@@ -159,7 +159,7 @@ public class EnhancedChatSession {
         private int totalTokensUsed = 0;
         private int promptTokens = 0;
         private int completionTokens = 0;
-        private boolean functionCallUsed = false;
+        private boolean toolCallUsed = false;
         private List<String> functionsUsed = new ArrayList<>();
         private Map<String, Object> additionalMetadata = new HashMap<>();
         private String sessionStatus = "SUCCESS";
@@ -240,8 +240,8 @@ public class EnhancedChatSession {
             return this;
         }
 
-        public Builder functionCallUsed(boolean functionCallUsed) {
-            this.functionCallUsed = functionCallUsed;
+        public Builder toolCallUsed(boolean toolCallUsed) {
+            this.toolCallUsed = toolCallUsed;
             return this;
         }
 
@@ -252,7 +252,7 @@ public class EnhancedChatSession {
 
         public Builder addFunctionUsed(String functionName) {
             this.functionsUsed.add(functionName);
-            this.functionCallUsed = true;
+            this.toolCallUsed = true;
             return this;
         }
 
