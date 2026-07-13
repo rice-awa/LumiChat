@@ -28,6 +28,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.ChatFormatting;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -61,6 +62,7 @@ public class LLMChatCommand {
                                 .then(Commands.argument("template", StringArgumentType.word())
                                         .executes(LLMChatCommand::handleShowTemplate)))
                         .then(Commands.literal("edit")
+                                .requires(CommandPermissionPolicy::canEditGlobalTemplates)
                                 .then(Commands.argument("template", StringArgumentType.word())
                                         .executes(LLMChatCommand::handleEditTemplate))
                                 .then(Commands.literal("name")
@@ -79,25 +81,30 @@ public class LLMChatCommand {
                                         .then(Commands.argument("suffix", StringArgumentType.greedyString())
                                                 .executes(LLMChatCommand::handleEditTemplateSuffix))))
                         .then(Commands.literal("create")
+                                .requires(CommandPermissionPolicy::canEditGlobalTemplates)
                                 .then(Commands.argument("template", StringArgumentType.word())
                                         .executes(LLMChatCommand::handleCreateTemplate)))
                         .then(Commands.literal("var")
                                 .then(Commands.literal("list")
                                         .executes(LLMChatCommand::handleListTemplateVars))
                                 .then(Commands.literal("set")
+                                        .requires(CommandPermissionPolicy::canEditGlobalTemplates)
                                         .then(Commands.argument("name", StringArgumentType.word())
                                                 .then(Commands.argument("value", StringArgumentType.greedyString())
                                                         .executes(LLMChatCommand::handleSetTemplateVar))))
                                 .then(Commands.literal("remove")
+                                        .requires(CommandPermissionPolicy::canEditGlobalTemplates)
                                         .then(Commands.argument("name", StringArgumentType.word())
                                                 .executes(LLMChatCommand::handleRemoveTemplateVar))))
                         .then(Commands.literal("preview")
                                 .executes(LLMChatCommand::handlePreviewTemplate))
                         .then(Commands.literal("save")
+                                .requires(CommandPermissionPolicy::canEditGlobalTemplates)
                                 .executes(LLMChatCommand::handleSaveTemplate))
                         .then(Commands.literal("cancel")
                                 .executes(LLMChatCommand::handleCancelTemplate))
                         .then(Commands.literal("copy")
+                                .requires(CommandPermissionPolicy::canEditGlobalTemplates)
                                 .then(Commands.argument("from", StringArgumentType.word())
                                         .then(Commands.argument("to", StringArgumentType.word())
                                                 .executes(LLMChatCommand::handleCopyTemplate))))
@@ -573,6 +580,10 @@ public class LLMChatCommand {
      */
     private static int handleEditTemplate(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -583,8 +594,7 @@ public class LLMChatCommand {
         String templateId = StringArgumentType.getString(context, "template");
         TemplateEditor editor = TemplateEditor.getInstance();
 
-        editor.startEditSession(player, templateId, false);
-        return 1;
+        return editor.startEditSession(player, templateId, false) ? 1 : 0;
     }
 
     /**
@@ -592,6 +602,10 @@ public class LLMChatCommand {
      */
     private static int handleCreateTemplate(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -600,6 +614,11 @@ public class LLMChatCommand {
         }
 
         String templateId = StringArgumentType.getString(context, "template");
+        String idError = TemplateEditor.validateTemplateId(templateId);
+        if (idError != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + idError).withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
         PromptTemplateManager templateManager = PromptTemplateManager.getInstance();
 
         if (templateManager.hasTemplate(templateId)) {
@@ -608,7 +627,13 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        editor.startEditSession(player, templateId, true);
+        if (!editor.startEditSession(player, templateId, true)) {
+            return 0;
+        }
+        TemplateEditor.EditSession session = editor.getEditSession(player);
+        if (session != null) {
+            auditTemplateMutation(player, "create_start", session.getTemplate());
+        }
         return 1;
     }
 
@@ -617,6 +642,10 @@ public class LLMChatCommand {
      */
     private static int handleEditTemplateName(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -625,15 +654,12 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        TemplateEditor.EditSession session = editor.getEditSession(player);
-
-        if (session == null) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板，请先使用 /llmchat template edit <模板ID>").withStyle(ChatFormatting.RED), false);
+        String name = StringArgumentType.getString(context, "name");
+        String error = editor.updateName(player, name);
+        if (error != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
             return 0;
         }
-
-        String name = StringArgumentType.getString(context, "name");
-        session.getTemplate().setName(name);
 
         MessageCompat.displayClientMessage(player, Component.literal("✅ 模板名称已更新为: " + name).withStyle(ChatFormatting.GREEN), false);
         return 1;
@@ -644,6 +670,10 @@ public class LLMChatCommand {
      */
     private static int handleEditTemplateDesc(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -652,15 +682,12 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        TemplateEditor.EditSession session = editor.getEditSession(player);
-
-        if (session == null) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板，请先使用 /llmchat template edit <模板ID>").withStyle(ChatFormatting.RED), false);
+        String description = StringArgumentType.getString(context, "description");
+        String error = editor.updateDescription(player, description);
+        if (error != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
             return 0;
         }
-
-        String description = StringArgumentType.getString(context, "description");
-        session.getTemplate().setDescription(description);
 
         MessageCompat.displayClientMessage(player, Component.literal("✅ 模板描述已更新").withStyle(ChatFormatting.GREEN), false);
         return 1;
@@ -671,6 +698,10 @@ public class LLMChatCommand {
      */
     private static int handleEditTemplateSystem(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -679,15 +710,12 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        TemplateEditor.EditSession session = editor.getEditSession(player);
-
-        if (session == null) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板，请先使用 /llmchat template edit <模板ID>").withStyle(ChatFormatting.RED), false);
+        String prompt = StringArgumentType.getString(context, "prompt");
+        String error = editor.updateSystemPrompt(player, prompt);
+        if (error != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
             return 0;
         }
-
-        String prompt = StringArgumentType.getString(context, "prompt");
-        session.getTemplate().setSystemPrompt(prompt);
 
         MessageCompat.displayClientMessage(player, Component.literal("✅ 系统提示词已更新").withStyle(ChatFormatting.GREEN), false);
         return 1;
@@ -698,6 +726,10 @@ public class LLMChatCommand {
      */
     private static int handleEditTemplatePrefix(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -706,15 +738,12 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        TemplateEditor.EditSession session = editor.getEditSession(player);
-
-        if (session == null) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板，请先使用 /llmchat template edit <模板ID>").withStyle(ChatFormatting.RED), false);
+        String prefix = StringArgumentType.getString(context, "prefix");
+        String error = editor.updatePrefix(player, prefix);
+        if (error != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
             return 0;
         }
-
-        String prefix = StringArgumentType.getString(context, "prefix");
-        session.getTemplate().setUserPromptPrefix(prefix);
 
         MessageCompat.displayClientMessage(player, Component.literal("✅ 用户消息前缀已更新").withStyle(ChatFormatting.GREEN), false);
         return 1;
@@ -725,6 +754,10 @@ public class LLMChatCommand {
      */
     private static int handleEditTemplateSuffix(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -733,15 +766,12 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        TemplateEditor.EditSession session = editor.getEditSession(player);
-
-        if (session == null) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板，请先使用 /llmchat template edit <模板ID>").withStyle(ChatFormatting.RED), false);
+        String suffix = StringArgumentType.getString(context, "suffix");
+        String error = editor.updateSuffix(player, suffix);
+        if (error != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
             return 0;
         }
-
-        String suffix = StringArgumentType.getString(context, "suffix");
-        session.getTemplate().setUserPromptSuffix(suffix);
 
         MessageCompat.displayClientMessage(player, Component.literal("✅ 用户消息后缀已更新").withStyle(ChatFormatting.GREEN), false);
         return 1;
@@ -789,6 +819,10 @@ public class LLMChatCommand {
      */
     private static int handleSetTemplateVar(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -797,17 +831,14 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        TemplateEditor.EditSession session = editor.getEditSession(player);
-
-        if (session == null) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板，请先使用 /llmchat template edit <模板ID>").withStyle(ChatFormatting.RED), false);
-            return 0;
-        }
-
         String name = StringArgumentType.getString(context, "name");
         String value = StringArgumentType.getString(context, "value");
 
-        session.getTemplate().setVariable(name, value);
+        String error = editor.setVariable(player, name, value);
+        if (error != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
         MessageCompat.displayClientMessage(player, Component.literal("✅ 变量已设置: {{" + name + "}} = " + value).withStyle(ChatFormatting.GREEN), false);
         return 1;
     }
@@ -817,6 +848,10 @@ public class LLMChatCommand {
      */
     private static int handleRemoveTemplateVar(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -825,21 +860,13 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        TemplateEditor.EditSession session = editor.getEditSession(player);
-
-        if (session == null) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板，请先使用 /llmchat template edit <模板ID>").withStyle(ChatFormatting.RED), false);
-            return 0;
-        }
-
         String name = StringArgumentType.getString(context, "name");
-
-        if (!session.getTemplate().getVariables().containsKey(name)) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 变量不存在: " + name).withStyle(ChatFormatting.RED), false);
+        String error = editor.removeVariable(player, name);
+        if (error != null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
             return 0;
         }
 
-        session.getTemplate().removeVariable(name);
         MessageCompat.displayClientMessage(player, Component.literal("✅ 变量已删除: {{" + name + "}}").withStyle(ChatFormatting.GREEN), false);
         return 1;
     }
@@ -866,6 +893,10 @@ public class LLMChatCommand {
      */
     private static int handleSaveTemplate(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -874,7 +905,17 @@ public class LLMChatCommand {
         }
 
         TemplateEditor editor = TemplateEditor.getInstance();
-        editor.saveTemplate(player);
+        TemplateEditor.EditSession session = editor.getEditSession(player);
+        if (session == null) {
+            MessageCompat.displayClientMessage(player, Component.literal("❌ 没有正在编辑的模板").withStyle(ChatFormatting.RED), false);
+            return 0;
+        }
+        PromptTemplate template = session.getTemplate();
+        String action = session.isNewTemplate() ? "create" : "save";
+        if (!editor.saveTemplate(player)) {
+            return 0;
+        }
+        auditTemplateMutation(player, action, template);
         return 1;
     }
 
@@ -905,6 +946,10 @@ public class LLMChatCommand {
      */
     private static int handleCopyTemplate(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
+        if (!CommandPermissionPolicy.canEditGlobalTemplates(source)) {
+            source.sendFailure(Component.literal("权限不足：只有管理员可以修改全局模板"));
+            return 0;
+        }
         Player player = source.getPlayer();
 
         if (player == null) {
@@ -915,32 +960,41 @@ public class LLMChatCommand {
         String fromId = StringArgumentType.getString(context, "from");
         String toId = StringArgumentType.getString(context, "to");
 
-        PromptTemplateManager templateManager = PromptTemplateManager.getInstance();
-
-        if (!templateManager.hasTemplate(fromId)) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 源模板不存在: " + fromId).withStyle(ChatFormatting.RED), false);
-            return 0;
-        }
-
-        if (templateManager.hasTemplate(toId)) {
-            MessageCompat.displayClientMessage(player, Component.literal("❌ 目标模板已存在: " + toId).withStyle(ChatFormatting.RED), false);
-            return 0;
-        }
-
         try {
-            PromptTemplate sourceTemplate = templateManager.getTemplate(fromId);
-            PromptTemplate newTemplate = sourceTemplate.copy();
-            newTemplate.setId(toId);
-            newTemplate.setName(sourceTemplate.getName() + " (副本)");
-
-            templateManager.addTemplate(newTemplate);
+            TemplateEditor editor = TemplateEditor.getInstance();
+            String error = editor.copyTemplate(fromId, toId);
+            if (error != null) {
+                MessageCompat.displayClientMessage(player, Component.literal("❌ " + error).withStyle(ChatFormatting.RED), false);
+                return 0;
+            }
+            PromptTemplate newTemplate = PromptTemplateManager.getInstance().getTemplate(toId);
+            auditTemplateMutation(player, "copy", newTemplate);
             MessageCompat.displayClientMessage(player, Component.literal("✅ 模板已复制: " + fromId + " → " + toId).withStyle(ChatFormatting.GREEN), false);
 
         } catch (Exception e) {
             MessageCompat.displayClientMessage(player, Component.literal("❌ 复制模板失败: " + e.getMessage()).withStyle(ChatFormatting.RED), false);
+            return 0;
         }
 
         return 1;
+    }
+
+    private static void auditTemplateMutation(Player player, String action, PromptTemplate template) {
+        LogManager.getInstance().audit("template_mutation", Map.of(
+                "actor_uuid", player.getUUID().toString(),
+                "action", action,
+                "template_id", template.getId(),
+                "name_length", lengthOf(template.getName()),
+                "description_length", lengthOf(template.getDescription()),
+                "system_prompt_length", lengthOf(template.getSystemPrompt()),
+                "prefix_length", lengthOf(template.getUserPromptPrefix()),
+                "suffix_length", lengthOf(template.getUserPromptSuffix()),
+                "variable_count", template.getVariables().size()
+        ));
+    }
+
+    private static int lengthOf(String value) {
+        return value == null ? 0 : value.length();
     }
 
     /**
