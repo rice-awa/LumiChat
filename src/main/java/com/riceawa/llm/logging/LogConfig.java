@@ -24,9 +24,9 @@ public class LogConfig {
     private boolean enableLLMRequestLog = true;
 
     // LLM请求日志特殊配置
-    private boolean logFullRequestBody = true;
-    private boolean logFullResponseBody = true;
-    private int maxLogContentLength = 10000; // 最大日志内容长度
+    private boolean logFullRequestBody = false;
+    private boolean logFullResponseBody = false;
+    private int maxLogContentLength = 2048; // 最大日志内容长度
     private boolean sanitizeSensitiveData = true; // 是否脱敏敏感数据
 
     public LogLevel getLogLevel() {

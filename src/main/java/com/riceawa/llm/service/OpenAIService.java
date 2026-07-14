@@ -7,9 +7,11 @@ import com.google.gson.JsonElement;
 import com.riceawa.llm.core.*;
 import com.riceawa.llm.config.ConcurrencySettings;
 import com.riceawa.llm.config.LLMChatConfig;
+import com.riceawa.llm.logging.LLMLogSanitizer;
 import com.riceawa.llm.logging.LLMLogUtils;
 import com.riceawa.llm.logging.LLMRequestLogEntry;
 import com.riceawa.llm.logging.LLMResponseLogEntry;
+import com.riceawa.llm.logging.LogConfig;
 import okhttp3.*;
 
 import java.io.IOException;
@@ -150,20 +152,25 @@ public class OpenAIService implements LLMService {
         requestHeaders.put("Content-Type", "application/json");
         requestHeaders.put("X-Request-ID", requestId);
 
-        // 记录请求日志
-        LLMRequestLogEntry requestLog = LLMLogUtils.createRequestLogBuilder(requestId)
+        // 记录请求日志：默认仅记录消息摘要和请求元数据
+        LogConfig logConfig = LLMChatConfig.getInstance().getLogConfig();
+        boolean includeRequestContent = logConfig.isLogFullRequestBody();
+        LLMRequestLogEntry.Builder requestLogBuilder = LLMLogUtils.createRequestLogBuilder(requestId)
                 .serviceName(getServiceName())
                 .playerName(playerName)
                 .playerUuid(playerUuid)
-                .messages(messages)
+                .messageSummaries(LLMLogSanitizer.summarizeMessages(
+                        messages, includeRequestContent, logConfig.getMaxLogContentLength()))
                 .config(config)
-                .rawRequestJson(requestBody.toString())
                 .requestUrl(requestUrl)
-                .requestHeaders(LLMLogUtils.sanitizeHeaders(requestHeaders))
-                .estimatedTokens(LLMLogUtils.estimateTokens(messages))
-                .build();
-
-        LLMLogUtils.logRequest(requestLog);
+                .requestHeaders(requestHeaders)
+                .estimatedTokens(LLMLogUtils.estimateTokens(messages));
+        if (includeRequestContent) {
+            requestLogBuilder.rawRequestJson(LLMLogSanitizer.truncateContent(
+                    LLMLogSanitizer.sanitizeJson(requestBody.toString()),
+                    logConfig.getMaxLogContentLength()));
+        }
+        LLMLogUtils.logRequest(requestLogBuilder.build());
 
         Request request = new Request.Builder()
                 .url(requestUrl)
@@ -186,36 +193,47 @@ public class OpenAIService implements LLMService {
             }
 
             if (!response.isSuccessful()) {
-                // 记录错误响应日志
-                LLMResponseLogEntry responseLog = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+                String sanitizedErrorBody = LLMLogSanitizer.sanitizeJson(responseBody);
+                LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
                         .httpStatusCode(response.code())
                         .success(false)
-                        .errorMessage("HTTP " + response.code() + ": " + responseBody)
-                        .rawResponseJson(responseBody)
+                        .errorMessage("HTTP " + response.code() + ": " + sanitizedErrorBody)
                         .responseHeaders(responseHeaders)
                         .responseTimeMs(responseTime)
-                        .build();
-
-                LLMLogUtils.logResponse(responseLog);
+                        .content(sanitizedErrorBody, logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength());
+                if (logConfig.isLogFullResponseBody()) {
+                    responseLogBuilder.rawResponseJson(LLMLogSanitizer.truncateContent(
+                            sanitizedErrorBody, logConfig.getMaxLogContentLength()));
+                }
+                LLMLogUtils.logResponse(responseLogBuilder.build());
 
                 LLMResponse errorResponse = new LLMResponse();
-                errorResponse.setError("HTTP " + response.code() + ": " + responseBody);
+                errorResponse.setError("HTTP " + response.code() + ": " + sanitizedErrorBody);
                 return errorResponse;
             }
 
             LLMResponse llmResponse = parseResponse(responseBody);
 
-            // 记录成功响应日志
-            LLMResponseLogEntry responseLog = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+            // 默认只记录状态、usage、finish reason及响应摘要
+            LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
                     .httpStatusCode(response.code())
                     .success(llmResponse.isSuccess())
-                    .llmResponse(llmResponse)
-                    .rawResponseJson(responseBody)
                     .responseHeaders(responseHeaders)
                     .responseTimeMs(responseTime)
-                    .build();
-
-            LLMLogUtils.logResponse(responseLog);
+                    .model(llmResponse.getModel())
+                    .content(llmResponse.getContent(), logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength());
+            if (llmResponse.getUsage() != null) {
+                LLMResponse.Usage usage = llmResponse.getUsage();
+                responseLogBuilder.usage(usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
+            }
+            if (llmResponse.getChoices() != null && !llmResponse.getChoices().isEmpty()) {
+                responseLogBuilder.finishReason(llmResponse.getChoices().get(0).getFinishReason());
+            }
+            if (logConfig.isLogFullResponseBody()) {
+                responseLogBuilder.rawResponseJson(LLMLogSanitizer.truncateContent(
+                        LLMLogSanitizer.sanitizeJson(responseBody), logConfig.getMaxLogContentLength()));
+            }
+            LLMLogUtils.logResponse(responseLogBuilder.build());
 
             // 记录token使用情况
             if (llmResponse.isSuccess() && llmResponse.getUsage() != null) {

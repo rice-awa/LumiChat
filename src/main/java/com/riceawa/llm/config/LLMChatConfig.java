@@ -3,6 +3,7 @@ package com.riceawa.llm.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.riceawa.llm.logging.LogConfig;
+import com.riceawa.llm.logging.LogManager;
 
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -105,7 +106,7 @@ public class LLMChatConfig {
 
         this.isInitializing = false;
 
-        System.out.println("LLMChatConfig initialized successfully");
+        LogManager.getInstance().system("LLMChatConfig initialized successfully");
     }
 
     public static LLMChatConfig getInstance() {
@@ -125,11 +126,11 @@ public class LLMChatConfig {
     private void loadConfig() {
         if (!Files.exists(configFile)) {
             // 创建默认配置文件
-            System.out.println("Config file does not exist, creating default configuration...");
+            LogManager.getInstance().system("Config file does not exist, creating default configuration...");
             createDefaultConfig();
-            System.out.println("Default configuration created with maxContextCharacters: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Default configuration created with maxContextCharacters: " + this.maxContextCharacters);
             saveConfig();
-            System.out.println("Default configuration saved to file");
+            LogManager.getInstance().system("Default configuration saved to file");
             return;
         }
 
@@ -139,13 +140,13 @@ public class LLMChatConfig {
             if (data != null) {
                 applyConfigData(data);
             } else {
-                System.err.println("Failed to parse config file, creating default configuration");
+                LogManager.getInstance().error("Failed to parse config file, creating default configuration");
                 createDefaultConfig();
                 saveConfig();
             }
         } catch (Exception e) {
-            System.err.println("Failed to load config: " + e.getMessage());
-            System.err.println("Creating backup and using default configuration...");
+            LogManager.getInstance().error("Failed to load config: " + e.getMessage());
+            LogManager.getInstance().error("Creating backup and using default configuration...");
 
             // 备份损坏的配置文件
             backupCorruptedConfig();
@@ -163,11 +164,11 @@ public class LLMChatConfig {
         try (OutputStreamWriter writer = new OutputStreamWriter(
                 Files.newOutputStream(configFile), StandardCharsets.UTF_8)) {
             ConfigData data = createConfigData();
-            System.out.println("Saving config with maxContextCharacters: " + data.maxContextCharacters);
+            LogManager.getInstance().system("Saving config with maxContextCharacters: " + data.maxContextCharacters);
             gson.toJson(data, writer);
-            System.out.println("Configuration saved successfully");
+            LogManager.getInstance().system("Configuration saved successfully");
         } catch (IOException e) {
-            System.err.println("Failed to save config: " + e.getMessage());
+            LogManager.getInstance().error("Failed to save config: " + e.getMessage());
         }
     }
 
@@ -182,7 +183,7 @@ public class LLMChatConfig {
             try {
                 com.riceawa.llm.context.ChatContextManager.getInstance().updateMaxContextLength();
             } catch (Exception e) {
-                System.err.println("Failed to update existing contexts after reload: " + e.getMessage());
+                LogManager.getInstance().error("Failed to update existing contexts after reload: " + e.getMessage());
             }
 
             // 触发异步健康检查
@@ -198,13 +199,13 @@ public class LLMChatConfig {
             ProviderManager providerManager = new ProviderManager(this.providers);
             providerManager.checkAllProvidersHealth().whenComplete((healthMap, throwable) -> {
                 if (throwable != null) {
-                    System.err.println("Provider health check failed: " + throwable.getMessage());
+                    LogManager.getInstance().error("Provider health check failed: " + throwable.getMessage());
                 } else {
-                    System.out.println("Provider health check completed for " + healthMap.size() + " providers");
+                    LogManager.getInstance().system("Provider health check completed for " + healthMap.size() + " providers");
                 }
             });
         } catch (Exception e) {
-            System.err.println("Failed to trigger health check: " + e.getMessage());
+            LogManager.getInstance().error("Failed to trigger health check: " + e.getMessage());
         }
     }
 
@@ -219,9 +220,9 @@ public class LLMChatConfig {
         try {
             Path backupFile = configFile.getParent().resolve("config.json.backup." + System.currentTimeMillis());
             Files.copy(configFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("Corrupted config backed up to: " + backupFile);
+            LogManager.getInstance().system("Corrupted config backed up to: " + backupFile);
         } catch (IOException e) {
-            System.err.println("Failed to backup corrupted config: " + e.getMessage());
+            LogManager.getInstance().error("Failed to backup corrupted config: " + e.getMessage());
         }
     }
 
@@ -239,7 +240,7 @@ public class LLMChatConfig {
         // 自动选择第一个有效的Provider和Model
         selectInitialProviderAndModel();
 
-        System.out.println("Created default configuration with " + this.providers.size() + " providers");
+        LogManager.getInstance().system("Created default configuration with " + this.providers.size() + " providers");
     }
 
     /**
@@ -252,11 +253,11 @@ public class LLMChatConfig {
         if (result.isSuccess()) {
             this.currentProvider = result.getProviderName();
             this.currentModel = result.getModelName();
-            System.out.println("Selected initial provider: " + this.currentProvider + ", model: " + this.currentModel);
+            LogManager.getInstance().system("Selected initial provider: " + this.currentProvider + ", model: " + this.currentModel);
         } else {
             this.currentProvider = ConfigDefaults.EMPTY_STRING;
             this.currentModel = ConfigDefaults.EMPTY_STRING;
-            System.out.println("No valid provider configuration found: " + result.getMessage());
+            LogManager.getInstance().system("No valid provider configuration found: " + result.getMessage());
         }
     }
 
@@ -275,13 +276,13 @@ public class LLMChatConfig {
         // 兼容旧配置：如果有maxContextLength，使用它作为maxContextCharacters
         if (data.maxContextLength != null) {
             this.maxContextCharacters = data.maxContextLength;
-            System.out.println("Using legacy maxContextLength as maxContextCharacters: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Using legacy maxContextLength as maxContextCharacters: " + this.maxContextCharacters);
         } else if (data.maxContextCharacters != null) {
             this.maxContextCharacters = data.maxContextCharacters;
-            System.out.println("Loaded maxContextCharacters from config: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Loaded maxContextCharacters from config: " + this.maxContextCharacters);
         } else {
             this.maxContextCharacters = ConfigDefaults.DEFAULT_MAX_CONTEXT_CHARACTERS;
-            System.out.println("Applied default maxContextCharacters: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Applied default maxContextCharacters: " + this.maxContextCharacters);
         }
 
         this.enableHistory = data.enableHistory != null ? data.enableHistory : (Boolean) ConfigDefaults.getDefaultValue("enableHistory");
@@ -346,25 +347,25 @@ public class LLMChatConfig {
 
         // 验证基础配置值
         if (!ConfigDefaults.isValidConfigValue("maxContextCharacters", this.maxContextCharacters)) {
-            System.out.println("Invalid maxContextCharacters (" + this.maxContextCharacters + "), resetting to default");
+            LogManager.getInstance().system("Invalid maxContextCharacters (" + this.maxContextCharacters + "), resetting to default");
             this.maxContextCharacters = ConfigDefaults.DEFAULT_MAX_CONTEXT_CHARACTERS;
             needsSave = true;
         }
 
         if (!ConfigDefaults.isValidConfigValue("defaultTemperature", this.defaultTemperature)) {
-            System.out.println("Invalid defaultTemperature (" + this.defaultTemperature + "), resetting to default");
+            LogManager.getInstance().system("Invalid defaultTemperature (" + this.defaultTemperature + "), resetting to default");
             this.defaultTemperature = ConfigDefaults.DEFAULT_TEMPERATURE;
             needsSave = true;
         }
 
         if (!ConfigDefaults.isValidConfigValue("defaultMaxTokens", this.defaultMaxTokens)) {
-            System.out.println("Invalid defaultMaxTokens (" + this.defaultMaxTokens + "), resetting to default");
+            LogManager.getInstance().system("Invalid defaultMaxTokens (" + this.defaultMaxTokens + "), resetting to default");
             this.defaultMaxTokens = ConfigDefaults.DEFAULT_MAX_TOKENS;
             needsSave = true;
         }
 
         if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", this.executeCommandMaxLength)) {
-            System.out.println("Invalid executeCommandMaxLength (" + this.executeCommandMaxLength
+            LogManager.getInstance().system("Invalid executeCommandMaxLength (" + this.executeCommandMaxLength
                     + "), resetting to default");
             this.executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
             needsSave = true;
@@ -388,10 +389,10 @@ public class LLMChatConfig {
                 this.currentProvider = result.getProviderName();
                 this.currentModel = result.getModelName();
                 needsSave = true;
-                System.out.println("Provider configuration fixed: " + result.getMessage());
+                LogManager.getInstance().system("Provider configuration fixed: " + result.getMessage());
             }
         } else {
-            System.out.println("Provider configuration issue: " + result.getMessage());
+            LogManager.getInstance().system("Provider configuration issue: " + result.getMessage());
         }
 
         // 如果有修复，保存配置
@@ -501,7 +502,7 @@ public class LLMChatConfig {
             try {
                 com.riceawa.llm.context.ChatContextManager.getInstance().updateMaxContextLength();
             } catch (Exception e) {
-                System.err.println("Failed to update existing contexts with new max context characters: " + e.getMessage());
+                LogManager.getInstance().error("Failed to update existing contexts with new max context characters: " + e.getMessage());
             }
         }
     }
@@ -785,11 +786,11 @@ public class LLMChatConfig {
             if (result.isSuccess()) {
                 this.currentProvider = result.getProviderName();
                 this.currentModel = result.getModelName();
-                System.out.println("Switched to provider: " + this.currentProvider + ", model: " + this.currentModel);
+                LogManager.getInstance().system("Switched to provider: " + this.currentProvider + ", model: " + this.currentModel);
             } else {
                 this.currentProvider = ConfigDefaults.EMPTY_STRING;
                 this.currentModel = ConfigDefaults.EMPTY_STRING;
-                System.out.println("No valid provider available after removal");
+                LogManager.getInstance().system("No valid provider available after removal");
             }
         }
 
