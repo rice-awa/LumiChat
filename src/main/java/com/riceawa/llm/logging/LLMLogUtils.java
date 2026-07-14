@@ -60,6 +60,14 @@ public final class LLMLogUtils {
         return LLMLogSanitizer.sanitizeHeaders(headers);
     }
 
+    public static Map<String, String> summarizeResponseHeaders(Map<String, String> headers) {
+        return LLMLogSanitizer.summarizeResponseHeaders(headers);
+    }
+
+    public static String sanitizeRequestUrl(String requestUrl) {
+        return LLMLogSanitizer.sanitizeRequestUrl(requestUrl);
+    }
+
     public static String sanitizeJson(String jsonString) {
         return LLMLogSanitizer.sanitizeJson(jsonString);
     }

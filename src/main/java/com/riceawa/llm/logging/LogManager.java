@@ -272,8 +272,8 @@ public class LogManager {
                     break;
             }
         } catch (Exception e) {
-            // 避免日志记录本身出错
-            System.err.println("Failed to log to console: " + e.getMessage());
+            // Avoid recursively routing an internal console failure through this manager.
+            FALLBACK_LOGGER.error("Failed to log to console");
         }
     }
 

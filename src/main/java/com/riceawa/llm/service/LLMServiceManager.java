@@ -5,6 +5,7 @@ import com.riceawa.llm.core.ConcurrencyManager;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.config.Provider;
 import com.riceawa.llm.config.ConcurrencySettings;
+import com.riceawa.llm.logging.LogManager;
 
 import java.util.HashMap;
 import java.util.List;
@@ -191,13 +192,13 @@ public class LLMServiceManager {
 
             providerManager.checkAllProvidersHealth().whenComplete((healthMap, throwable) -> {
                 if (throwable != null) {
-                    System.err.println("Service health check failed: " + throwable.getMessage());
+                    LogManager.getInstance().error("Service health check failed");
                 } else {
-                    System.out.println("Service health check completed for " + healthMap.size() + " services");
+                    LogManager.getInstance().system("Service health check completed for " + healthMap.size() + " services");
                 }
             });
         } catch (Exception e) {
-            System.err.println("Failed to trigger service health check: " + e.getMessage());
+            LogManager.getInstance().error("Failed to trigger service health check");
         }
     }
 

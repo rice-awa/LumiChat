@@ -7,6 +7,8 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import com.riceawa.llm.core.LLMMessage;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -26,7 +28,10 @@ public final class LLMLogSanitizer {
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)\\bBearer\\s+[^\\s,\\\"}]+" );
     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)\\b(?:sk|rk)-[a-z0-9_-]+\\b");
     private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
-            "(?i)(\\b(?:api[_-]?key|access[_-]?token|secret|password)\\s*[=:]\\s*)([^\\s,\\\"}]+)");
+            "(?i)(\\b(?:x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|secret|password)\\s*[=:]\\s*)([^\\s,\\\"}]+)");
+    private static final String[] SAFE_RESPONSE_HEADERS = {
+            "content-type", "content-length", "x-request-id", "request-id", "retry-after"
+    };
 
     private LLMLogSanitizer() {
     }
@@ -50,7 +55,31 @@ public final class LLMLogSanitizer {
             summary.put("length", content.length());
             summary.put("sha256", sha256(content));
             if (includeContent) {
-                summary.put("content", truncateContent(sanitizeText(content), maxLength));
+                summary.put("content", truncateContent(sanitizeContent(content), maxLength));
+            }
+            summaries.add(summary);
+        }
+        return summaries;
+    }
+
+    /**
+     * Rebuilds caller-provided summaries through the same allowlist used for message logs.
+     */
+    public static List<Map<String, Object>> sanitizeMessageSummaries(
+            List<Map<String, Object>> messages, boolean includeContent, int maxLength) {
+        List<Map<String, Object>> summaries = new ArrayList<>();
+        if (messages == null) {
+            return summaries;
+        }
+        for (Map<String, Object> message : messages) {
+            Map<String, Object> summary = new LinkedHashMap<>();
+            Object contentValue = message == null ? null : message.get("content");
+            String content = contentValue == null ? null : String.valueOf(contentValue);
+            summary.put("role", safeRole(message == null ? null : message.get("role")));
+            summary.put("length", content != null ? content.length() : safeLength(message == null ? null : message.get("length")));
+            summary.put("sha256", content != null ? sha256(content) : safeHash(message == null ? null : message.get("sha256")));
+            if (includeContent && content != null) {
+                summary.put("content", truncateContent(sanitizeContent(content), maxLength));
             }
             summaries.add(summary);
         }
@@ -95,6 +124,40 @@ public final class LLMLogSanitizer {
     }
 
     /**
+     * Keeps only a minimal allowlist of response headers. Provider-specific values are omitted.
+     */
+    public static Map<String, String> summarizeResponseHeaders(Map<String, String> headers) {
+        Map<String, String> summary = new LinkedHashMap<>();
+        if (headers == null) {
+            return summary;
+        }
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            if (isSafeResponseHeader(entry.getKey())) {
+                summary.put(entry.getKey(), "[PRESENT]");
+            }
+        }
+        return summary;
+    }
+
+    /**
+     * Removes credentials, query parameters, fragments, user-info and paths from a request URL.
+     */
+    public static String sanitizeRequestUrl(String requestUrl) {
+        if (requestUrl == null) {
+            return null;
+        }
+        try {
+            URI uri = new URI(requestUrl);
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return "[REDACTED_REQUEST_URL]";
+            }
+            return new URI(uri.getScheme(), null, uri.getHost(), uri.getPort(), null, null, null).toString();
+        } catch (URISyntaxException e) {
+            return "[REDACTED_REQUEST_URL sha256=" + sha256(requestUrl) + "]";
+        }
+    }
+
+    /**
      * Returns a lowercase SHA-256 digest of the supplied text.
      */
     public static String sha256(String value) {
@@ -125,6 +188,28 @@ public final class LLMLogSanitizer {
     }
 
     /**
+     * Sanitizes JSON-shaped content structurally and ordinary text with text redaction rules.
+     */
+    public static String sanitizeContent(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.startsWith("{") || trimmed.startsWith("[")
+                ? sanitizeJson(value) : sanitizeText(value);
+    }
+
+    /**
+     * Replaces arbitrary content with non-reversible diagnostics for default log fields.
+     */
+    public static String summarizeContent(String value) {
+        if (value == null) {
+            return null;
+        }
+        return "[REDACTED sha256=" + sha256(value) + " length=" + value.length() + "]";
+    }
+
+    /**
      * Truncates to at most maxLength characters, including the truncation marker.
      */
     public static String truncateContent(String value, int maxLength) {
@@ -135,6 +220,23 @@ public final class LLMLogSanitizer {
             return TRUNCATED.substring(0, maxLength);
         }
         return value.substring(0, maxLength - TRUNCATED.length()) + TRUNCATED;
+    }
+
+    private static String safeRole(Object role) {
+        String value = role == null ? "unknown" : String.valueOf(role);
+        return value.matches("[A-Za-z0-9_-]{1,32}") ? value : "unknown";
+    }
+
+    private static int safeLength(Object length) {
+        if (length instanceof Number) {
+            return Math.max(0, ((Number) length).intValue());
+        }
+        return 0;
+    }
+
+    private static String safeHash(Object hash) {
+        String value = hash == null ? "" : String.valueOf(hash);
+        return value.matches("[a-fA-F0-9]{64}") ? value.toLowerCase(Locale.ROOT) : sha256("");
     }
 
     private static String messageContent(LLMMessage message) {
@@ -191,13 +293,26 @@ public final class LLMLogSanitizer {
         if (key == null) {
             return false;
         }
-        String normalized = key.toLowerCase(Locale.ROOT).replace("-", "_");
+        String normalized = key.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
         return normalized.equals("authorization")
-                || normalized.contains("api_key")
+                || normalized.contains("apikey")
                 || normalized.contains("token")
                 || normalized.contains("secret")
                 || normalized.contains("password")
                 || normalized.equals("cookie");
+    }
+
+    private static boolean isSafeResponseHeader(String key) {
+        if (key == null || isSensitiveKey(key)) {
+            return false;
+        }
+        String normalized = key.toLowerCase(Locale.ROOT);
+        for (String safeHeader : SAFE_RESPONSE_HEADERS) {
+            if (safeHeader.equals(normalized)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String maskHeaderValue(String key, String value) {

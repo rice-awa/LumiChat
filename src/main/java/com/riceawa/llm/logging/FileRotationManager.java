@@ -89,7 +89,7 @@ public class FileRotationManager {
             
         } catch (IOException e) {
             // 如果压缩失败，保留原始文件
-            System.err.println("Failed to compress log file: " + file + ", error: " + e.getMessage());
+            LogManager.getInstance().error("Failed to compress log file");
         }
     }
 
@@ -115,7 +115,7 @@ public class FileRotationManager {
                     try {
                         Files.deleteIfExists(oldFiles.get(i));
                     } catch (IOException e) {
-                        System.err.println("Failed to delete old log file: " + oldFiles.get(i));
+                        LogManager.getInstance().error("Failed to delete old log file");
                     }
                 }
             }
@@ -124,7 +124,7 @@ public class FileRotationManager {
             cleanupByRetentionDays(baseName);
             
         } catch (IOException e) {
-            System.err.println("Failed to cleanup old log files: " + e.getMessage());
+            LogManager.getInstance().error("Failed to cleanup old log files");
         }
     }
 
@@ -150,7 +150,7 @@ public class FileRotationManager {
                         Files.deleteIfExists(file);
                     }
                 } catch (IOException e) {
-                    System.err.println("Failed to check/delete old log file: " + file);
+                    LogManager.getInstance().error("Failed to check/delete old log file");
                 }
             });
         }

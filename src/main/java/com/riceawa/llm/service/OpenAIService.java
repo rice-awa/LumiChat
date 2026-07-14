@@ -166,9 +166,8 @@ public class OpenAIService implements LLMService {
                 .requestHeaders(requestHeaders)
                 .estimatedTokens(LLMLogUtils.estimateTokens(messages));
         if (includeRequestContent) {
-            requestLogBuilder.rawRequestJson(LLMLogSanitizer.truncateContent(
-                    LLMLogSanitizer.sanitizeJson(requestBody.toString()),
-                    logConfig.getMaxLogContentLength()));
+            requestLogBuilder.rawRequestJson(
+                    requestBody.toString(), true, logConfig.getMaxLogContentLength());
         }
         LLMLogUtils.logRequest(requestLogBuilder.build());
 
@@ -202,8 +201,8 @@ public class OpenAIService implements LLMService {
                         .responseTimeMs(responseTime)
                         .content(sanitizedErrorBody, logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength());
                 if (logConfig.isLogFullResponseBody()) {
-                    responseLogBuilder.rawResponseJson(LLMLogSanitizer.truncateContent(
-                            sanitizedErrorBody, logConfig.getMaxLogContentLength()));
+                    responseLogBuilder.rawResponseJson(
+                            responseBody, true, logConfig.getMaxLogContentLength());
                 }
                 LLMLogUtils.logResponse(responseLogBuilder.build());
 
@@ -230,8 +229,8 @@ public class OpenAIService implements LLMService {
                 responseLogBuilder.finishReason(llmResponse.getChoices().get(0).getFinishReason());
             }
             if (logConfig.isLogFullResponseBody()) {
-                responseLogBuilder.rawResponseJson(LLMLogSanitizer.truncateContent(
-                        LLMLogSanitizer.sanitizeJson(responseBody), logConfig.getMaxLogContentLength()));
+                responseLogBuilder.rawResponseJson(
+                        responseBody, true, logConfig.getMaxLogContentLength());
             }
             LLMLogUtils.logResponse(responseLogBuilder.build());
 

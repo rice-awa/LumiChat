@@ -64,11 +64,15 @@ public class LLMRequestLogEntry {
         this.playerUuid = builder.playerUuid;
         this.serviceName = builder.serviceName;
         this.model = builder.model;
-        this.messages = builder.messages == null ? new ArrayList<>() : new ArrayList<>(builder.messages);
+        this.messages = builder.messages == null ? new ArrayList<>()
+                : LLMLogSanitizer.sanitizeMessageSummaries(
+                        builder.messages, builder.includeMessageContent, builder.messageContentMaxLength);
         this.config = builder.config;
-        this.rawRequestJson = builder.rawRequestJson;
-        this.requestUrl = builder.requestUrl;
-        this.requestHeaders = new HashMap<>(builder.requestHeaders);
+        this.rawRequestJson = builder.includeRawRequestContent
+                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawRequestJson), builder.rawRequestContentMaxLength)
+                : LLMLogSanitizer.summarizeContent(builder.rawRequestJson);
+        this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(builder.requestUrl);
+        this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));
         this.contextMessageCount = builder.contextMessageCount;
         this.estimatedTokens = builder.estimatedTokens;
         this.metadata = new HashMap<>(builder.metadata);
@@ -115,8 +119,12 @@ public class LLMRequestLogEntry {
         private String serviceName;
         private String model;
         private List<Map<String, Object>> messages;
+        private boolean includeMessageContent;
+        private int messageContentMaxLength;
         private LLMConfig config;
         private String rawRequestJson;
+        private boolean includeRawRequestContent;
+        private int rawRequestContentMaxLength;
         private String requestUrl;
         private Map<String, String> requestHeaders = new HashMap<>();
         private int contextMessageCount;
@@ -131,13 +139,25 @@ public class LLMRequestLogEntry {
         public Builder model(String model) { this.model = model; return this; }
 
         public Builder messages(List<LLMMessage> messages) {
+            this.includeMessageContent = false;
+            this.messageContentMaxLength = 0;
             this.messages = LLMLogSanitizer.summarizeMessages(messages, false, 0);
             this.contextMessageCount = messages != null ? messages.size() : 0;
             return this;
         }
 
         public Builder messageSummaries(List<Map<String, Object>> messages) {
-            this.messages = messages;
+            this.includeMessageContent = false;
+            this.messageContentMaxLength = 0;
+            this.messages = LLMLogSanitizer.sanitizeMessageSummaries(messages, false, 0);
+            this.contextMessageCount = messages != null ? messages.size() : 0;
+            return this;
+        }
+
+        public Builder messageSummaries(List<Map<String, Object>> messages, boolean includeContent, int maxLength) {
+            this.includeMessageContent = includeContent;
+            this.messageContentMaxLength = maxLength;
+            this.messages = LLMLogSanitizer.sanitizeMessageSummaries(messages, includeContent, maxLength);
             this.contextMessageCount = messages != null ? messages.size() : 0;
             return this;
         }
@@ -150,8 +170,24 @@ public class LLMRequestLogEntry {
             return this;
         }
 
-        public Builder rawRequestJson(String rawRequestJson) { this.rawRequestJson = rawRequestJson; return this; }
-        public Builder requestUrl(String requestUrl) { this.requestUrl = requestUrl; return this; }
+        public Builder rawRequestJson(String rawRequestJson) {
+            this.rawRequestJson = rawRequestJson;
+            this.includeRawRequestContent = false;
+            this.rawRequestContentMaxLength = 0;
+            return this;
+        }
+
+        public Builder rawRequestJson(String rawRequestJson, boolean includeContent, int maxLength) {
+            this.rawRequestJson = rawRequestJson;
+            this.includeRawRequestContent = includeContent;
+            this.rawRequestContentMaxLength = maxLength;
+            return this;
+        }
+
+        public Builder requestUrl(String requestUrl) {
+            this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(requestUrl);
+            return this;
+        }
 
         public Builder requestHeaders(Map<String, String> headers) {
             if (headers != null) {

@@ -72,8 +72,10 @@ public class LLMResponseLogEntry {
         this.success = builder.success;
         this.errorMessage = builder.errorMessage;
         this.llmResponse = builder.llmResponse;
-        this.rawResponseJson = builder.rawResponseJson;
-        this.responseHeaders = new HashMap<>(builder.responseHeaders);
+        this.rawResponseJson = builder.includeRawResponseContent
+                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawResponseJson), builder.rawResponseContentMaxLength)
+                : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
+        this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
         this.content = builder.content;
         this.contentLength = builder.originalContent == null ? 0 : builder.originalContent.length();
         this.contentSha256 = LLMLogSanitizer.sha256(builder.originalContent);
@@ -154,6 +156,8 @@ public class LLMResponseLogEntry {
         private String errorMessage;
         private LLMResponse llmResponse;
         private String rawResponseJson;
+        private boolean includeRawResponseContent;
+        private int rawResponseContentMaxLength;
         private Map<String, String> responseHeaders = new HashMap<>();
         private String content;
         private String originalContent;
@@ -170,7 +174,7 @@ public class LLMResponseLogEntry {
         public Builder success(boolean success) { this.success = success; return this; }
 
         public Builder errorMessage(String errorMessage) {
-            this.errorMessage = LLMLogSanitizer.sanitizeText(errorMessage);
+            this.errorMessage = LLMLogSanitizer.summarizeContent(errorMessage);
             return this;
         }
 
@@ -180,7 +184,7 @@ public class LLMResponseLogEntry {
                 this.success = llmResponse.isSuccess();
                 setContent(llmResponse.getContent());
                 this.model = llmResponse.getModel();
-                this.errorMessage = LLMLogSanitizer.sanitizeText(llmResponse.getError());
+                this.errorMessage = LLMLogSanitizer.summarizeContent(llmResponse.getError());
                 if (llmResponse.getUsage() != null) {
                     LLMResponse.Usage responseUsage = llmResponse.getUsage();
                     this.usage = new TokenUsage(responseUsage.getPromptTokens(), responseUsage.getCompletionTokens(), responseUsage.getTotalTokens());
@@ -195,27 +199,37 @@ public class LLMResponseLogEntry {
         public Builder content(String content, boolean includeContent, int maxLength) {
             this.originalContent = content;
             this.content = includeContent
-                    ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeText(content), maxLength)
+                    ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeContent(content), maxLength)
                     : null;
             return this;
         }
 
         private void setContent(String content) {
             this.originalContent = content;
-            this.content = LLMLogSanitizer.sanitizeText(content);
+            this.content = null;
         }
 
-        public Builder rawResponseJson(String rawResponseJson) { this.rawResponseJson = rawResponseJson; return this; }
+        public Builder rawResponseJson(String rawResponseJson) {
+            this.rawResponseJson = rawResponseJson;
+            this.includeRawResponseContent = false;
+            this.rawResponseContentMaxLength = 0;
+            return this;
+        }
+
+        public Builder rawResponseJson(String rawResponseJson, boolean includeContent, int maxLength) {
+            this.rawResponseJson = rawResponseJson;
+            this.includeRawResponseContent = includeContent;
+            this.rawResponseContentMaxLength = maxLength;
+            return this;
+        }
 
         public Builder responseHeaders(Map<String, String> headers) {
-            if (headers != null) {
-                this.responseHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(headers));
-            }
+            this.responseHeaders.putAll(LLMLogSanitizer.summarizeResponseHeaders(headers));
             return this;
         }
 
         public Builder responseHeader(String key, String value) {
-            this.responseHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(Map.of(key, value)));
+            this.responseHeaders.putAll(LLMLogSanitizer.summarizeResponseHeaders(Map.of(key, value)));
             return this;
         }
 

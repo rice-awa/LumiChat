@@ -2,6 +2,7 @@ package com.riceawa.llm.logging;
 
 import com.google.gson.Gson;
 import com.riceawa.llm.core.LLMMessage;
+import com.riceawa.llm.core.LLMResponse;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashMap;
@@ -99,5 +100,56 @@ class LLMLogSanitizerTest {
         assertFalse(config.isLogFullResponseBody());
         assertEquals(2048, config.getMaxLogContentLength());
         assertTrue(config.isSanitizeSensitiveData());
+    }
+
+    @Test
+    void sanitizerMasksCamelCaseAndHeaderKeyVariants() {
+        String opaqueKey = "opaque-provider-credential-value";
+        String json = "{\"apiKey\":\"" + opaqueKey + "\",\"APIKey\":\"" + opaqueKey
+                + "\",\"xApiKey\":\"" + opaqueKey + "\"}";
+        Map<String, String> headers = Map.of("X-Api-Key", opaqueKey, "APIKey", opaqueKey);
+
+        String sanitizedJson = LLMLogSanitizer.sanitizeJson(json);
+        Map<String, String> sanitizedHeaders = LLMLogSanitizer.sanitizeHeaders(headers);
+
+        assertFalse(sanitizedJson.contains(opaqueKey));
+        assertFalse(sanitizedHeaders.toString().contains(opaqueKey));
+        assertTrue(sanitizedJson.contains("***MASKED***"));
+    }
+
+    @Test
+    void defaultLogEntrySerializationRedactsRequestAndResponseContent() {
+        String secret = "opaque-provider-credential-value";
+        String privatePrompt = "player private prompt";
+        String privateResponse = "provider private response";
+
+        LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("request-1")
+                .serviceName("provider")
+                .messages(List.of(new LLMMessage(LLMMessage.MessageRole.USER, privatePrompt)))
+                .rawRequestJson("{\"apiKey\":\"" + secret + "\",\"content\":\"" + privatePrompt + "\"}")
+                .requestUrl("https://user:pass@provider.example/v1/chat?apiKey=" + secret + "#fragment")
+                .build();
+
+        LLMResponse response = new LLMResponse();
+        response.setError(privateResponse + " apiKey=" + secret);
+        LLMResponseLogEntry responseEntry = LLMLogUtils.createResponseLogBuilder("response-1", "request-1")
+                .llmResponse(response)
+                .rawResponseJson("{\"apiKey\":\"" + secret + "\",\"content\":\"" + privateResponse + "\"}")
+                .responseHeaders(Map.of("X-Api-Key", secret, "X-Provider-Trace", privateResponse,
+                        "Content-Type", "application/json"))
+                .build();
+
+        String requestJson = request.toJsonString();
+        String responseJson = responseEntry.toJsonString();
+        assertFalse(requestJson.contains(secret));
+        assertFalse(requestJson.contains(privatePrompt));
+        assertFalse(requestJson.contains("user:pass"));
+        assertFalse(requestJson.contains("/v1/chat"));
+        assertFalse(responseJson.contains(secret));
+        assertFalse(responseJson.contains(privateResponse));
+        assertFalse(responseJson.contains("X-Api-Key"));
+        assertFalse(responseJson.contains("X-Provider-Trace"));
+        assertTrue(responseJson.contains("Content-Type"));
+        assertTrue(responseJson.contains("[PRESENT]"));
     }
 }
