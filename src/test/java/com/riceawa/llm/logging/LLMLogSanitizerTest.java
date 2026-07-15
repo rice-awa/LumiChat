@@ -48,9 +48,10 @@ class LLMLogSanitizerTest {
                 .build()
                 .toJsonString();
         String responseJson = LLMLogUtils.createResponseLogBuilder("execute-response", "execute-request")
-                .rawResponseJson("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"execute_command\",\"arguments\":\""
-                        + command + "\"}}]}}],\"messages\":[{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
-                        + output + "\"}]}", true, 4096)
+                .content("{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
+                        + output + "\"}", true, 4096)
+                .rawResponseJson("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"tool_call\":{\"name\":\"execute_command\",\"arguments\":\""
+                        + command + "\"}}}}]}", true, 4096)
                 .build()
                 .toJsonString();
 
@@ -58,6 +59,32 @@ class LLMLogSanitizerTest {
         assertFalse(requestJson.contains(output));
         assertFalse(responseJson.contains(command));
         assertFalse(responseJson.contains(output));
+    }
+
+
+    @Test
+    void fullLlmLogsRedactLegacyToolCallAndKeepOtherToolData() {
+        String command = "op SensitivePlayer --secret=legacy-never-log-this";
+        String output = "legacy command output must never enter logs";
+        String timeArguments = "{\"timezone\":\"UTC\"}";
+        String payload = "{\"messages\":["
+                + "{\"role\":\"assistant\",\"tool_call\":{\"name\":\"execute_command\",\"arguments\":\""
+                + command + "\"}},"
+                + "{\"role\":\"assistant\",\"tool_call\":{\"name\":\"get_time\",\"arguments\":\""
+                + timeArguments.replace("\"", "\\\"") + "\"}},"
+                + "{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
+                + output + "\"},"
+                + "{\"role\":\"tool\",\"name\":\"get_time\",\"content\":\"12:00 UTC\"}]}";
+
+        String sanitized = LLMLogSanitizer.sanitizeLlmLogContent(payload);
+
+        assertFalse(sanitized.contains(command));
+        assertFalse(sanitized.contains(output));
+        assertTrue(sanitized.contains("[REDACTED execute_command arguments]"));
+        assertTrue(sanitized.contains("[REDACTED execute_command output]"));
+        assertTrue(sanitized.contains("get_time"));
+        assertTrue(sanitized.contains("UTC"));
+        assertTrue(sanitized.contains("12:00 UTC"));
     }
 
 

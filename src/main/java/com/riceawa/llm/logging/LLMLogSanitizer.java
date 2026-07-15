@@ -406,7 +406,12 @@ public final class LLMLogSanitizer {
         if ("assistant".equals(role) && object.has("tool_calls")) {
             redactExecuteCommandToolCalls(object.getAsJsonArray("tool_calls"));
         }
-        if ("tool".equals(role) && "execute_command".equals(stringValue(object.get("name")))) {
+        if ("assistant".equals(role)) {
+            redactExecuteCommandCall(object.getAsJsonObject("tool_call"));
+            redactExecuteCommandCall(object.getAsJsonObject("function_call"));
+        }
+        if (("tool".equals(role) || "function".equals(role))
+                && "execute_command".equals(stringValue(object.get("name")))) {
             object.addProperty("content", EXECUTE_COMMAND_OUTPUT_REDACTED);
         }
         if ("assistant".equals(role) && object.has("content")
@@ -427,11 +432,20 @@ public final class LLMLogSanitizer {
             if (toolCallElement == null || !toolCallElement.isJsonObject()) {
                 continue;
             }
-            JsonObject toolCall = toolCallElement.getAsJsonObject();
-            JsonObject function = toolCall.getAsJsonObject("function");
-            if (function != null && "execute_command".equals(stringValue(function.get("name")))) {
-                function.addProperty("arguments", EXECUTE_COMMAND_ARGUMENTS_REDACTED);
-            }
+            redactExecuteCommandCall(toolCallElement.getAsJsonObject());
+        }
+    }
+
+    private static void redactExecuteCommandCall(JsonObject call) {
+        if (call == null) {
+            return;
+        }
+        JsonObject function = call.getAsJsonObject("function");
+        if (function != null && "execute_command".equals(stringValue(function.get("name")))) {
+            function.addProperty("arguments", EXECUTE_COMMAND_ARGUMENTS_REDACTED);
+        }
+        if ("execute_command".equals(stringValue(call.get("name")))) {
+            call.addProperty("arguments", EXECUTE_COMMAND_ARGUMENTS_REDACTED);
         }
     }
 

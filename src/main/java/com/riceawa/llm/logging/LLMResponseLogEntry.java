@@ -199,7 +199,7 @@ public class LLMResponseLogEntry {
         public Builder content(String content, boolean includeContent, int maxLength) {
             this.originalContent = content;
             this.content = includeContent
-                    ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeContent(content), maxLength)
+                    ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(content), maxLength)
                     : null;
             return this;
         }

@@ -286,11 +286,46 @@ PATH=/tmp/lumichat-jdk21/bin:$PATH \
 
 Result: `BUILD SUCCESSFUL`; 30 actionable tasks (8 executed, 22 up-to-date). `git diff --check` passed during self-review.
 
-### Concerns
+### Remaining concern
 
-No in-game smoke test was available. A live server check should explicitly enable `execute_command`, allowlist a safe root such as `list`, confirm the default tool result includes command output, then disable `executeCommandReturnFullOutput` and confirm the tool result falls back to its summary while the six-field audit event continues to exclude raw command/output.
+No live provider/server smoke test was available. A live check should enable both full logging flags, issue one allowlisted execute_command call and one get_time call, then inspect that execute_command command/output are absent from both serialized response fields while get_time data remains visible and the in-memory execute_command result remains complete.
 
-## 2026-07-15 Important review fix: full LLM logging must not retain execute_command data
+## 2026-07-15 Important review fix: legacy tool_call and response content logging boundaries
+
+### Review findings addressed
+
+- `sanitizeLlmLogContent` now redacts both modern plural `tool_calls` and the legacy singular `assistant.tool_call` supported by `OpenAIService`. It also covers the corresponding `assistant.function_call` shape when present. Only calls whose function/name is exactly `execute_command` have arguments replaced; `get_time` arguments remain visible in configured full logging.
+- `LLMResponseLogEntry.Builder.content(String, boolean, int)` now uses `sanitizeLlmLogContent`, closing the derived `content` bypass for protocol JSON that contains execute_command output. Both `raw_response_json` and `content` therefore receive command-aware structural redaction.
+- The full in-memory LLM tool result remains unchanged and still includes complete command output when `executeCommandReturnFullOutput=true`; only serialized log fields are redacted. Command execution remains disabled by default, allowlist/player-source behavior remains unchanged, and audit fields remain metadata-only.
+
+### Regression coverage
+
+`LLMLogSanitizerTest` now covers: legacy singular `tool_call`, `function_call` compatibility, modern `tool_calls`, response `content` plus `raw_response_json`, and same-payload `get_time` arguments/content preservation. The tests assert command and output markers are absent while non-command tool data remains present.
+
+### Validation results
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.21.11:test --tests com.riceawa.llm.logging.LLMLogSanitizerTest
+```
+
+Result: `BUILD SUCCESSFUL`; 16 tests, 0 failures/errors/skips.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest \
+  :1.21.11:test --tests com.riceawa.llm.function.CommandExecutionPolicyTest \
+  :1.19:build :1.21.11:build
+```
+
+Result: `BUILD SUCCESSFUL`; ToolCallHandlerTest 5/5, CommandExecutionPolicyTest 9/9, and both representative builds succeeded (30 actionable tasks, 16 executed, 14 up-to-date). `git diff --check` passed.
+
 
 ### Review finding and scope rationale
 
