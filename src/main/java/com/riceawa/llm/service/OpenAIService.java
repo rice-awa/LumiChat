@@ -37,6 +37,7 @@ public class OpenAIService implements LLMService {
     private final String providerName;
     private final String apiKey;
     private final String baseUrl;
+    private final RetrySleeper retrySleeper;
 
     public OpenAIService(String apiKey) {
         this("OpenAI", apiKey, "https://api.openai.com/v1");
@@ -47,11 +48,21 @@ public class OpenAIService implements LLMService {
     }
 
     public OpenAIService(String providerName, String apiKey, String baseUrl) {
+        this(providerName, apiKey, baseUrl, Thread::sleep);
+    }
+
+    OpenAIService(String providerName, String apiKey, String baseUrl, RetrySleeper retrySleeper) {
         this.providerName = providerName == null || providerName.trim().isEmpty() ? "OpenAI" : providerName;
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
+        this.retrySleeper = retrySleeper == null ? Thread::sleep : retrySleeper;
         this.httpClient = createOptimizedHttpClient();
         this.gson = new Gson();
+    }
+
+    @FunctionalInterface
+    interface RetrySleeper {
+        void sleep(long delayMillis) throws InterruptedException;
     }
 
     /**
@@ -131,7 +142,7 @@ public class OpenAIService implements LLMService {
                     long delay = retryPolicy.nextDelayMillis(attempt, retryAfterMs,
                             () -> ThreadLocalRandom.current().nextDouble(0.5D, 1.5D));
                     try {
-                        Thread.sleep(delay);
+                        retrySleeper.sleep(delay);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         throw ie;

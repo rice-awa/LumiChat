@@ -13,7 +13,9 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -22,19 +24,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OpenAIServiceRetryTest {
     private MockWebServer server;
     private ConcurrencySettings settings;
+    private Field configDirField;
+    private Object loader;
+    private Path originalConfigDir;
+    private boolean originalEnableRetry;
+    private int originalMaxRetryAttempts;
+    private long originalRetryDelayMs;
+    private double originalRetryBackoffMultiplier;
 
     @BeforeEach
     void setUp() throws Exception {
-        Field field = Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
+        configDirField = Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
                 .getDeclaredField("configDir");
-        field.setAccessible(true);
-        field.set(Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
-                .getField("INSTANCE").get(null), Files.createTempDirectory("lumichat-retry-test-config"));
+        configDirField.setAccessible(true);
+        loader = Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
+                .getField("INSTANCE").get(null);
+        originalConfigDir = (Path) configDirField.get(loader);
+        configDirField.set(loader, Files.createTempDirectory("lumichat-retry-test-config"));
+
+        settings = LLMChatConfig.getInstance().getConcurrencySettings();
+        originalEnableRetry = settings.isEnableRetry();
+        originalMaxRetryAttempts = settings.getMaxRetryAttempts();
+        originalRetryDelayMs = settings.getRetryDelayMs();
+        originalRetryBackoffMultiplier = settings.getRetryBackoffMultiplier();
 
         server = new MockWebServer();
         server.start();
 
-        settings = LLMChatConfig.getInstance().getConcurrencySettings();
         settings.setEnableRetry(true);
         settings.setMaxRetryAttempts(2);
         settings.setRetryDelayMs(0L);
@@ -45,6 +61,15 @@ class OpenAIServiceRetryTest {
     void tearDown() throws Exception {
         if (server != null) {
             server.shutdown();
+        }
+        if (settings != null) {
+            settings.setEnableRetry(originalEnableRetry);
+            settings.setMaxRetryAttempts(originalMaxRetryAttempts);
+            settings.setRetryDelayMs(originalRetryDelayMs);
+            settings.setRetryBackoffMultiplier(originalRetryBackoffMultiplier);
+        }
+        if (configDirField != null && loader != null) {
+            configDirField.set(loader, originalConfigDir);
         }
     }
 
@@ -70,6 +95,23 @@ class OpenAIServiceRetryTest {
         assertFalse(response.isSuccess());
         assertTrue(response.getError().contains("HTTP 400"));
         assertEquals(1, server.getRequestCount());
+    }
+
+    @Test
+    void usesRetryAfterHeaderInEndToEndDelaySelection() throws Exception {
+        server.enqueue(errorResponse(429, "{\"error\":\"rate limited\"}")
+                .setHeader("Retry-After", "2"));
+        server.enqueue(successResponse());
+        settings.setMaxRetryAttempts(1);
+        AtomicLong selectedDelay = new AtomicLong();
+
+        LLMResponse response = new OpenAIService("test", "test-key",
+                server.url("/v1").toString().replaceAll("/$", ""), selectedDelay::set)
+                .chat(messages(), config()).get();
+
+        assertTrue(response.isSuccess());
+        assertEquals(2, server.getRequestCount());
+        assertTrue(selectedDelay.get() >= 2_000L);
     }
 
     @Test
