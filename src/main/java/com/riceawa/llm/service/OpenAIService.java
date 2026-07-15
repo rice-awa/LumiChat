@@ -16,11 +16,15 @@ import okhttp3.*;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
@@ -120,12 +124,17 @@ public class OpenAIService implements LLMService {
                 lastException = e;
 
                 if (attempt < maxAttempts && shouldRetry(e)) {
-                    long delay = (long) (settings.getRetryDelayMs() * Math.pow(settings.getRetryBackoffMultiplier(), attempt - 1));
+                    RetryPolicy retryPolicy = new RetryPolicy(
+                            settings.getRetryDelayMs(), settings.getRetryBackoffMultiplier());
+                    long retryAfterMs = e instanceof HttpStatusException
+                            ? ((HttpStatusException) e).retryAfterMs() : -1L;
+                    long delay = retryPolicy.nextDelayMillis(attempt, retryAfterMs,
+                            () -> ThreadLocalRandom.current().nextDouble(0.5D, 1.5D));
                     try {
                         Thread.sleep(delay);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        throw new RuntimeException("Request interrupted", ie);
+                        throw ie;
                     }
                 } else {
                     break;
@@ -202,7 +211,9 @@ public class OpenAIService implements LLMService {
             }
 
             if (!response.isSuccessful()) {
-                String sanitizedErrorBody = LLMLogSanitizer.sanitizeJson(responseBody);
+                HttpStatusException statusException = new HttpStatusException(response.code(), responseBody,
+                        parseRetryAfterMillis(response.header("Retry-After")));
+                String sanitizedErrorBody = statusException.responseSummary();
                 LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
                         .httpStatusCode(response.code())
                         .success(false)
@@ -216,6 +227,10 @@ public class OpenAIService implements LLMService {
                             responseBody, true, logConfig.getMaxLogContentLength());
                 }
                 LLMLogUtils.logResponse(responseLogBuilder.build());
+
+                if (RetryPolicy.isRetryable(response.code())) {
+                    throw statusException;
+                }
 
                 LLMResponse errorResponse = new LLMResponse();
                 errorResponse.setError("HTTP " + response.code() + ": " + sanitizedErrorBody);
@@ -264,20 +279,29 @@ public class OpenAIService implements LLMService {
      * 判断是否应该重试
      */
     private boolean shouldRetry(Exception e) {
-        if (e instanceof IOException) {
-            return true; // 网络错误通常可以重试
+        if (e instanceof HttpStatusException) {
+            return RetryPolicy.isRetryable(((HttpStatusException) e).statusCode());
         }
+        return e instanceof IOException;
+    }
 
-        String message = e.getMessage();
-        if (message != null) {
-            // 检查是否是可重试的HTTP错误
-            return message.contains("HTTP 429") || // 速率限制
-                   message.contains("HTTP 502") || // 网关错误
-                   message.contains("HTTP 503") || // 服务不可用
-                   message.contains("HTTP 504");   // 网关超时
+    private long parseRetryAfterMillis(String retryAfter) {
+        if (retryAfter == null || retryAfter.trim().isEmpty()) {
+            return -1L;
         }
-
-        return false;
+        String value = retryAfter.trim();
+        try {
+            long seconds = Long.parseLong(value);
+            return seconds < 0L || seconds > Long.MAX_VALUE / 1_000L ? -1L : seconds * 1_000L;
+        } catch (NumberFormatException ignored) {
+            try {
+                long delay = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME)
+                        .toInstant().toEpochMilli() - System.currentTimeMillis();
+                return delay > 0L ? delay : -1L;
+            } catch (DateTimeParseException ignoredDate) {
+                return -1L;
+            }
+        }
     }
 
     @Override

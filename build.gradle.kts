@@ -58,6 +58,7 @@ dependencies {
     add("include", "com.typesafe:config:1.4.3")
 
     add("testImplementation", "org.junit.jupiter:junit-jupiter:5.10.2")
+    add("testImplementation", "com.squareup.okhttp3:mockwebserver:4.12.0")
     add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
 }
 
