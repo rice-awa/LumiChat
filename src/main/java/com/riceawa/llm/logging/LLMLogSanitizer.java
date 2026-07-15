@@ -27,6 +27,8 @@ public final class LLMLogSanitizer {
     private static final String TRUNCATED = "... [TRUNCATED]";
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)\\bBearer\\s+[^\\s,\\\"}]+" );
     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)\\b(?:sk|rk)-[a-z0-9_-]+\\b");
+    private static final Pattern AUTHORIZATION_PATTERN = Pattern.compile(
+            "(?i)(\\bauthorization\\s*[=:]\\s*)(?:([\\\"'])(?:\\\\.|(?!\\2).)*\\2|[^\\r\\n,;}]+)");
     private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
             "(?i)(\\b(?:x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|secret|password)\\s*[=:]\\s*)(?:([\\\"'])(?:\\\\.|(?!\\2).)*\\2|[^\\s,}]+)");
     private static final String[] SAFE_RESPONSE_HEADERS = {
@@ -95,6 +97,10 @@ public final class LLMLogSanitizer {
         }
         try {
             JsonElement element = JsonParser.parseString(json);
+            if (element.isJsonPrimitive()) {
+                JsonPrimitive primitive = element.getAsJsonPrimitive();
+                return primitive.isString() ? sanitizeText(primitive.getAsString()) : element.toString();
+            }
             sanitizeElement(element, null);
             return element.toString();
         } catch (Exception ignored) {
@@ -183,6 +189,7 @@ public final class LLMLogSanitizer {
             return null;
         }
         String sanitized = BEARER_PATTERN.matcher(value).replaceAll("Bearer " + MASKED);
+        sanitized = AUTHORIZATION_PATTERN.matcher(sanitized).replaceAll("$1" + MASKED);
         sanitized = API_KEY_PATTERN.matcher(sanitized).replaceAll(MASKED);
         return KEY_VALUE_PATTERN.matcher(sanitized).replaceAll("$1" + MASKED);
     }

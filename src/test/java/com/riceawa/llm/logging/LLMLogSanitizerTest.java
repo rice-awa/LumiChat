@@ -77,6 +77,26 @@ class LLMLogSanitizerTest {
     }
 
     @Test
+    void sanitizeJsonRedactsScalarCredentialText() {
+        String basicCredential = "Authorization: Basic dXNlcjpwYXNzd29yZA==";
+        String sanitized = LLMLogSanitizer.sanitizeJson("\"" + basicCredential + "\"");
+
+        assertFalse(sanitized.contains("dXNlcjpwYXNzd29yZA=="));
+        assertTrue(sanitized.contains("Authorization: ***MASKED***"));
+    }
+
+    @Test
+    void sanitizeTextRedactsPlainTextAuthorizationSchemes() {
+        String text = "Authorization: Basic dXNlcjpwYXNzd29yZA==; authorization='Digest opaque-secret'";
+        String sanitized = LLMLogSanitizer.sanitizeText(text);
+
+        assertFalse(sanitized.contains("dXNlcjpwYXNzd29yZA=="));
+        assertFalse(sanitized.contains("opaque-secret"));
+        assertTrue(sanitized.contains("Authorization: ***MASKED***"));
+        assertTrue(sanitized.contains("authorization=***MASKED***"));
+    }
+
+    @Test
     void sanitizeJsonRedactsNestedSecretsAndNeverReturnsUnparseableInput() {
         String json = "{\"api_key\":\"" + API_KEY
                 + "\",\"authorization\":\"Bearer " + API_KEY
