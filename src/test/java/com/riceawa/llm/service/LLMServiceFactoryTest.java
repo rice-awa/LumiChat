@@ -5,9 +5,11 @@ import com.riceawa.llm.core.LLMConfig;
 import com.riceawa.llm.core.LLMMessage;
 import com.riceawa.llm.core.LLMResponse;
 import com.riceawa.llm.core.LLMService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -17,6 +19,15 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LLMServiceFactoryTest {
+
+    @BeforeEach
+    void configureFabricLoaderConfigDirectory() throws Exception {
+        Field field = Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
+                .getDeclaredField("configDir");
+        field.setAccessible(true);
+        field.set(Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
+                .getField("INSTANCE").get(null), Files.createTempDirectory("lumichat-test-config"));
+    }
 
     @Test
     void createsServiceForMatchingOpenAICompatibleProtocol() {
@@ -67,31 +78,11 @@ class LLMServiceFactoryTest {
     }
 
     @Test
-    void openAIServiceUsesProviderName() throws Exception {
-        OpenAIService service = allocateOpenAIService();
-        setField(service, "providerName", "named-provider");
+    void openAIServiceUsesProviderName() {
+        Provider provider = provider("named-provider", "openai-compatible");
 
-        assertEquals("named-provider", service.getServiceName());
+        assertEquals("named-provider", new OpenAICompatibleAdapter().create(provider).getServiceName());
     }
-
-    private static String providerName(OpenAIService service) throws Exception {
-        Field field = OpenAIService.class.getDeclaredField("providerName");
-        field.setAccessible(true);
-        return (String) field.get(service);
-    }
-
-    private static OpenAIService allocateOpenAIService() throws Exception {
-        Field field = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-        field.setAccessible(true);
-        return (OpenAIService) ((sun.misc.Unsafe) field.get(null)).allocateInstance(OpenAIService.class);
-    }
-
-    private static void setField(Object target, String fieldName, Object value) throws Exception {
-        Field field = target.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(target, value);
-    }
-
     private static Provider provider(String name, String protocol) {
         Provider provider = new Provider(
                 name,

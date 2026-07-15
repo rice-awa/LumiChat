@@ -38,6 +38,25 @@ class ProviderHealthCheckerTest {
     }
 
     @Test
+    void checkAllProvidersUsesCurrentProtocolResultInsteadOfStaleCache() throws Exception {
+        AtomicInteger networkCalls = new AtomicInteger();
+        Provider provider = provider("batch-cached-provider", "openai-compatible");
+        ProviderHealthChecker checker = new ProviderHealthChecker(
+                new LLMServiceFactory(new RecordingAdapter(new RecordingService(networkCalls))));
+
+        assertEquals(ProviderHealthChecker.HealthStatus.ErrorType.API_ERROR,
+                checker.checkProviderHealth(provider).get().getErrorType());
+        assertEquals(1, networkCalls.get());
+
+        provider.setProtocol("unknown-protocol");
+        ProviderHealthChecker.HealthStatus status = checker.checkAllProviders(List.of(provider))
+                .get().get(provider.getName());
+
+        assertFalse(status.isHealthy());
+        assertEquals(ProviderHealthChecker.HealthStatus.ErrorType.CONFIG_ERROR, status.getErrorType());
+        assertEquals(1, networkCalls.get());
+    }
+    @Test
     void unknownProtocolFailsClosedWithoutNetworkRequest() throws Exception {
         AtomicInteger networkCalls = new AtomicInteger();
         Provider provider = provider("unknown-provider", "anthropic");
@@ -50,6 +69,7 @@ class ProviderHealthCheckerTest {
         assertEquals(ProviderHealthChecker.HealthStatus.ErrorType.CONFIG_ERROR, status.getErrorType());
         assertEquals(0, networkCalls.get());
     }
+
 
     private static Provider provider(String name, String protocol) {
         Provider provider = new Provider(name, "https://example.test/v1", "test-api-key",

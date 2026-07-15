@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -90,17 +91,18 @@ public class ProviderHealthChecker {
             return CompletableFuture.completedFuture(Map.of());
         }
         
-        CompletableFuture<?>[] futures = providers.stream()
+        List<CompletableFuture<HealthStatus>> futures = providers.stream()
             .map(this::checkProviderHealth)
-            .toArray(CompletableFuture[]::new);
-        
-        return CompletableFuture.allOf(futures)
+            .collect(Collectors.toList());
+
+        CompletableFuture<?>[] allFutures = futures.toArray(new CompletableFuture<?>[0]);
+        return CompletableFuture.allOf(allFutures)
             .thenApply(v -> {
                 Map<String, HealthStatus> results = new ConcurrentHashMap<>();
-                for (Provider provider : providers) {
-                    HealthStatus status = healthCache.get(provider.getName());
+                for (int i = 0; i < providers.size(); i++) {
+                    HealthStatus status = futures.get(i).join();
                     if (status != null) {
-                        results.put(provider.getName(), status);
+                        results.put(providers.get(i).getName(), status);
                     }
                 }
                 return results;
