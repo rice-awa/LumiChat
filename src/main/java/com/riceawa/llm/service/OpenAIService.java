@@ -159,8 +159,11 @@ public class OpenAIService implements LLMService {
                 .serviceName(getServiceName())
                 .playerName(playerName)
                 .playerUuid(playerUuid)
-                .messageSummaries(LLMLogSanitizer.summarizeMessages(
-                        messages, includeRequestContent, logConfig.getMaxLogContentLength()))
+                .messageSummaries(
+                        LLMLogSanitizer.summarizeMessages(
+                                messages, includeRequestContent, logConfig.getMaxLogContentLength()),
+                        includeRequestContent,
+                        logConfig.getMaxLogContentLength())
                 .config(config)
                 .requestUrl(requestUrl)
                 .requestHeaders(requestHeaders)

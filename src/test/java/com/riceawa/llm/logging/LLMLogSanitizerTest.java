@@ -214,6 +214,37 @@ class LLMLogSanitizerTest {
     }
 
     @Test
+    void configuredMessageSummaryContentIsRetainedOnlyByThreeArgumentOverload() {
+        String apiKey = "opaque-provider-credential-value";
+        String privatePrompt = "apiKey=" + apiKey + " safe request message ending that must be truncated";
+        int maxLength = 48;
+        List<Map<String, Object>> summaries = LLMLogSanitizer.summarizeMessages(List.of(
+                new LLMMessage(LLMMessage.MessageRole.USER, privatePrompt)
+        ), true, maxLength);
+
+        LLMRequestLogEntry defaultRequest = LLMLogUtils.createRequestLogBuilder("request-summary-default")
+                .serviceName("provider")
+                .messageSummaries(summaries)
+                .build();
+        LLMRequestLogEntry fullRequest = LLMLogUtils.createRequestLogBuilder("request-summary-full")
+                .serviceName("provider")
+                .messageSummaries(summaries, true, maxLength)
+                .build();
+
+        String defaultRequestJson = defaultRequest.toJsonString();
+        String fullRequestJson = fullRequest.toJsonString();
+        Object fullContent = fullRequest.getMessages().get(0).get("content");
+
+        assertFalse(defaultRequestJson.contains("content"));
+        assertFalse(defaultRequestJson.contains(privatePrompt));
+        assertTrue(fullContent instanceof String);
+        assertTrue(((String) fullContent).contains("apiKey=***MASKED***"));
+        assertFalse(fullRequestJson.contains(apiKey));
+        assertFalse(fullRequestJson.contains("ending that must be truncated"));
+        assertTrue(fullRequestJson.contains("[TRUNCATED]"));
+    }
+
+    @Test
     void defaultLogEntrySerializationAllowsOnlyKnownSafeMetadata() {
         String privatePrompt = "metadata must not serialize this private prompt";
         String sensitiveLookingKey = "apiKey-sk-test-secret-key";
