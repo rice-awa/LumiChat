@@ -18,10 +18,16 @@ import java.util.Set;
 public class LLMServiceManager {
     private static volatile LLMServiceManager instance;
     private final Map<String, LLMService> services;
+    private final LLMServiceFactory serviceFactory;
     private String defaultServiceName;
 
     private LLMServiceManager() {
+        this(LLMServiceFactory.getDefaultInstance());
+    }
+
+    LLMServiceManager(LLMServiceFactory serviceFactory) {
         this.services = new HashMap<>();
+        this.serviceFactory = serviceFactory;
         initializeServices();
     }
 
@@ -79,27 +85,13 @@ public class LLMServiceManager {
      * 从Provider配置创建服务
      */
     private void createServiceFromProvider(Provider provider) {
-        String name = provider.getName();
-        String apiKey = provider.getApiKey();
-        String baseUrl = provider.getApiBaseUrl();
-
-        // 根据provider名称或baseUrl判断服务类型
-        if (isOpenAICompatible(name, baseUrl)) {
-            OpenAIService service = new OpenAIService(apiKey, baseUrl);
-            services.put(name, service);
+        try {
+            services.put(provider.getName(), serviceFactory.create(provider));
+        } catch (IllegalArgumentException exception) {
+            LogManager.getInstance().error("Unable to create service for provider "
+                    + provider.getName() + ": " + exception.getMessage());
         }
-        // 可以在这里添加其他服务类型的支持
-        // 例如：Claude、Gemini等
     }
-
-    /**
-     * 判断是否为OpenAI兼容的服务
-     */
-    private boolean isOpenAICompatible(String name, String baseUrl) {
-        // 大多数现代LLM API都兼容OpenAI的接口格式
-        return true; // 暂时默认都使用OpenAI兼容的服务
-    }
-
 
 
     /**
@@ -237,6 +229,9 @@ public class LLMServiceManager {
         // 如果服务不存在，创建它
         if (!services.containsKey(providerName)) {
             createServiceFromProvider(provider);
+        }
+        if (!services.containsKey(providerName)) {
+            return false;
         }
 
         // 更新配置

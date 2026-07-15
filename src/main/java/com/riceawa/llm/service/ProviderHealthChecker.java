@@ -24,8 +24,15 @@ public class ProviderHealthChecker {
     private static volatile ProviderHealthChecker instance;
     private final Map<String, HealthStatus> healthCache = new ConcurrentHashMap<>();
     private final long CACHE_DURATION_MS = TimeUnit.MINUTES.toMillis(5); // 5分钟缓存
-    
-    private ProviderHealthChecker() {}
+    private final LLMServiceFactory serviceFactory;
+
+    private ProviderHealthChecker() {
+        this(LLMServiceFactory.getDefaultInstance());
+    }
+
+    ProviderHealthChecker(LLMServiceFactory serviceFactory) {
+        this.serviceFactory = serviceFactory;
+    }
     
     public static ProviderHealthChecker getInstance() {
         if (instance == null) {
@@ -120,20 +127,13 @@ public class ProviderHealthChecker {
     private HealthStatus performHealthCheck(Provider provider) {
         LocalDateTime checkTime = LocalDateTime.now();
         
-        // 基本配置检查
+        // Basic configuration and protocol validation must complete before any network request.
         if (!isProviderConfigValid(provider)) {
-            return new HealthStatus(false, getConfigErrorMessage(provider), 
+            return new HealthStatus(false, getConfigErrorMessage(provider),
                 HealthStatus.ErrorType.CONFIG_ERROR, checkTime);
         }
-        
         try {
-            // 创建服务实例进行测试
-            LLMService service = createServiceForProvider(provider);
-            if (service == null) {
-                return new HealthStatus(false, "无法创建服务实例", 
-                    HealthStatus.ErrorType.CONFIG_ERROR, checkTime);
-            }
-            
+            LLMService service = serviceFactory.create(provider);
             // 发送测试请求
             LLMMessage testMessage = new LLMMessage(LLMMessage.MessageRole.USER, "test");
             LLMConfig testConfig = new LLMConfig();
@@ -158,6 +158,9 @@ public class ProviderHealthChecker {
                 return new HealthStatus(false, "API错误: " + error, errorType, checkTime);
             }
             
+        } catch (IllegalArgumentException e) {
+            return new HealthStatus(false, "配置错误: " + e.getMessage(),
+                    HealthStatus.ErrorType.CONFIG_ERROR, checkTime);
         } catch (java.util.concurrent.TimeoutException e) {
             return new HealthStatus(false, "连接超时", HealthStatus.ErrorType.NETWORK_ERROR, checkTime);
         } catch (Exception e) {
@@ -199,15 +202,7 @@ public class ProviderHealthChecker {
         if (provider.getModels() == null || provider.getModels().isEmpty()) return "模型列表为空";
         return "配置无效";
     }
-    
-    /**
-     * 为provider创建服务实例
-     */
-    private LLMService createServiceForProvider(Provider provider) {
-        // 目前只支持OpenAI兼容的服务
-        return new OpenAIService(provider.getApiKey(), provider.getApiBaseUrl());
-    }
-    
+
     /**
      * 根据错误信息分类错误类型
      */

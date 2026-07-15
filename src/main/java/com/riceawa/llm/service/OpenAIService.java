@@ -30,14 +30,20 @@ import java.util.UUID;
 public class OpenAIService implements LLMService {
     private final OkHttpClient httpClient;
     private final Gson gson;
+    private final String providerName;
     private final String apiKey;
     private final String baseUrl;
 
     public OpenAIService(String apiKey) {
-        this(apiKey, "https://api.openai.com/v1");
+        this("OpenAI", apiKey, "https://api.openai.com/v1");
     }
 
     public OpenAIService(String apiKey, String baseUrl) {
+        this("OpenAI", apiKey, baseUrl);
+    }
+
+    public OpenAIService(String providerName, String apiKey, String baseUrl) {
+        this.providerName = providerName == null || providerName.trim().isEmpty() ? "OpenAI" : providerName;
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
         this.httpClient = createOptimizedHttpClient();
@@ -338,7 +344,7 @@ public class OpenAIService implements LLMService {
 
     @Override
     public String getServiceName() {
-        return "OpenAI";
+        return providerName;
     }
 
     /**

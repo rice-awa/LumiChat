@@ -56,6 +56,9 @@ public class ConfigDefaults {
 
     // API密钥占位符（用于检测无效密钥）
     public static final String API_KEY_PLACEHOLDER = "your-api-key-here";
+    public static final String DEFAULT_PROVIDER_PROTOCOL = "openai-compatible";
+    public static final String ANTHROPIC_PROVIDER_PROTOCOL = "anthropic";
+    public static final String GOOGLE_PROVIDER_PROTOCOL = "google";
 
     // 空字符串默认值（用于Provider和Model）
     public static final String EMPTY_STRING = "";
@@ -99,6 +102,7 @@ public class ConfigDefaults {
         // Anthropic Provider
         providers.add(new Provider(
             "anthropic",
+            ANTHROPIC_PROVIDER_PROTOCOL,
             "https://api.anthropic.com/v1",
             API_KEY_PLACEHOLDER,
             List.of("claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku")
@@ -107,6 +111,7 @@ public class ConfigDefaults {
         // Google AI Provider
         providers.add(new Provider(
             "google",
+            GOOGLE_PROVIDER_PROTOCOL,
             "https://generativelanguage.googleapis.com/v1beta",
             API_KEY_PLACEHOLDER,
             List.of("gemini-2.5-pro-preview", "gemini-1.5-pro", "gemini-1.5-flash")
