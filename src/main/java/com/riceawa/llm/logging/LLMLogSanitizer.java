@@ -34,6 +34,14 @@ public final class LLMLogSanitizer {
     private static final String[] SAFE_RESPONSE_HEADERS = {
             "content-type", "content-length", "x-request-id", "request-id", "retry-after"
     };
+    /*
+     * LLMLogUtils creates only these request/response metadata fields. Do not accept arbitrary
+     * caller-supplied names: metadata keys are serialized and can themselves contain secrets.
+     */
+    private static final String[] SAFE_METADATA_KEYS = {
+            "player_name", "player_uuid", "service_name", "message_count", "timestamp",
+            "response_time_ms", "success", "model", "total_tokens"
+    };
 
     private LLMLogSanitizer() {
     }
@@ -217,7 +225,8 @@ public final class LLMLogSanitizer {
     }
 
     /**
-     * Retains metadata keys and fixed scalar values while replacing arbitrary text or objects.
+     * Retains only documented request/response metadata fields with safe scalar values.
+     * Arbitrary keys are omitted because keys are serialized verbatim and may contain secrets.
      */
     public static Map<String, Object> summarizeMetadata(Map<String, Object> metadata) {
         Map<String, Object> summaries = new LinkedHashMap<>();
@@ -225,11 +234,9 @@ public final class LLMLogSanitizer {
             return summaries;
         }
         for (Map.Entry<String, Object> entry : metadata.entrySet()) {
-            String key = entry.getKey();
-            if (key == null || !key.matches("[A-Za-z][A-Za-z0-9_.-]{0,63}")) {
-                continue;
+            if (isSafeMetadataKey(entry.getKey())) {
+                summaries.put(entry.getKey(), summarizeMetadataValue(entry.getValue()));
             }
-            summaries.put(key, summarizeMetadataValue(entry.getValue()));
         }
         return summaries;
     }
@@ -257,6 +264,18 @@ public final class LLMLogSanitizer {
             return Math.max(0, ((Number) length).intValue());
         }
         return 0;
+    }
+
+    private static boolean isSafeMetadataKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        for (String safeKey : SAFE_METADATA_KEYS) {
+            if (safeKey.equals(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Object summarizeMetadataValue(Object value) {

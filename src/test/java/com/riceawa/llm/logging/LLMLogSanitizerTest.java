@@ -214,27 +214,37 @@ class LLMLogSanitizerTest {
     }
 
     @Test
-    void defaultLogEntrySerializationSummarizesArbitraryMetadata() {
+    void defaultLogEntrySerializationAllowsOnlyKnownSafeMetadata() {
         String privatePrompt = "metadata must not serialize this private prompt";
+        String sensitiveLookingKey = "apiKey-sk-test-secret-key";
+        String longPrivateKey = "private-message-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 
         LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("request-metadata")
                 .serviceName("provider")
-                .metadata("prompt", privatePrompt)
-                .metadata("attempt", 2)
+                .metadata(sensitiveLookingKey, 1)
+                .metadata(longPrivateKey, 2)
+                .metadata("message_count", 2)
+                .metadata("total_tokens", 42)
                 .build();
         LLMResponseLogEntry response = LLMLogUtils.createResponseLogBuilder("response-metadata", "request-metadata")
-                .metadata("response_content", privatePrompt)
+                .metadata(sensitiveLookingKey, privatePrompt)
+                .metadata(longPrivateKey, privatePrompt)
                 .metadata("success", true)
+                .metadata("response_time_ms", 12L)
                 .build();
 
         String requestJson = request.toJsonString();
         String responseJson = response.toJsonString();
 
+        assertFalse(requestJson.contains(sensitiveLookingKey));
+        assertFalse(responseJson.contains(sensitiveLookingKey));
+        assertFalse(requestJson.contains(longPrivateKey));
+        assertFalse(responseJson.contains(longPrivateKey));
         assertFalse(requestJson.contains(privatePrompt));
         assertFalse(responseJson.contains(privatePrompt));
-        assertTrue(requestJson.contains("[REDACTED sha256\\u003d"));
-        assertTrue(responseJson.contains("[REDACTED sha256\\u003d"));
-        assertTrue(requestJson.contains("\"attempt\": 2"));
+        assertTrue(requestJson.contains("\"message_count\": 2"));
+        assertTrue(requestJson.contains("\"total_tokens\": 42"));
         assertTrue(responseJson.contains("\"success\": true"));
+        assertTrue(responseJson.contains("\"response_time_ms\": 12"));
     }
 }
