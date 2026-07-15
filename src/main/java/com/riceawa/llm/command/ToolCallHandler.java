@@ -56,7 +56,7 @@ public final class ToolCallHandler {
             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
                         if (toolCallId != null) {
-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext);
+                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config);
                             callLLMWithFunctionResult(player, chatContext, config, 1);
                         } else {
                             handleLegacyToolCall(result, functionName, player, chatContext, config);
@@ -217,7 +217,7 @@ public final class ToolCallHandler {
             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
                         if (toolCallId != null) {
-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext);
+                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config);
                             callLLMWithFunctionResult(
                                     player, chatContext, config, recursionDepth + 1);
                         } else {
@@ -309,7 +309,7 @@ public final class ToolCallHandler {
                                       LLMChatConfig config) {
         if (result.isSuccess()) {
             String resultMessage = result.getResult();
-            String llmSafeResult = toolResultContent(functionName, result);
+            String llmSafeResult = toolResultContent(functionName, result, config);
             MessageCompat.displayClientMessage(player,
                     Component.literal("[函数执行] " + resultMessage)
                             .withStyle(ChatFormatting.GREEN), false);
@@ -342,14 +342,14 @@ public final class ToolCallHandler {
 
     private void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
                                     String toolCallId, LLMFunction.FunctionResult result,
-                                    ChatContext chatContext) {
+                                    ChatContext chatContext, LLMChatConfig config) {
         LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
         metadata.setToolCall(safeFollowUpToolCall(toolCall));
         toolCallMessage.setMetadata(metadata);
         chatContext.addMessage(toolCallMessage);
 
-        String resultContent = toolResultContent(functionName, result);
+        String resultContent = toolResultContent(functionName, result, config);
         LLMMessage toolResponseMessage = new LLMMessage(
                 LLMMessage.MessageRole.TOOL, resultContent);
         toolResponseMessage.setName(functionName);
@@ -364,17 +364,19 @@ public final class ToolCallHandler {
         return new LLMMessage.ToolCall(toolCall.getName(), "{}", toolCall.getToolCallId());
     }
 
-    static String toolResultContent(String functionName, LLMFunction.FunctionResult result) {
+    static String toolResultContent(String functionName, LLMFunction.FunctionResult result,
+                                    LLMChatConfig config) {
         if (!result.isSuccess()) {
             return "错误: " + result.getError();
         }
         if ("execute_command".equals(functionName)) {
-            return commandExecutionSummary(result);
+            return commandExecutionSummary(result, config);
         }
         return result.getResult();
     }
 
-    private static String commandExecutionSummary(LLMFunction.FunctionResult result) {
+    private static String commandExecutionSummary(LLMFunction.FunctionResult result,
+                                                  LLMChatConfig config) {
         if (result.getData() == null) {
             return "命令执行成功";
         }
@@ -382,7 +384,12 @@ public final class ToolCallHandler {
                 ? result.getData().get("command_root").getAsString() : "";
         int resultCode = result.getData().has("result_code")
                 ? result.getData().get("result_code").getAsInt() : 0;
-        return "命令执行成功: " + root + " (返回码: " + resultCode + ")";
+        String summary = "命令执行成功: " + root + " (返回码: " + resultCode + ")";
+        if (config != null && config.isExecuteCommandReturnFullOutput()
+                && result.getData().has("output")) {
+            summary += "\n" + result.getData().get("output").getAsString();
+        }
+        return summary;
     }
 
     private void observeFinalFailure(String playerId, String operation, Throwable finalFailure) {

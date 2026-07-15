@@ -1,31 +1,47 @@
 package com.riceawa.llm.command;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.config.ConfigDefaults;
+import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.context.ChatContext;
 import com.riceawa.llm.context.ContextCompressor;
 import com.riceawa.llm.core.LLMMessage;
 import com.riceawa.llm.function.LLMFunction;
 import org.junit.jupiter.api.Test;
+import sun.misc.Unsafe;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ToolCallHandlerTest {
 
     @Test
-    void sanitizesExecuteCommandOutputBeforeItCanBecomeAToolMessage() {
-        JsonObject data = new JsonObject();
-        data.addProperty("command_root", "list");
-        data.addProperty("result_code", 1);
+    void returnsCompleteExecuteCommandOutputWhenConfigured() throws Exception {
+        JsonObject data = commandResultData();
+        data.addProperty("output", "secret command output");
         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
                 "命令执行成功: list (返回码: 1)\nsecret command output", data);
 
-        String toolContent = toolMessageContent("execute_command", result);
+        assertTrue(ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT);
+        assertEquals("命令执行成功: list (返回码: 1)\nsecret command output",
+                toolMessageContent("execute_command", result, commandOutputConfig(true)));
+    }
+
+    @Test
+    void summarizesExecuteCommandOutputWhenConfigured() throws Exception {
+        JsonObject data = commandResultData();
+        data.addProperty("output", "secret command output");
+        LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
+                "命令执行成功: list (返回码: 1)\nsecret command output", data);
+
+        String toolContent = toolMessageContent("execute_command", result, commandOutputConfig(false));
 
         assertEquals("命令执行成功: list (返回码: 1)", toolContent);
         assertFalse(toolContent.contains("secret command output"));
@@ -59,32 +75,27 @@ class ToolCallHandlerTest {
     }
 
     @Test
-    void preservesOtherFunctionResultsForToolMessages() {
+    void preservesOtherFunctionResultsWhenCommandOutputIsDisabled() throws Exception {
         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success("safe result");
 
-        assertEquals("safe result", toolMessageContent("get_time", result));
+        assertEquals("safe result", toolMessageContent("get_time", result, commandOutputConfig(false)));
     }
 
-    @Test
-    void usesTheSafeExecuteCommandSummaryForLegacyContext() {
+    private static JsonObject commandResultData() {
         JsonObject data = new JsonObject();
         data.addProperty("command_root", "list");
         data.addProperty("result_code", 1);
-        LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
-                "命令执行成功: list (返回码: 1)\nsecret command output", data);
-
-        assertEquals("命令执行成功: list (返回码: 1)",
-                toolMessageContent("execute_command", result));
+        return data;
     }
 
     private static void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
                                            String toolCallId, ChatContext context) throws Exception {
         Method method = ToolCallHandler.class.getDeclaredMethod("appendToolExchange",
                 LLMMessage.ToolCall.class, String.class, String.class,
-                LLMFunction.FunctionResult.class, ChatContext.class);
+                LLMFunction.FunctionResult.class, ChatContext.class, LLMChatConfig.class);
         method.setAccessible(true);
         method.invoke(ToolCallHandler.getInstance(), toolCall, functionName, toolCallId,
-                LLMFunction.FunctionResult.success("safe result"), context);
+                LLMFunction.FunctionResult.success("safe result"), context, commandOutputConfig(false));
     }
 
     private static ChatContext newContext() throws Exception {
@@ -96,7 +107,19 @@ class ToolCallHandlerTest {
                 (ContextCompressor) messages -> "summary");
     }
 
-    private static String toolMessageContent(String functionName, LLMFunction.FunctionResult result) {
-        return ToolCallHandler.toolResultContent(functionName, result);
+    private static LLMChatConfig commandOutputConfig(boolean returnFullOutput) throws Exception {
+        Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
+        unsafeField.setAccessible(true);
+        Unsafe unsafe = (Unsafe) unsafeField.get(null);
+        LLMChatConfig config = (LLMChatConfig) unsafe.allocateInstance(LLMChatConfig.class);
+        Field outputFlag = LLMChatConfig.class.getDeclaredField("executeCommandReturnFullOutput");
+        outputFlag.setAccessible(true);
+        outputFlag.setBoolean(config, returnFullOutput);
+        return config;
+    }
+
+    private static String toolMessageContent(String functionName, LLMFunction.FunctionResult result,
+                                             LLMChatConfig config) {
+        return ToolCallHandler.toolResultContent(functionName, result, config);
     }
 }

@@ -235,3 +235,57 @@ Result: both representative builds were `BUILD SUCCESSFUL` (30 actionable tasks;
 ### Remaining limitation
 
 No in-game smoke test was available. A live server check should enable and allowlist `execute_command`/`list`, trigger a recursive command call containing sensitive arguments, then verify that the following INFO `raw_request_json` emits `{}` for the assistant tool-call arguments rather than the command text.
+
+## 2026-07-15 Task 7 correction: return complete command output to the LLM
+
+### Files changed
+
+- `src/main/java/com/riceawa/llm/config/ConfigDefaults.java`
+- `src/main/java/com/riceawa/llm/config/LLMChatConfig.java`
+- `src/main/java/com/riceawa/llm/command/ToolCallHandler.java`
+- `src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java`
+
+### Behavior
+
+- Added serialized `executeCommandReturnFullOutput`, which defaults to `true`; absent legacy configuration receives that default. Its getter and setter save the administrator-selected value.
+- The two recursive tool-exchange paths and legacy tool-call path now pass the active `LLMChatConfig` into `toolResultContent`.
+- For a successful `execute_command`, `ToolCallHandler.commandExecutionSummary` appends `FunctionResult.data.output` only while `executeCommandReturnFullOutput` is enabled. With the setting disabled, the existing `命令执行成功: <root> (返回码: <code>)` summary is retained. Other function results are unchanged.
+- The correction does not alter `enableExecuteCommand`, which remains disabled by default; it does not change the allowlist, initiating-player `CommandSourceStack`, or command audit implementation. `ExecuteCommandFunction.audit` continues to emit only actor UUID, command root, command SHA-256, result code, duration, and success. Raw command text and command output are not written to audit logs. The Task 7 `{}` sanitization of recursive `execute_command` arguments remains intact, so raw command arguments do not enter follow-up request/INFO logs.
+
+### Tests and builds
+
+The available Java 21/init-script setup was used without changing repository build configuration. Eclipse Temurin 17/21 toolchains were installed under `/tmp` only because the host initially lacked the Java 17 compiler required by the 1.19 node.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
+```
+
+Result: `BUILD SUCCESSFUL`; 5 tests, 0 failures/errors/skips.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.21.11:test --tests com.riceawa.llm.function.CommandExecutionPolicyTest
+```
+
+Result: `BUILD SUCCESSFUL`; 9 tests, 0 failures/errors/skips.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.19:build :1.21.11:build
+```
+
+Result: `BUILD SUCCESSFUL`; 30 actionable tasks (8 executed, 22 up-to-date). `git diff --check` passed during self-review.
+
+### Concerns
+
+No in-game smoke test was available. A live server check should explicitly enable `execute_command`, allowlist a safe root such as `list`, confirm the default tool result includes command output, then disable `executeCommandReturnFullOutput` and confirm the tool result falls back to its summary while the six-field audit event continues to exclude raw command/output.

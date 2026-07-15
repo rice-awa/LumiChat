@@ -20,6 +20,7 @@ public class ConfigDefaults {
     public static final boolean DEFAULT_ENABLE_TOOL_CALL = true;
     public static final boolean DEFAULT_ENABLE_BROADCAST = false;
     public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = false;
+    public static final boolean DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT = true;
     public static final int DEFAULT_EXECUTE_COMMAND_MAX_LENGTH = 256;
     public static final int DEFAULT_HISTORY_RETENTION_DAYS = 30;
     
@@ -161,6 +162,7 @@ public class ConfigDefaults {
             case "enableToolCall": return "启用工具调用";
             case "enableBroadcast": return "启用广播";
             case "enableExecuteCommand": return "启用命令执行";
+            case "executeCommandReturnFullOutput": return "命令执行返回完整输出";
             case "executeCommandMaxLength": return "命令执行最大长度";
             case "compressionModel": return "压缩模型";
             case "enableCompressionNotification": return "启用压缩通知";
@@ -226,6 +228,7 @@ public class ConfigDefaults {
             case "toolCallTimeoutMs": return DEFAULT_TOOL_CALL_TIMEOUT_MS;
             case "enableBroadcast": return DEFAULT_ENABLE_BROADCAST;
             case "enableExecuteCommand": return DEFAULT_ENABLE_EXECUTE_COMMAND;
+            case "executeCommandReturnFullOutput": return DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
             case "executeCommandMaxLength": return DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
             case "historyRetentionDays": return DEFAULT_HISTORY_RETENTION_DAYS;
             case "compressionModel": return DEFAULT_COMPRESSION_MODEL;

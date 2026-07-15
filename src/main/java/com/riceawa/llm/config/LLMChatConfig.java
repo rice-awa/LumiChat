@@ -41,6 +41,7 @@ public class LLMChatConfig {
     private boolean enableBroadcast = ConfigDefaults.DEFAULT_ENABLE_BROADCAST;
     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
     private boolean enableExecuteCommand = ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
+    private boolean executeCommandReturnFullOutput = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
     private Set<String> executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
     private int executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
     private int historyRetentionDays = ConfigDefaults.DEFAULT_HISTORY_RETENTION_DAYS;
@@ -291,6 +292,9 @@ public class LLMChatConfig {
         this.broadcastPlayers = data.broadcastPlayers != null ? new HashSet<>(data.broadcastPlayers) : ConfigDefaults.createDefaultBroadcastPlayers();
         this.enableExecuteCommand = data.enableExecuteCommand != null
                 ? data.enableExecuteCommand : ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
+        this.executeCommandReturnFullOutput = data.executeCommandReturnFullOutput != null
+                ? data.executeCommandReturnFullOutput
+                : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
         this.executeCommandAllowlist = data.executeCommandAllowlist != null
                 ? new HashSet<>(data.executeCommandAllowlist)
                 : ConfigDefaults.createDefaultExecuteCommandAllowlist();
@@ -422,6 +426,7 @@ public class LLMChatConfig {
         data.enableBroadcast = this.enableBroadcast;
         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
         data.enableExecuteCommand = this.enableExecuteCommand;
+        data.executeCommandReturnFullOutput = this.executeCommandReturnFullOutput;
         data.executeCommandAllowlist = new HashSet<>(this.executeCommandAllowlist);
         data.executeCommandMaxLength = this.executeCommandMaxLength;
         data.historyRetentionDays = this.historyRetentionDays;
@@ -551,6 +556,15 @@ public class LLMChatConfig {
 
     public void setEnableExecuteCommand(boolean enableExecuteCommand) {
         this.enableExecuteCommand = enableExecuteCommand;
+        saveConfig();
+    }
+
+    public boolean isExecuteCommandReturnFullOutput() {
+        return executeCommandReturnFullOutput;
+    }
+
+    public void setExecuteCommandReturnFullOutput(boolean executeCommandReturnFullOutput) {
+        this.executeCommandReturnFullOutput = executeCommandReturnFullOutput;
         saveConfig();
     }
 
@@ -1125,6 +1139,7 @@ public class LLMChatConfig {
         Boolean enableBroadcast;
         Set<String> broadcastPlayers;
         Boolean enableExecuteCommand;
+        Boolean executeCommandReturnFullOutput;
         Set<String> executeCommandAllowlist;
         Integer executeCommandMaxLength;
         Integer historyRetentionDays;
