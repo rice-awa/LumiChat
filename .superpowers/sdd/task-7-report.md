@@ -289,3 +289,62 @@ Result: `BUILD SUCCESSFUL`; 30 actionable tasks (8 executed, 22 up-to-date). `gi
 ### Concerns
 
 No in-game smoke test was available. A live server check should explicitly enable `execute_command`, allowlist a safe root such as `list`, confirm the default tool result includes command output, then disable `executeCommandReturnFullOutput` and confirm the tool result falls back to its summary while the six-field audit event continues to exclude raw command/output.
+
+## 2026-07-15 Important review fix: full LLM logging must not retain execute_command data
+
+### Review finding and scope rationale
+
+The correction's full-output behavior was correct at the immediate `ToolCallHandler` tool-message boundary, but full request/response logging created a second data path. `OpenAIService` serializes the recursive assistant tool-call arguments before `safeFollowUpToolCall` can affect a later context copy, and it also serializes the TOOL message containing the captured output. The existing Task 9 sanitizer removed credentials but intentionally retained ordinary full content, so raw execute_command command arguments and output could still enter INFO `raw_request_json`, `messages[].content`, or response content when both full-body switches were enabled.
+
+The smallest secure change crosses the existing Task 9 logging boundary only: `LLMLogSanitizer` now provides `sanitizeLlmLogContent`, and both request/response DTOs use it for their explicitly enabled raw-body fields. The normal `sanitizeJson`/`sanitizeContent` behavior remains unchanged for non-command data. This is intentionally a Task 9 boundary hardening, not a change to execution policy or the user-facing tool result.
+
+### Files changed for the review fix
+
+- `src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java`
+- `src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java`
+- `src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java`
+- `src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java`
+
+### Security behavior
+
+- In log-only JSON content, assistant `tool_calls[].function` entries named `execute_command` have `arguments` replaced with `[REDACTED execute_command arguments]`, regardless of the full request-body setting.
+- TOOL messages named `execute_command` have `content` replaced with `[REDACTED execute_command output]`. Legacy assistant context content beginning with `调用了函数 execute_command，结果：` is also replaced at the log boundary.
+- The same structural redaction applies to response raw JSON when a provider echoes tool calls or output-like TOOL messages. Other tool/function content continues through the existing credential sanitizer and configured truncation path.
+- `ToolCallHandler` still returns the complete captured output in the in-memory LLM tool message when `executeCommandReturnFullOutput=true`; this fix changes only serialized INFO log data. `enableExecuteCommand=false`, allowlist checks, player-created `CommandSourceStack`, safe follow-up `{}` arguments, and the six-field audit schema are unchanged.
+
+### Regression tests and results
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.21.11:test --tests com.riceawa.llm.logging.LLMLogSanitizerTest
+```
+
+Result: `BUILD SUCCESSFUL`; 15 sanitizer tests, 0 failures/errors/skips. The added tests enable the DTO full-content overloads and assert raw command/output are absent from serialized request and response log JSON while redaction markers remain.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
+```
+
+Result: `BUILD SUCCESSFUL`; existing Task 7 handler suite passed 5/5, including full output enabled, summary-only mode, and ordinary function behavior.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  :1.21.11:test --tests com.riceawa.llm.function.CommandExecutionPolicyTest \
+  :1.19:build :1.21.11:build
+```
+
+Result: `BUILD SUCCESSFUL`; CommandExecutionPolicyTest passed 9/9 and both required representative builds completed successfully (30 actionable tasks, 16 executed, 14 up-to-date). `git diff --check` passed.
+
+### Concerns
+
+No live OpenAI-compatible provider/server smoke test was available, so the logging-path regression is validated at the exact DTO/sanitizer boundary used by `OpenAIService`, with both full-body overloads enabled. A live check should enable full request/response logging, issue an allowlisted `execute_command` call with distinctive command/output markers, verify those markers are present in the in-memory tool result but absent from INFO logs, and inspect the unchanged six-field audit event.

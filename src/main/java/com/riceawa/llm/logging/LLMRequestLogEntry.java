@@ -69,7 +69,7 @@ public class LLMRequestLogEntry {
                         builder.messages, builder.includeMessageContent, builder.messageContentMaxLength);
         this.config = builder.config;
         this.rawRequestJson = builder.includeRawRequestContent
-                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawRequestJson), builder.rawRequestContentMaxLength)
+                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawRequestJson), builder.rawRequestContentMaxLength)
                 : LLMLogSanitizer.summarizeContent(builder.rawRequestJson);
         this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(builder.requestUrl);
         this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));

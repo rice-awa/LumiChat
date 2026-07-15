@@ -20,6 +20,48 @@ class LLMLogSanitizerTest {
     private static final String TOOL_ARGUMENTS = "tool arguments containing private data";
 
     @Test
+    void fullLlmLogsRedactExecuteCommandArgumentsAndOutputButKeepOtherContent() {
+        String command = "op SensitivePlayer --secret=never-log-this";
+        String output = "Sensitive command output must never enter logs";
+        String requestBody = "{\"messages\":[{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"execute_command\",\"arguments\":\"{\\\"command\\\":\\\""
+                + command + "\\\"}\"}}]},{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
+                + output + "\"}]}";
+
+        String sanitized = LLMLogSanitizer.sanitizeLlmLogContent(requestBody);
+
+        assertFalse(sanitized.contains(command));
+        assertFalse(sanitized.contains(output));
+        assertTrue(sanitized.contains("[REDACTED execute_command arguments]"));
+        assertTrue(sanitized.contains("[REDACTED execute_command output]"));
+    }
+
+    @Test
+    void fullLogEntryBoundaryRedactsExecuteCommandData() {
+        String command = "list --secret=never-log-this";
+        String output = "secret command output";
+        String rawRequest = "{\"messages\":[{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"execute_command\",\"arguments\":\""
+                + command + "\"}}]},{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
+                + output + "\"}]}";
+        String requestJson = LLMLogUtils.createRequestLogBuilder("execute-request")
+                .serviceName("provider")
+                .rawRequestJson(rawRequest, true, 4096)
+                .build()
+                .toJsonString();
+        String responseJson = LLMLogUtils.createResponseLogBuilder("execute-response", "execute-request")
+                .rawResponseJson("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"execute_command\",\"arguments\":\""
+                        + command + "\"}}]}}],\"messages\":[{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
+                        + output + "\"}]}", true, 4096)
+                .build()
+                .toJsonString();
+
+        assertFalse(requestJson.contains(command));
+        assertFalse(requestJson.contains(output));
+        assertFalse(responseJson.contains(command));
+        assertFalse(responseJson.contains(output));
+    }
+
+
+    @Test
     void defaultMessageSummaryContainsOnlyMetadata() {
         LLMMessage toolMessage = new LLMMessage(
                 LLMMessage.MessageRole.TOOL,

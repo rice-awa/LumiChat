@@ -73,7 +73,7 @@ public class LLMResponseLogEntry {
         this.errorMessage = builder.errorMessage;
         this.llmResponse = builder.llmResponse;
         this.rawResponseJson = builder.includeRawResponseContent
-                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawResponseJson), builder.rawResponseContentMaxLength)
+                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawResponseJson), builder.rawResponseContentMaxLength)
                 : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
         this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
         this.content = builder.content;

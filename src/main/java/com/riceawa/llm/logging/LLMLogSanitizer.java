@@ -25,6 +25,12 @@ import java.util.regex.Pattern;
 public final class LLMLogSanitizer {
     private static final String MASKED = "***MASKED***";
     private static final String TRUNCATED = "... [TRUNCATED]";
+    private static final String EXECUTE_COMMAND_ARGUMENTS_REDACTED =
+            "[REDACTED execute_command arguments]";
+    private static final String EXECUTE_COMMAND_OUTPUT_REDACTED =
+            "[REDACTED execute_command output]";
+    private static final String EXECUTE_COMMAND_LEGACY_RESULT_MARKER =
+            "调用了函数 execute_command，结果：";
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)\\bBearer\\s+[^\\s,\\\"}]+" );
     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)\\b(?:sk|rk)-[a-z0-9_-]+\\b");
     private static final Pattern AUTHORIZATION_PATTERN = Pattern.compile(
@@ -65,7 +71,7 @@ public final class LLMLogSanitizer {
             summary.put("length", content.length());
             summary.put("sha256", sha256(content));
             if (includeContent) {
-                summary.put("content", truncateContent(sanitizeContent(content), maxLength));
+                summary.put("content", truncateContent(messageLogContent(message), maxLength));
             }
             summaries.add(summary);
         }
@@ -89,7 +95,7 @@ public final class LLMLogSanitizer {
             summary.put("length", content != null ? content.length() : safeLength(message == null ? null : message.get("length")));
             summary.put("sha256", content != null ? sha256(content) : safeHash(message == null ? null : message.get("sha256")));
             if (includeContent && content != null) {
-                summary.put("content", truncateContent(sanitizeContent(content), maxLength));
+                summary.put("content", truncateContent(sanitizeLlmLogContent(content), maxLength));
             }
             summaries.add(summary);
         }
@@ -215,6 +221,29 @@ public final class LLMLogSanitizer {
     }
 
     /**
+     * Removes execute_command arguments and captured output before content can enter INFO logs.
+     * The immediate tool response remains untouched; this boundary is only for log serialization.
+     */
+    public static String sanitizeLlmLogContent(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            try {
+                JsonElement element = JsonParser.parseString(value);
+                redactExecuteCommandFields(element);
+                sanitizeElement(element, null);
+                return element.toString();
+            } catch (Exception ignored) {
+                return "[UNPARSEABLE_REDACTED sha256=" + sha256(value)
+                        + " length=" + value.length() + "]";
+            }
+        }
+        return sanitizeText(value);
+    }
+
+    /**
      * Replaces arbitrary content with non-reversible diagnostics for default log fields.
      */
     public static String summarizeContent(String value) {
@@ -305,6 +334,24 @@ public final class LLMLogSanitizer {
         return "";
     }
 
+    private static String messageLogContent(LLMMessage message) {
+        if (message != null && message.getMetadata() != null
+                && message.getMetadata().getToolCall() != null
+                && "execute_command".equals(message.getMetadata().getToolCall().getName())) {
+            return EXECUTE_COMMAND_ARGUMENTS_REDACTED;
+        }
+        if (message != null && message.getRole() == LLMMessage.MessageRole.ASSISTANT
+                && message.getContent() != null
+                && message.getContent().contains(EXECUTE_COMMAND_LEGACY_RESULT_MARKER)) {
+            return EXECUTE_COMMAND_OUTPUT_REDACTED;
+        }
+        if (message != null && message.getRole() == LLMMessage.MessageRole.TOOL
+                && "execute_command".equals(message.getName())) {
+            return EXECUTE_COMMAND_OUTPUT_REDACTED;
+        }
+        return sanitizeLlmLogContent(messageContent(message));
+    }
+
     private static void sanitizeElement(JsonElement element, String fieldName) {
         if (element == null || element.isJsonNull()) {
             return;
@@ -338,6 +385,59 @@ public final class LLMLogSanitizer {
                 sanitizeElement(value, fieldName);
             }
         }
+    }
+
+    private static void redactExecuteCommandFields(JsonElement element) {
+        if (element == null || element.isJsonNull()) {
+            return;
+        }
+        if (element.isJsonArray()) {
+            for (JsonElement child : element.getAsJsonArray()) {
+                redactExecuteCommandFields(child);
+            }
+            return;
+        }
+        if (!element.isJsonObject()) {
+            return;
+        }
+
+        JsonObject object = element.getAsJsonObject();
+        String role = stringValue(object.get("role"));
+        if ("assistant".equals(role) && object.has("tool_calls")) {
+            redactExecuteCommandToolCalls(object.getAsJsonArray("tool_calls"));
+        }
+        if ("tool".equals(role) && "execute_command".equals(stringValue(object.get("name")))) {
+            object.addProperty("content", EXECUTE_COMMAND_OUTPUT_REDACTED);
+        }
+        if ("assistant".equals(role) && object.has("content")
+                && stringValue(object.get("content")) != null
+                && stringValue(object.get("content")).contains(EXECUTE_COMMAND_LEGACY_RESULT_MARKER)) {
+            object.addProperty("content", EXECUTE_COMMAND_OUTPUT_REDACTED);
+        }
+        for (JsonElement child : object.entrySet().stream().map(Map.Entry::getValue).toList()) {
+            redactExecuteCommandFields(child);
+        }
+    }
+
+    private static void redactExecuteCommandToolCalls(JsonArray toolCalls) {
+        if (toolCalls == null) {
+            return;
+        }
+        for (JsonElement toolCallElement : toolCalls) {
+            if (toolCallElement == null || !toolCallElement.isJsonObject()) {
+                continue;
+            }
+            JsonObject toolCall = toolCallElement.getAsJsonObject();
+            JsonObject function = toolCall.getAsJsonObject("function");
+            if (function != null && "execute_command".equals(stringValue(function.get("name")))) {
+                function.addProperty("arguments", EXECUTE_COMMAND_ARGUMENTS_REDACTED);
+            }
+        }
+    }
+
+    private static String stringValue(JsonElement element) {
+        return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()
+                ? element.getAsString() : null;
     }
 
     private static boolean isSensitiveKey(String key) {
