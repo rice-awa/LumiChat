@@ -1,0 +1,479 @@
+# Review package: f844567ed0d53acfd74b96d160e7bb200645ced5..93fe6aa
+
+## Commits
+93fe6aa fix(service): 让可恢复HTTP状态参与重试
+
+## Files changed
+ build.gradle.kts                                   |   1 +
+ .../riceawa/llm/service/HttpStatusException.java   |  47 +++++++++
+ .../com/riceawa/llm/service/OpenAIService.java     |  52 ++++++---
+ .../java/com/riceawa/llm/service/RetryPolicy.java  |  48 +++++++++
+ .../llm/service/OpenAIServiceRetryTest.java        | 116 +++++++++++++++++++++
+ .../com/riceawa/llm/service/RetryPolicyTest.java   |  37 +++++++
+ 6 files changed, 287 insertions(+), 14 deletions(-)
+
+## Diff
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 40b81c1..5be577f 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -51,20 +51,21 @@ dependencies {
+     add("implementation", "com.squareup.okio:okio:3.6.0")
+     add("include", "com.squareup.okio:okio:3.6.0")
+     add("implementation", "org.jetbrains.kotlin:kotlin-stdlib:1.9.10")
+     add("include", "org.jetbrains.kotlin:kotlin-stdlib:1.9.10")
+     add("implementation", "com.google.code.gson:gson:2.10.1")
+     add("include", "com.google.code.gson:gson:2.10.1")
+     add("implementation", "com.typesafe:config:1.4.3")
+     add("include", "com.typesafe:config:1.4.3")
+ 
+     add("testImplementation", "org.junit.jupiter:junit-jupiter:5.10.2")
++    add("testImplementation", "com.squareup.okhttp3:mockwebserver:4.12.0")
+     add("testRuntimeOnly", "org.junit.platform:junit-platform-launcher")
+ }
+ 
+ extensions.configure<LoomGradleExtensionAPI>("loom") {
+     splitEnvironmentSourceSets()
+ 
+     mods {
+         create(property("mod.id") as String) {
+             sourceSet(sourceSets.main.get())
+             sourceSet(sourceSets.getByName("client"))
+diff --git a/src/main/java/com/riceawa/llm/service/HttpStatusException.java b/src/main/java/com/riceawa/llm/service/HttpStatusException.java
+new file mode 100644
+index 0000000..1276c8d
+--- /dev/null
++++ b/src/main/java/com/riceawa/llm/service/HttpStatusException.java
+@@ -0,0 +1,47 @@
++package com.riceawa.llm.service;
++
++import com.riceawa.llm.logging.LLMLogSanitizer;
++
++import java.io.IOException;
++
++/**
++ * HTTP failure details that are safe to return to callers and inspect for retry eligibility.
++ */
++public final class HttpStatusException extends IOException {
++    private static final int MAX_RESPONSE_SUMMARY_LENGTH = 256;
++
++    private final int statusCode;
++    private final String responseSummary;
++    private final long retryAfterMs;
++
++    public HttpStatusException(int statusCode, String responseBody) {
++        this(statusCode, responseBody, -1L);
++    }
++
++    HttpStatusException(int statusCode, String responseBody, long retryAfterMs) {
++        super("HTTP " + statusCode + ": " + summarize(responseBody));
++        this.statusCode = statusCode;
++        this.responseSummary = summarize(responseBody);
++        this.retryAfterMs = retryAfterMs;
++    }
++
++    public int statusCode() {
++        return statusCode;
++    }
++
++    public String responseSummary() {
++        return responseSummary;
++    }
++
++    long retryAfterMs() {
++        return retryAfterMs;
++    }
++
++    private static String summarize(String responseBody) {
++        String sanitized = LLMLogSanitizer.sanitizeContent(responseBody);
++        if (sanitized == null || sanitized.isEmpty()) {
++            return "[EMPTY_RESPONSE]";
++        }
++        return LLMLogSanitizer.truncateContent(sanitized, MAX_RESPONSE_SUMMARY_LENGTH);
++    }
++}
+diff --git a/src/main/java/com/riceawa/llm/service/OpenAIService.java b/src/main/java/com/riceawa/llm/service/OpenAIService.java
+index 69e2ea7..b737dd0 100644
+--- a/src/main/java/com/riceawa/llm/service/OpenAIService.java
++++ b/src/main/java/com/riceawa/llm/service/OpenAIService.java
+@@ -9,25 +9,29 @@ import com.riceawa.llm.config.ConcurrencySettings;
+ import com.riceawa.llm.config.LLMChatConfig;
+ import com.riceawa.llm.logging.LLMLogSanitizer;
+ import com.riceawa.llm.logging.LLMLogUtils;
+ import com.riceawa.llm.logging.LLMRequestLogEntry;
+ import com.riceawa.llm.logging.LLMResponseLogEntry;
+ import com.riceawa.llm.logging.LogConfig;
+ import okhttp3.*;
+ 
+ import java.io.IOException;
+ import java.time.LocalDateTime;
++import java.time.ZonedDateTime;
++import java.time.format.DateTimeFormatter;
++import java.time.format.DateTimeParseException;
+ import java.util.Arrays;
+ import java.util.HashMap;
+ import java.util.List;
+ import java.util.Map;
+ import java.util.concurrent.CompletableFuture;
++import java.util.concurrent.ThreadLocalRandom;
+ import java.util.concurrent.TimeUnit;
+ import java.util.UUID;
+ 
+ /**
+  * OpenAI API服务实现
+  */
+ public class OpenAIService implements LLMService {
+     private final OkHttpClient httpClient;
+     private final Gson gson;
+     private final String providerName;
+@@ -113,26 +117,31 @@ public class OpenAIService implements LLMService {
+         String playerName = context != null ? context.getPlayerName() : null;
+         String playerUuid = context != null ? context.getPlayerUuid() : null;
+ 
+         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+             try {
+                 return executeRequest(messages, config, requestId, playerName, playerUuid);
+             } catch (Exception e) {
+                 lastException = e;
+ 
+                 if (attempt < maxAttempts && shouldRetry(e)) {
+-                    long delay = (long) (settings.getRetryDelayMs() * Math.pow(settings.getRetryBackoffMultiplier(), attempt - 1));
++                    RetryPolicy retryPolicy = new RetryPolicy(
++                            settings.getRetryDelayMs(), settings.getRetryBackoffMultiplier());
++                    long retryAfterMs = e instanceof HttpStatusException
++                            ? ((HttpStatusException) e).retryAfterMs() : -1L;
++                    long delay = retryPolicy.nextDelayMillis(attempt, retryAfterMs,
++                            () -> ThreadLocalRandom.current().nextDouble(0.5D, 1.5D));
+                     try {
+                         Thread.sleep(delay);
+                     } catch (InterruptedException ie) {
+                         Thread.currentThread().interrupt();
+-                        throw new RuntimeException("Request interrupted", ie);
++                        throw ie;
+                     }
+                 } else {
+                     break;
+                 }
+             }
+         }
+ 
+         throw lastException;
+     }
+ 
+@@ -195,35 +204,41 @@ public class OpenAIService implements LLMService {
+             String responseBody = response.body().string();
+             String responseId = LLMLogUtils.generateResponseId();
+ 
+             // 构建响应头
+             Map<String, String> responseHeaders = new HashMap<>();
+             for (String headerName : response.headers().names()) {
+                 responseHeaders.put(headerName, response.header(headerName));
+             }
+ 
+             if (!response.isSuccessful()) {
+-                String sanitizedErrorBody = LLMLogSanitizer.sanitizeJson(responseBody);
++                HttpStatusException statusException = new HttpStatusException(response.code(), responseBody,
++                        parseRetryAfterMillis(response.header("Retry-After")));
++                String sanitizedErrorBody = statusException.responseSummary();
+                 LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+                         .httpStatusCode(response.code())
+                         .success(false)
+                         .errorMessage("HTTP " + response.code() + ": " + sanitizedErrorBody)
+                         .responseHeaders(responseHeaders)
+                         .responseTimeMs(responseTime)
+                         .content(sanitizedErrorBody, logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength())
+                         .containsExecuteCommand(containsExecuteCommand);
+                 if (logConfig.isLogFullResponseBody()) {
+                     responseLogBuilder.rawResponseJson(
+                             responseBody, true, logConfig.getMaxLogContentLength());
+                 }
+                 LLMLogUtils.logResponse(responseLogBuilder.build());
+ 
++                if (RetryPolicy.isRetryable(response.code())) {
++                    throw statusException;
++                }
++
+                 LLMResponse errorResponse = new LLMResponse();
+                 errorResponse.setError("HTTP " + response.code() + ": " + sanitizedErrorBody);
+                 return errorResponse;
+             }
+ 
+             LLMResponse llmResponse = parseResponse(responseBody);
+ 
+             // 默认只记录状态、usage、finish reason及响应摘要
+             LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+                     .httpStatusCode(response.code())
+@@ -257,34 +272,43 @@ public class OpenAIService implements LLMService {
+             }
+ 
+             return llmResponse;
+         }
+     }
+ 
+     /**
+      * 判断是否应该重试
+      */
+     private boolean shouldRetry(Exception e) {
+-        if (e instanceof IOException) {
+-            return true; // 网络错误通常可以重试
++        if (e instanceof HttpStatusException) {
++            return RetryPolicy.isRetryable(((HttpStatusException) e).statusCode());
+         }
++        return e instanceof IOException;
++    }
+ 
+-        String message = e.getMessage();
+-        if (message != null) {
+-            // 检查是否是可重试的HTTP错误
+-            return message.contains("HTTP 429") || // 速率限制
+-                   message.contains("HTTP 502") || // 网关错误
+-                   message.contains("HTTP 503") || // 服务不可用
+-                   message.contains("HTTP 504");   // 网关超时
++    private long parseRetryAfterMillis(String retryAfter) {
++        if (retryAfter == null || retryAfter.trim().isEmpty()) {
++            return -1L;
++        }
++        String value = retryAfter.trim();
++        try {
++            long seconds = Long.parseLong(value);
++            return seconds < 0L || seconds > Long.MAX_VALUE / 1_000L ? -1L : seconds * 1_000L;
++        } catch (NumberFormatException ignored) {
++            try {
++                long delay = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME)
++                        .toInstant().toEpochMilli() - System.currentTimeMillis();
++                return delay > 0L ? delay : -1L;
++            } catch (DateTimeParseException ignoredDate) {
++                return -1L;
++            }
+         }
+-
+-        return false;
+     }
+ 
+     @Override
+     public CompletableFuture<Void> chatStream(List<LLMMessage> messages, LLMConfig config, StreamCallback callback) {
+         return CompletableFuture.runAsync(() -> {
+             try {
+                 JsonObject requestBody = buildRequestBody(messages, config);
+                 requestBody.addProperty("stream", true);
+                 
+                 Request request = new Request.Builder()
+diff --git a/src/main/java/com/riceawa/llm/service/RetryPolicy.java b/src/main/java/com/riceawa/llm/service/RetryPolicy.java
+new file mode 100644
+index 0000000..e03f1d0
+--- /dev/null
++++ b/src/main/java/com/riceawa/llm/service/RetryPolicy.java
+@@ -0,0 +1,48 @@
++package com.riceawa.llm.service;
++
++import java.util.function.DoubleSupplier;
++
++/**
++ * Calculates retry eligibility and capped exponential backoff delays.
++ */
++public final class RetryPolicy {
++    private static final long MAX_DELAY_MILLIS = 30_000L;
++
++    private final long baseDelayMillis;
++    private final double multiplier;
++
++    public RetryPolicy(long baseDelayMillis, double multiplier) {
++        this.baseDelayMillis = Math.max(0L, baseDelayMillis);
++        this.multiplier = multiplier > 0.0D ? multiplier : 1.0D;
++    }
++
++    public static boolean isRetryable(int statusCode) {
++        return statusCode == 429 || statusCode == 502 || statusCode == 503 || statusCode == 504;
++    }
++
++    public long nextDelayMillis(int attempt, long retryAfterMs, DoubleSupplier jitter) {
++        int normalizedAttempt = Math.max(1, attempt);
++        double backoff = baseDelayMillis * Math.pow(multiplier, normalizedAttempt - 1);
++        double jitterValue = jitter == null ? 1.0D : jitter.getAsDouble();
++        long jitteredBackoff = cap(backoff * boundedJitter(jitterValue));
++        long serverDelay = Math.max(0L, retryAfterMs);
++        return Math.min(MAX_DELAY_MILLIS, Math.max(jitteredBackoff, serverDelay));
++    }
++
++    private static double boundedJitter(double jitter) {
++        if (Double.isNaN(jitter) || jitter < 0.5D) {
++            return 0.5D;
++        }
++        return Math.min(jitter, Math.nextDown(1.5D));
++    }
++
++    private static long cap(double delay) {
++        if (Double.isNaN(delay) || delay <= 0.0D) {
++            return 0L;
++        }
++        if (Double.isInfinite(delay) || delay >= MAX_DELAY_MILLIS) {
++            return MAX_DELAY_MILLIS;
++        }
++        return (long) delay;
++    }
++}
+diff --git a/src/test/java/com/riceawa/llm/service/OpenAIServiceRetryTest.java b/src/test/java/com/riceawa/llm/service/OpenAIServiceRetryTest.java
+new file mode 100644
+index 0000000..ee668a2
+--- /dev/null
++++ b/src/test/java/com/riceawa/llm/service/OpenAIServiceRetryTest.java
+@@ -0,0 +1,116 @@
++package com.riceawa.llm.service;
++
++import com.riceawa.llm.config.ConcurrencySettings;
++import com.riceawa.llm.config.LLMChatConfig;
++import com.riceawa.llm.core.LLMConfig;
++import com.riceawa.llm.core.LLMMessage;
++import com.riceawa.llm.core.LLMResponse;
++import okhttp3.mockwebserver.MockResponse;
++import okhttp3.mockwebserver.MockWebServer;
++import org.junit.jupiter.api.AfterEach;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++
++import java.lang.reflect.Field;
++import java.nio.file.Files;
++import java.util.List;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class OpenAIServiceRetryTest {
++    private MockWebServer server;
++    private ConcurrencySettings settings;
++
++    @BeforeEach
++    void setUp() throws Exception {
++        Field field = Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
++                .getDeclaredField("configDir");
++        field.setAccessible(true);
++        field.set(Class.forName("net.fabricmc.loader.impl.FabricLoaderImpl")
++                .getField("INSTANCE").get(null), Files.createTempDirectory("lumichat-retry-test-config"));
++
++        server = new MockWebServer();
++        server.start();
++
++        settings = LLMChatConfig.getInstance().getConcurrencySettings();
++        settings.setEnableRetry(true);
++        settings.setMaxRetryAttempts(2);
++        settings.setRetryDelayMs(0L);
++        settings.setRetryBackoffMultiplier(2.0D);
++    }
++
++    @AfterEach
++    void tearDown() throws Exception {
++        if (server != null) {
++            server.shutdown();
++        }
++    }
++
++    @Test
++    void retries429Then503AndReturnsSuccessfulResponse() throws Exception {
++        server.enqueue(errorResponse(429, "{\"error\":\"rate limited\"}"));
++        server.enqueue(errorResponse(503, "{\"error\":\"temporarily unavailable\"}"));
++        server.enqueue(successResponse());
++
++        LLMResponse response = service().chat(messages(), config()).get();
++
++        assertTrue(response.isSuccess());
++        assertEquals("retried response", response.getContent());
++        assertEquals(3, server.getRequestCount());
++    }
++
++    @Test
++    void doesNotRetryNonRecoverableBadRequest() throws Exception {
++        server.enqueue(errorResponse(400, "{\"error\":\"bad request\"}"));
++
++        LLMResponse response = service().chat(messages(), config()).get();
++
++        assertFalse(response.isSuccess());
++        assertTrue(response.getError().contains("HTTP 400"));
++        assertEquals(1, server.getRequestCount());
++    }
++
++    @Test
++    void returnsTruncatedErrorAfterRetryBudgetIsExhausted() throws Exception {
++        String fullBody = "{\"error\":\"" + "sensitive-response-".repeat(64) + "\"}";
++        server.enqueue(errorResponse(503, fullBody));
++        server.enqueue(errorResponse(503, fullBody));
++        server.enqueue(errorResponse(503, fullBody));
++
++        LLMResponse response = service().chat(messages(), config()).get();
++
++        assertFalse(response.isSuccess());
++        assertEquals(3, server.getRequestCount());
++        assertTrue(response.getError().contains("HTTP 503"));
++        assertFalse(response.getError().contains(fullBody));
++        assertTrue(response.getError().contains("TRUNCATED"));
++    }
++
++    private OpenAIService service() {
++        return new OpenAIService("test", "test-key", server.url("/v1").toString().replaceAll("/$", ""));
++    }
++
++    private static List<LLMMessage> messages() {
++        return List.of(new LLMMessage(LLMMessage.MessageRole.USER, "hello"));
++    }
++
++    private static LLMConfig config() {
++        LLMConfig config = new LLMConfig();
++        config.setModel("test-model");
++        return config;
++    }
++
++    private static MockResponse errorResponse(int statusCode, String body) {
++        return new MockResponse().setResponseCode(statusCode)
++                .setHeader("Content-Type", "application/json")
++                .setBody(body);
++    }
++
++    private static MockResponse successResponse() {
++        return new MockResponse().setResponseCode(200)
++                .setHeader("Content-Type", "application/json")
++                .setBody("{\"id\":\"retry-test\",\"model\":\"test-model\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"retried response\"},\"finish_reason\":\"stop\"}]}");
++    }
++}
+diff --git a/src/test/java/com/riceawa/llm/service/RetryPolicyTest.java b/src/test/java/com/riceawa/llm/service/RetryPolicyTest.java
+new file mode 100644
+index 0000000..818492b
+--- /dev/null
++++ b/src/test/java/com/riceawa/llm/service/RetryPolicyTest.java
+@@ -0,0 +1,37 @@
++package com.riceawa.llm.service;
++
++import org.junit.jupiter.api.Test;
++
++import static org.junit.jupiter.api.Assertions.assertEquals;
++import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
++
++class RetryPolicyTest {
++
++    @Test
++    void recognizesOnlyConfiguredRecoverableHttpStatuses() {
++        assertTrue(RetryPolicy.isRetryable(429));
++        assertTrue(RetryPolicy.isRetryable(502));
++        assertTrue(RetryPolicy.isRetryable(503));
++        assertTrue(RetryPolicy.isRetryable(504));
++        assertFalse(RetryPolicy.isRetryable(400));
++        assertFalse(RetryPolicy.isRetryable(500));
++    }
++
++    @Test
++    void retryAfterTakesPrecedenceWhenItExceedsJitteredBackoff() {
++        RetryPolicy policy = new RetryPolicy(1_000L, 2.0D);
++
++        assertEquals(2_000L, policy.nextDelayMillis(1, 2_000L, () -> 0.5D));
++        assertEquals(30_000L, policy.nextDelayMillis(1, 60_000L, () -> 0.5D));
++    }
++
++    @Test
++    void appliesBoundedJitterAndThirtySecondCeiling() {
++        RetryPolicy policy = new RetryPolicy(20_000L, 2.0D);
++
++        assertEquals(10_000L, policy.nextDelayMillis(1, -1L, () -> 0.5D));
++        assertEquals(29_999L, policy.nextDelayMillis(1, -1L, () -> 1.49999D));
++        assertEquals(30_000L, policy.nextDelayMillis(2, 60_000L, () -> 1.0D));
++    }
++}

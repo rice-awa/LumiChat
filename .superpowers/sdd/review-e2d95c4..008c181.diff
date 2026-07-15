@@ -1,0 +1,443 @@
+# Review package: e2d95c4..008c181
+
+## Commits
+008c181 fix(logging): 防止命令工具内容进入完整LLM日志
+
+## Files changed
+ .superpowers/sdd/task-7-report.md                  |  59 ++++++++++++
+ .../com/riceawa/llm/logging/LLMLogSanitizer.java   | 104 ++++++++++++++++++++-
+ .../riceawa/llm/logging/LLMRequestLogEntry.java    |   2 +-
+ .../riceawa/llm/logging/LLMResponseLogEntry.java   |   2 +-
+ .../riceawa/llm/logging/LLMLogSanitizerTest.java   |  42 +++++++++
+ 5 files changed, 205 insertions(+), 4 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/task-7-report.md b/.superpowers/sdd/task-7-report.md
+index 844409a..8c91f6a 100644
+--- a/.superpowers/sdd/task-7-report.md
++++ b/.superpowers/sdd/task-7-report.md
+@@ -282,10 +282,69 @@ PATH=/tmp/lumichat-jdk21/bin:$PATH \
+ ./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
+   -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+   :1.19:build :1.21.11:build
+ ```
+ 
+ Result: `BUILD SUCCESSFUL`; 30 actionable tasks (8 executed, 22 up-to-date). `git diff --check` passed during self-review.
+ 
+ ### Concerns
+ 
+ No in-game smoke test was available. A live server check should explicitly enable `execute_command`, allowlist a safe root such as `list`, confirm the default tool result includes command output, then disable `executeCommandReturnFullOutput` and confirm the tool result falls back to its summary while the six-field audit event continues to exclude raw command/output.
++
++## 2026-07-15 Important review fix: full LLM logging must not retain execute_command data
++
++### Review finding and scope rationale
++
++The correction's full-output behavior was correct at the immediate `ToolCallHandler` tool-message boundary, but full request/response logging created a second data path. `OpenAIService` serializes the recursive assistant tool-call arguments before `safeFollowUpToolCall` can affect a later context copy, and it also serializes the TOOL message containing the captured output. The existing Task 9 sanitizer removed credentials but intentionally retained ordinary full content, so raw execute_command command arguments and output could still enter INFO `raw_request_json`, `messages[].content`, or response content when both full-body switches were enabled.
++
++The smallest secure change crosses the existing Task 9 logging boundary only: `LLMLogSanitizer` now provides `sanitizeLlmLogContent`, and both request/response DTOs use it for their explicitly enabled raw-body fields. The normal `sanitizeJson`/`sanitizeContent` behavior remains unchanged for non-command data. This is intentionally a Task 9 boundary hardening, not a change to execution policy or the user-facing tool result.
++
++### Files changed for the review fix
++
++- `src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java`
++- `src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java`
++- `src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java`
++- `src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java`
++
++### Security behavior
++
++- In log-only JSON content, assistant `tool_calls[].function` entries named `execute_command` have `arguments` replaced with `[REDACTED execute_command arguments]`, regardless of the full request-body setting.
++- TOOL messages named `execute_command` have `content` replaced with `[REDACTED execute_command output]`. Legacy assistant context content beginning with `调用了函数 execute_command，结果：` is also replaced at the log boundary.
++- The same structural redaction applies to response raw JSON when a provider echoes tool calls or output-like TOOL messages. Other tool/function content continues through the existing credential sanitizer and configured truncation path.
++- `ToolCallHandler` still returns the complete captured output in the in-memory LLM tool message when `executeCommandReturnFullOutput=true`; this fix changes only serialized INFO log data. `enableExecuteCommand=false`, allowlist checks, player-created `CommandSourceStack`, safe follow-up `{}` arguments, and the six-field audit schema are unchanged.
++
++### Regression tests and results
++
++```bash
++JAVA_HOME=/tmp/lumichat-jdk21 \
++PATH=/tmp/lumichat-jdk21/bin:$PATH \
++./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
++  :1.21.11:test --tests com.riceawa.llm.logging.LLMLogSanitizerTest
++```
++
++Result: `BUILD SUCCESSFUL`; 15 sanitizer tests, 0 failures/errors/skips. The added tests enable the DTO full-content overloads and assert raw command/output are absent from serialized request and response log JSON while redaction markers remain.
++
++```bash
++JAVA_HOME=/tmp/lumichat-jdk21 \
++PATH=/tmp/lumichat-jdk21/bin:$PATH \
++./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
++  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
++```
++
++Result: `BUILD SUCCESSFUL`; existing Task 7 handler suite passed 5/5, including full output enabled, summary-only mode, and ordinary function behavior.
++
++```bash
++JAVA_HOME=/tmp/lumichat-jdk21 \
++PATH=/tmp/lumichat-jdk21/bin:$PATH \
++./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
++  :1.21.11:test --tests com.riceawa.llm.function.CommandExecutionPolicyTest \
++  :1.19:build :1.21.11:build
++```
++
++Result: `BUILD SUCCESSFUL`; CommandExecutionPolicyTest passed 9/9 and both required representative builds completed successfully (30 actionable tasks, 16 executed, 14 up-to-date). `git diff --check` passed.
++
++### Concerns
++
++No live OpenAI-compatible provider/server smoke test was available, so the logging-path regression is validated at the exact DTO/sanitizer boundary used by `OpenAIService`, with both full-body overloads enabled. A live check should enable full request/response logging, issue an allowlisted `execute_command` call with distinctive command/output markers, verify those markers are present in the in-memory tool result but absent from INFO logs, and inspect the unchanged six-field audit event.
+diff --git a/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java b/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java
+index b6115d9..ce0cbe6 100644
+--- a/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java
++++ b/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java
+@@ -18,20 +18,26 @@ import java.util.List;
+ import java.util.Locale;
+ import java.util.Map;
+ import java.util.regex.Pattern;
+ 
+ /**
+  * Sanitizes and minimizes data written to LLM request/response logs.
+  */
+ public final class LLMLogSanitizer {
+     private static final String MASKED = "***MASKED***";
+     private static final String TRUNCATED = "... [TRUNCATED]";
++    private static final String EXECUTE_COMMAND_ARGUMENTS_REDACTED =
++            "[REDACTED execute_command arguments]";
++    private static final String EXECUTE_COMMAND_OUTPUT_REDACTED =
++            "[REDACTED execute_command output]";
++    private static final String EXECUTE_COMMAND_LEGACY_RESULT_MARKER =
++            "调用了函数 execute_command，结果：";
+     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)\\bBearer\\s+[^\\s,\\\"}]+" );
+     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)\\b(?:sk|rk)-[a-z0-9_-]+\\b");
+     private static final Pattern AUTHORIZATION_PATTERN = Pattern.compile(
+             "(?i)(\\bauthorization\\s*[=:]\\s*)(?:([\\\"'])(?:\\\\.|(?!\\2).)*\\2|[^\\r\\n,;}]+)");
+     private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
+             "(?i)(\\b(?:x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|secret|password)\\s*[=:]\\s*)(?:([\\\"'])(?:\\\\.|(?!\\2).)*\\2|[^\\s,}]+)");
+     private static final String[] SAFE_RESPONSE_HEADERS = {
+             "content-type", "content-length", "x-request-id", "request-id", "retry-after"
+     };
+     /*
+@@ -58,21 +64,21 @@ public final class LLMLogSanitizer {
+ 
+         for (LLMMessage message : messages) {
+             Map<String, Object> summary = new LinkedHashMap<>();
+             String role = message == null || message.getRole() == null
+                     ? "unknown" : message.getRole().getValue();
+             String content = messageContent(message);
+             summary.put("role", role);
+             summary.put("length", content.length());
+             summary.put("sha256", sha256(content));
+             if (includeContent) {
+-                summary.put("content", truncateContent(sanitizeContent(content), maxLength));
++                summary.put("content", truncateContent(messageLogContent(message), maxLength));
+             }
+             summaries.add(summary);
+         }
+         return summaries;
+     }
+ 
+     /**
+      * Rebuilds caller-provided summaries through the same allowlist used for message logs.
+      */
+     public static List<Map<String, Object>> sanitizeMessageSummaries(
+@@ -82,21 +88,21 @@ public final class LLMLogSanitizer {
+             return summaries;
+         }
+         for (Map<String, Object> message : messages) {
+             Map<String, Object> summary = new LinkedHashMap<>();
+             Object contentValue = message == null ? null : message.get("content");
+             String content = contentValue == null ? null : String.valueOf(contentValue);
+             summary.put("role", safeRole(message == null ? null : message.get("role")));
+             summary.put("length", content != null ? content.length() : safeLength(message == null ? null : message.get("length")));
+             summary.put("sha256", content != null ? sha256(content) : safeHash(message == null ? null : message.get("sha256")));
+             if (includeContent && content != null) {
+-                summary.put("content", truncateContent(sanitizeContent(content), maxLength));
++                summary.put("content", truncateContent(sanitizeLlmLogContent(content), maxLength));
+             }
+             summaries.add(summary);
+         }
+         return summaries;
+     }
+ 
+     /**
+      * Sanitizes a JSON document. Invalid JSON is replaced by a non-reversible marker.
+      */
+     public static String sanitizeJson(String json) {
+@@ -207,20 +213,43 @@ public final class LLMLogSanitizer {
+      */
+     public static String sanitizeContent(String value) {
+         if (value == null) {
+             return null;
+         }
+         String trimmed = value.trim();
+         return trimmed.startsWith("{") || trimmed.startsWith("[")
+                 ? sanitizeJson(value) : sanitizeText(value);
+     }
+ 
++    /**
++     * Removes execute_command arguments and captured output before content can enter INFO logs.
++     * The immediate tool response remains untouched; this boundary is only for log serialization.
++     */
++    public static String sanitizeLlmLogContent(String value) {
++        if (value == null) {
++            return null;
++        }
++        String trimmed = value.trim();
++        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
++            try {
++                JsonElement element = JsonParser.parseString(value);
++                redactExecuteCommandFields(element);
++                sanitizeElement(element, null);
++                return element.toString();
++            } catch (Exception ignored) {
++                return "[UNPARSEABLE_REDACTED sha256=" + sha256(value)
++                        + " length=" + value.length() + "]";
++            }
++        }
++        return sanitizeText(value);
++    }
++
+     /**
+      * Replaces arbitrary content with non-reversible diagnostics for default log fields.
+      */
+     public static String summarizeContent(String value) {
+         if (value == null) {
+             return null;
+         }
+         return "[REDACTED sha256=" + sha256(value) + " length=" + value.length() + "]";
+     }
+ 
+@@ -298,20 +327,38 @@ public final class LLMLogSanitizer {
+         if (content != null) {
+             return content;
+         }
+         if (message.getMetadata() != null && message.getMetadata().getToolCall() != null) {
+             LLMMessage.ToolCall toolCall = message.getMetadata().getToolCall();
+             return toolCall.getArguments() == null ? "" : toolCall.getArguments();
+         }
+         return "";
+     }
+ 
++    private static String messageLogContent(LLMMessage message) {
++        if (message != null && message.getMetadata() != null
++                && message.getMetadata().getToolCall() != null
++                && "execute_command".equals(message.getMetadata().getToolCall().getName())) {
++            return EXECUTE_COMMAND_ARGUMENTS_REDACTED;
++        }
++        if (message != null && message.getRole() == LLMMessage.MessageRole.ASSISTANT
++                && message.getContent() != null
++                && message.getContent().contains(EXECUTE_COMMAND_LEGACY_RESULT_MARKER)) {
++            return EXECUTE_COMMAND_OUTPUT_REDACTED;
++        }
++        if (message != null && message.getRole() == LLMMessage.MessageRole.TOOL
++                && "execute_command".equals(message.getName())) {
++            return EXECUTE_COMMAND_OUTPUT_REDACTED;
++        }
++        return sanitizeLlmLogContent(messageContent(message));
++    }
++
+     private static void sanitizeElement(JsonElement element, String fieldName) {
+         if (element == null || element.isJsonNull()) {
+             return;
+         }
+         if (element.isJsonObject()) {
+             sanitizeObject(element.getAsJsonObject());
+         } else if (element.isJsonArray()) {
+             JsonArray array = element.getAsJsonArray();
+             for (int i = 0; i < array.size(); i++) {
+                 JsonElement child = array.get(i);
+@@ -333,20 +380,73 @@ public final class LLMLogSanitizer {
+                 object.addProperty(fieldName, MASKED);
+             } else if (value != null && value.isJsonPrimitive()
+                     && value.getAsJsonPrimitive().isString()) {
+                 object.addProperty(fieldName, sanitizeText(value.getAsString()));
+             } else {
+                 sanitizeElement(value, fieldName);
+             }
+         }
+     }
+ 
++    private static void redactExecuteCommandFields(JsonElement element) {
++        if (element == null || element.isJsonNull()) {
++            return;
++        }
++        if (element.isJsonArray()) {
++            for (JsonElement child : element.getAsJsonArray()) {
++                redactExecuteCommandFields(child);
++            }
++            return;
++        }
++        if (!element.isJsonObject()) {
++            return;
++        }
++
++        JsonObject object = element.getAsJsonObject();
++        String role = stringValue(object.get("role"));
++        if ("assistant".equals(role) && object.has("tool_calls")) {
++            redactExecuteCommandToolCalls(object.getAsJsonArray("tool_calls"));
++        }
++        if ("tool".equals(role) && "execute_command".equals(stringValue(object.get("name")))) {
++            object.addProperty("content", EXECUTE_COMMAND_OUTPUT_REDACTED);
++        }
++        if ("assistant".equals(role) && object.has("content")
++                && stringValue(object.get("content")) != null
++                && stringValue(object.get("content")).contains(EXECUTE_COMMAND_LEGACY_RESULT_MARKER)) {
++            object.addProperty("content", EXECUTE_COMMAND_OUTPUT_REDACTED);
++        }
++        for (JsonElement child : object.entrySet().stream().map(Map.Entry::getValue).toList()) {
++            redactExecuteCommandFields(child);
++        }
++    }
++
++    private static void redactExecuteCommandToolCalls(JsonArray toolCalls) {
++        if (toolCalls == null) {
++            return;
++        }
++        for (JsonElement toolCallElement : toolCalls) {
++            if (toolCallElement == null || !toolCallElement.isJsonObject()) {
++                continue;
++            }
++            JsonObject toolCall = toolCallElement.getAsJsonObject();
++            JsonObject function = toolCall.getAsJsonObject("function");
++            if (function != null && "execute_command".equals(stringValue(function.get("name")))) {
++                function.addProperty("arguments", EXECUTE_COMMAND_ARGUMENTS_REDACTED);
++            }
++        }
++    }
++
++    private static String stringValue(JsonElement element) {
++        return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()
++                ? element.getAsString() : null;
++    }
++
+     private static boolean isSensitiveKey(String key) {
+         if (key == null) {
+             return false;
+         }
+         String normalized = key.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+         return normalized.equals("authorization")
+                 || normalized.contains("apikey")
+                 || normalized.contains("token")
+                 || normalized.contains("secret")
+                 || normalized.contains("password")
+diff --git a/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java b/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java
+index 91acb08..dfa39f3 100644
+--- a/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java
++++ b/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java
+@@ -62,21 +62,21 @@ public class LLMRequestLogEntry {
+         this.timestamp = builder.timestamp != null ? builder.timestamp : LocalDateTime.now();
+         this.playerName = builder.playerName;
+         this.playerUuid = builder.playerUuid;
+         this.serviceName = builder.serviceName;
+         this.model = builder.model;
+         this.messages = builder.messages == null ? new ArrayList<>()
+                 : LLMLogSanitizer.sanitizeMessageSummaries(
+                         builder.messages, builder.includeMessageContent, builder.messageContentMaxLength);
+         this.config = builder.config;
+         this.rawRequestJson = builder.includeRawRequestContent
+-                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawRequestJson), builder.rawRequestContentMaxLength)
++                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawRequestJson), builder.rawRequestContentMaxLength)
+                 : LLMLogSanitizer.summarizeContent(builder.rawRequestJson);
+         this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(builder.requestUrl);
+         this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));
+         this.contextMessageCount = builder.contextMessageCount;
+         this.estimatedTokens = builder.estimatedTokens;
+         this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
+     }
+ 
+     public String getRequestId() { return requestId; }
+     public LocalDateTime getTimestamp() { return timestamp; }
+diff --git a/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java b/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java
+index af0f739..f41eeaa 100644
+--- a/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java
++++ b/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java
+@@ -66,21 +66,21 @@ public class LLMResponseLogEntry {
+     private LLMResponseLogEntry(Builder builder) {
+         this.responseId = builder.responseId;
+         this.requestId = builder.requestId;
+         this.timestamp = builder.timestamp != null ? builder.timestamp : LocalDateTime.now();
+         this.responseTimeMs = builder.responseTimeMs;
+         this.httpStatusCode = builder.httpStatusCode;
+         this.success = builder.success;
+         this.errorMessage = builder.errorMessage;
+         this.llmResponse = builder.llmResponse;
+         this.rawResponseJson = builder.includeRawResponseContent
+-                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawResponseJson), builder.rawResponseContentMaxLength)
++                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawResponseJson), builder.rawResponseContentMaxLength)
+                 : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
+         this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
+         this.content = builder.content;
+         this.contentLength = builder.originalContent == null ? 0 : builder.originalContent.length();
+         this.contentSha256 = LLMLogSanitizer.sha256(builder.originalContent);
+         this.model = builder.model;
+         this.usage = builder.usage;
+         this.finishReason = builder.finishReason;
+         this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
+     }
+diff --git a/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java b/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java
+index bae4008..8999922 100644
+--- a/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java
++++ b/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java
+@@ -12,20 +12,62 @@ import java.util.Map;
+ import static org.junit.jupiter.api.Assertions.assertEquals;
+ import static org.junit.jupiter.api.Assertions.assertFalse;
+ import static org.junit.jupiter.api.Assertions.assertTrue;
+ 
+ class LLMLogSanitizerTest {
+     private static final String API_KEY = "sk-test-secret-key";
+     private static final String SYSTEM_PROMPT = "private system prompt that must not be logged";
+     private static final String PLAYER_MESSAGE = "player private message";
+     private static final String TOOL_ARGUMENTS = "tool arguments containing private data";
+ 
++    @Test
++    void fullLlmLogsRedactExecuteCommandArgumentsAndOutputButKeepOtherContent() {
++        String command = "op SensitivePlayer --secret=never-log-this";
++        String output = "Sensitive command output must never enter logs";
++        String requestBody = "{\"messages\":[{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"execute_command\",\"arguments\":\"{\\\"command\\\":\\\""
++                + command + "\\\"}\"}}]},{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
++                + output + "\"}]}";
++
++        String sanitized = LLMLogSanitizer.sanitizeLlmLogContent(requestBody);
++
++        assertFalse(sanitized.contains(command));
++        assertFalse(sanitized.contains(output));
++        assertTrue(sanitized.contains("[REDACTED execute_command arguments]"));
++        assertTrue(sanitized.contains("[REDACTED execute_command output]"));
++    }
++
++    @Test
++    void fullLogEntryBoundaryRedactsExecuteCommandData() {
++        String command = "list --secret=never-log-this";
++        String output = "secret command output";
++        String rawRequest = "{\"messages\":[{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"execute_command\",\"arguments\":\""
++                + command + "\"}}]},{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
++                + output + "\"}]}";
++        String requestJson = LLMLogUtils.createRequestLogBuilder("execute-request")
++                .serviceName("provider")
++                .rawRequestJson(rawRequest, true, 4096)
++                .build()
++                .toJsonString();
++        String responseJson = LLMLogUtils.createResponseLogBuilder("execute-response", "execute-request")
++                .rawResponseJson("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"tool_calls\":[{\"function\":{\"name\":\"execute_command\",\"arguments\":\""
++                        + command + "\"}}]}}],\"messages\":[{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
++                        + output + "\"}]}", true, 4096)
++                .build()
++                .toJsonString();
++
++        assertFalse(requestJson.contains(command));
++        assertFalse(requestJson.contains(output));
++        assertFalse(responseJson.contains(command));
++        assertFalse(responseJson.contains(output));
++    }
++
++
+     @Test
+     void defaultMessageSummaryContainsOnlyMetadata() {
+         LLMMessage toolMessage = new LLMMessage(
+                 LLMMessage.MessageRole.TOOL,
+                 "{\"api_key\":\"" + API_KEY + "\",\"arguments\":\"" + TOOL_ARGUMENTS + "\"}");
+         LLMMessage assistantMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
+         LLMMessage.ToolCall toolCall = new LLMMessage.ToolCall("send_message", TOOL_ARGUMENTS);
+         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
+         metadata.setToolCall(toolCall);
+         assistantMessage.setMetadata(metadata);

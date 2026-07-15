@@ -1,0 +1,561 @@
+# Review package: 238944f..e2d95c4
+
+## Commits
+e2d95c4 feat(functions): execute_command 默认向 LLM 返回完整命令输出
+
+## Files changed
+ .superpowers/sdd/task-7-report.md                  | 54 ++++++++++++++++++++
+ .../com/riceawa/llm/command/ToolCallHandler.java   | 25 +++++----
+ .../com/riceawa/llm/config/ConfigDefaults.java     |  3 ++
+ .../java/com/riceawa/llm/config/LLMChatConfig.java | 15 ++++++
+ .../riceawa/llm/command/ToolCallHandlerTest.java   | 59 +++++++++++++++-------
+ 5 files changed, 129 insertions(+), 27 deletions(-)
+
+## Diff
+diff --git a/.superpowers/sdd/task-7-report.md b/.superpowers/sdd/task-7-report.md
+index e79b828..844409a 100644
+--- a/.superpowers/sdd/task-7-report.md
++++ b/.superpowers/sdd/task-7-report.md
+@@ -228,10 +228,64 @@ PATH=/tmp/gradle-init/temurin-21/bin:$PATH \
+   :1.19:build :1.21.11:build
+ 
+ git -C /workspaces/LumiChat/.worktrees/multiversion-remediation diff --check
+ ```
+ 
+ Result: both representative builds were `BUILD SUCCESSFUL` (30 actionable tasks; 5 executed, 25 up-to-date); `git diff --check` passed. Java diagnostics were clean for the changed production and test files. The 1.19 build verifies the shared code remains Java 17 compatible.
+ 
+ ### Remaining limitation
+ 
+ No in-game smoke test was available. A live server check should enable and allowlist `execute_command`/`list`, trigger a recursive command call containing sensitive arguments, then verify that the following INFO `raw_request_json` emits `{}` for the assistant tool-call arguments rather than the command text.
++
++## 2026-07-15 Task 7 correction: return complete command output to the LLM
++
++### Files changed
++
++- `src/main/java/com/riceawa/llm/config/ConfigDefaults.java`
++- `src/main/java/com/riceawa/llm/config/LLMChatConfig.java`
++- `src/main/java/com/riceawa/llm/command/ToolCallHandler.java`
++- `src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java`
++
++### Behavior
++
++- Added serialized `executeCommandReturnFullOutput`, which defaults to `true`; absent legacy configuration receives that default. Its getter and setter save the administrator-selected value.
++- The two recursive tool-exchange paths and legacy tool-call path now pass the active `LLMChatConfig` into `toolResultContent`.
++- For a successful `execute_command`, `ToolCallHandler.commandExecutionSummary` appends `FunctionResult.data.output` only while `executeCommandReturnFullOutput` is enabled. With the setting disabled, the existing `命令执行成功: <root> (返回码: <code>)` summary is retained. Other function results are unchanged.
++- The correction does not alter `enableExecuteCommand`, which remains disabled by default; it does not change the allowlist, initiating-player `CommandSourceStack`, or command audit implementation. `ExecuteCommandFunction.audit` continues to emit only actor UUID, command root, command SHA-256, result code, duration, and success. Raw command text and command output are not written to audit logs. The Task 7 `{}` sanitization of recursive `execute_command` arguments remains intact, so raw command arguments do not enter follow-up request/INFO logs.
++
++### Tests and builds
++
++The available Java 21/init-script setup was used without changing repository build configuration. Eclipse Temurin 17/21 toolchains were installed under `/tmp` only because the host initially lacked the Java 17 compiler required by the 1.19 node.
++
++```bash
++JAVA_HOME=/tmp/lumichat-jdk21 \
++PATH=/tmp/lumichat-jdk21/bin:$PATH \
++./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
++  :1.21.11:test --tests com.riceawa.llm.command.ToolCallHandlerTest
++```
++
++Result: `BUILD SUCCESSFUL`; 5 tests, 0 failures/errors/skips.
++
++```bash
++JAVA_HOME=/tmp/lumichat-jdk21 \
++PATH=/tmp/lumichat-jdk21/bin:$PATH \
++./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
++  :1.21.11:test --tests com.riceawa.llm.function.CommandExecutionPolicyTest
++```
++
++Result: `BUILD SUCCESSFUL`; 9 tests, 0 failures/errors/skips.
++
++```bash
++JAVA_HOME=/tmp/lumichat-jdk21 \
++PATH=/tmp/lumichat-jdk21/bin:$PATH \
++./gradlew --init-script /tmp/lumichat-adoptium-jdk.gradle --max-workers=1 \
++  -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
++  :1.19:build :1.21.11:build
++```
++
++Result: `BUILD SUCCESSFUL`; 30 actionable tasks (8 executed, 22 up-to-date). `git diff --check` passed during self-review.
++
++### Concerns
++
++No in-game smoke test was available. A live server check should explicitly enable `execute_command`, allowlist a safe root such as `list`, confirm the default tool result includes command output, then disable `executeCommandReturnFullOutput` and confirm the tool result falls back to its summary while the six-field audit event continues to exclude raw command/output.
+diff --git a/src/main/java/com/riceawa/llm/command/ToolCallHandler.java b/src/main/java/com/riceawa/llm/command/ToolCallHandler.java
+index 3d0bbbd..4dc7507 100644
+--- a/src/main/java/com/riceawa/llm/command/ToolCallHandler.java
++++ b/src/main/java/com/riceawa/llm/command/ToolCallHandler.java
+@@ -49,21 +49,21 @@ public final class ToolCallHandler {
+             JsonObject arguments = parseArguments(toolCall.getArguments(), player);
+             if (arguments == null) {
+                 return;
+             }
+ 
+             MinecraftServer server = EntityHelper.getServer(player);
+             String playerId = player.getStringUUID();
+             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
+                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
+                         if (toolCallId != null) {
+-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext);
++                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config);
+                             callLLMWithFunctionResult(player, chatContext, config, 1);
+                         } else {
+                             handleLegacyToolCall(result, functionName, player, chatContext, config);
+                         }
+                     }))
+                     .exceptionallyCompose(throwable -> ServerThreadCompat.execute(server,
+                             () -> MessageCompat.displayClientMessage(player,
+                                 Component.literal("工具调用处理失败: " + throwable.getMessage())
+                                         .withStyle(ChatFormatting.RED), false)))
+                     .whenComplete((ignored, finalFailure) -> observeFinalFailure(
+@@ -210,21 +210,21 @@ public final class ToolCallHandler {
+             JsonObject arguments = parseArguments(toolCall.getArguments(), player);
+             if (arguments == null) {
+                 return;
+             }
+ 
+             MinecraftServer server = EntityHelper.getServer(player);
+             String playerId = player.getStringUUID();
+             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
+                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
+                         if (toolCallId != null) {
+-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext);
++                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config);
+                             callLLMWithFunctionResult(
+                                     player, chatContext, config, recursionDepth + 1);
+                         } else {
+                             handleLegacyToolCall(result, functionName, player, chatContext, config);
+                         }
+                     }))
+                     .exceptionallyCompose(throwable -> ServerThreadCompat.execute(server,
+                             () -> MessageCompat.displayClientMessage(player,
+                                 Component.literal("递归工具调用处理失败: " + throwable.getMessage())
+                                         .withStyle(ChatFormatting.RED), false)))
+@@ -302,21 +302,21 @@ public final class ToolCallHandler {
+                     Component.literal("调用LLM失败: " + exception.getMessage())
+                             .withStyle(ChatFormatting.RED), false);
+         }
+     }
+ 
+     private void handleLegacyToolCall(LLMFunction.FunctionResult result, String functionName,
+                                       ServerPlayer player, ChatContext chatContext,
+                                       LLMChatConfig config) {
+         if (result.isSuccess()) {
+             String resultMessage = result.getResult();
+-            String llmSafeResult = toolResultContent(functionName, result);
++            String llmSafeResult = toolResultContent(functionName, result, config);
+             MessageCompat.displayClientMessage(player,
+                     Component.literal("[函数执行] " + resultMessage)
+                             .withStyle(ChatFormatting.GREEN), false);
+             chatContext.addAssistantMessage("调用了函数 " + functionName + "，结果：" + llmSafeResult);
+             if (config.isEnableHistory()) {
+                 ChatHistory.getInstance().saveSession(chatContext);
+             }
+             ChatRequestHandler.getInstance().checkAndNotifyCompression(chatContext, player, config);
+         } else {
+             MessageCompat.displayClientMessage(player,
+@@ -335,61 +335,68 @@ public final class ToolCallHandler {
+         } catch (Exception exception) {
+             MessageCompat.displayClientMessage(player,
+                     Component.literal("函数参数解析失败: " + exception.getMessage())
+                             .withStyle(ChatFormatting.RED), false);
+             return null;
+         }
+     }
+ 
+     private void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
+                                     String toolCallId, LLMFunction.FunctionResult result,
+-                                    ChatContext chatContext) {
++                                    ChatContext chatContext, LLMChatConfig config) {
+         LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
+         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
+         metadata.setToolCall(safeFollowUpToolCall(toolCall));
+         toolCallMessage.setMetadata(metadata);
+         chatContext.addMessage(toolCallMessage);
+ 
+-        String resultContent = toolResultContent(functionName, result);
++        String resultContent = toolResultContent(functionName, result, config);
+         LLMMessage toolResponseMessage = new LLMMessage(
+                 LLMMessage.MessageRole.TOOL, resultContent);
+         toolResponseMessage.setName(functionName);
+         toolResponseMessage.setToolCallId(toolCallId);
+         chatContext.addMessage(toolResponseMessage);
+     }
+ 
+     static LLMMessage.ToolCall safeFollowUpToolCall(LLMMessage.ToolCall toolCall) {
+         if (!"execute_command".equals(toolCall.getName())) {
+             return toolCall;
+         }
+         return new LLMMessage.ToolCall(toolCall.getName(), "{}", toolCall.getToolCallId());
+     }
+ 
+-    static String toolResultContent(String functionName, LLMFunction.FunctionResult result) {
++    static String toolResultContent(String functionName, LLMFunction.FunctionResult result,
++                                    LLMChatConfig config) {
+         if (!result.isSuccess()) {
+             return "错误: " + result.getError();
+         }
+         if ("execute_command".equals(functionName)) {
+-            return commandExecutionSummary(result);
++            return commandExecutionSummary(result, config);
+         }
+         return result.getResult();
+     }
+ 
+-    private static String commandExecutionSummary(LLMFunction.FunctionResult result) {
++    private static String commandExecutionSummary(LLMFunction.FunctionResult result,
++                                                  LLMChatConfig config) {
+         if (result.getData() == null) {
+             return "命令执行成功";
+         }
+         String root = result.getData().has("command_root")
+                 ? result.getData().get("command_root").getAsString() : "";
+         int resultCode = result.getData().has("result_code")
+                 ? result.getData().get("result_code").getAsInt() : 0;
+-        return "命令执行成功: " + root + " (返回码: " + resultCode + ")";
++        String summary = "命令执行成功: " + root + " (返回码: " + resultCode + ")";
++        if (config != null && config.isExecuteCommandReturnFullOutput()
++                && result.getData().has("output")) {
++            summary += "\n" + result.getData().get("output").getAsString();
++        }
++        return summary;
+     }
+ 
+     private void observeFinalFailure(String playerId, String operation, Throwable finalFailure) {
+         if (finalFailure != null) {
+             com.riceawa.llm.logging.LogManager.getInstance().error(
+                     "Async chain failed [operation=" + operation
+                             + ", player_uuid=" + playerId + "]");
+         }
+     }
+ }
+diff --git a/src/main/java/com/riceawa/llm/config/ConfigDefaults.java b/src/main/java/com/riceawa/llm/config/ConfigDefaults.java
+index 3b322a2..3d502ff 100644
+--- a/src/main/java/com/riceawa/llm/config/ConfigDefaults.java
++++ b/src/main/java/com/riceawa/llm/config/ConfigDefaults.java
+@@ -13,20 +13,21 @@ public class ConfigDefaults {
+     
+     // 基础配置默认值
+     public static final String DEFAULT_PROMPT_TEMPLATE = "default";
+     public static final double DEFAULT_TEMPERATURE = 0.7;
+     public static final int DEFAULT_MAX_TOKENS = 8192;
+     public static final int DEFAULT_MAX_CONTEXT_CHARACTERS = 60000;
+     public static final boolean DEFAULT_ENABLE_HISTORY = true;
+     public static final boolean DEFAULT_ENABLE_TOOL_CALL = true;
+     public static final boolean DEFAULT_ENABLE_BROADCAST = false;
+     public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = false;
++    public static final boolean DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT = true;
+     public static final int DEFAULT_EXECUTE_COMMAND_MAX_LENGTH = 256;
+     public static final int DEFAULT_HISTORY_RETENTION_DAYS = 30;
+     
+     // 上下文压缩配置默认值
+     public static final String DEFAULT_COMPRESSION_MODEL = ""; // 空字符串表示使用当前模型
+     public static final boolean DEFAULT_ENABLE_COMPRESSION_NOTIFICATION = true;
+ 
+     // 消息预览配置默认值
+     public static final int DEFAULT_MESSAGE_PREVIEW_COUNT = 5; // 恢复对话时显示的消息数量
+     public static final int DEFAULT_MESSAGE_PREVIEW_MAX_LENGTH = 150; // 每条消息的最大显示长度
+@@ -154,20 +155,21 @@ public class ConfigDefaults {
+      */
+     public static String getConfigDisplayName(String configKey) {
+         switch (configKey) {
+             case "maxContextCharacters": return "最大上下文字符数";
+             case "defaultTemperature": return "默认温度";
+             case "defaultMaxTokens": return "默认最大Token数";
+             case "enableHistory": return "启用历史记录";
+             case "enableToolCall": return "启用工具调用";
+             case "enableBroadcast": return "启用广播";
+             case "enableExecuteCommand": return "启用命令执行";
++            case "executeCommandReturnFullOutput": return "命令执行返回完整输出";
+             case "executeCommandMaxLength": return "命令执行最大长度";
+             case "compressionModel": return "压缩模型";
+             case "enableCompressionNotification": return "启用压缩通知";
+             case "enableGlobalContext": return "启用全局上下文";
+             default: return configKey;
+         }
+     }
+     
+     /**
+      * 验证配置值是否在合理范围内
+@@ -219,20 +221,21 @@ public class ConfigDefaults {
+             case "defaultTemperature": return DEFAULT_TEMPERATURE;
+             case "defaultMaxTokens": return DEFAULT_MAX_TOKENS;
+             case "maxContextCharacters": return DEFAULT_MAX_CONTEXT_CHARACTERS;
+             case "enableHistory": return DEFAULT_ENABLE_HISTORY;
+             case "enableToolCall": return DEFAULT_ENABLE_TOOL_CALL;
+             case "enableRecursiveToolCalls": return DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
+             case "maxToolCallDepth": return DEFAULT_MAX_TOOL_CALL_DEPTH;
+             case "toolCallTimeoutMs": return DEFAULT_TOOL_CALL_TIMEOUT_MS;
+             case "enableBroadcast": return DEFAULT_ENABLE_BROADCAST;
+             case "enableExecuteCommand": return DEFAULT_ENABLE_EXECUTE_COMMAND;
++            case "executeCommandReturnFullOutput": return DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
+             case "executeCommandMaxLength": return DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+             case "historyRetentionDays": return DEFAULT_HISTORY_RETENTION_DAYS;
+             case "compressionModel": return DEFAULT_COMPRESSION_MODEL;
+             case "enableCompressionNotification": return DEFAULT_ENABLE_COMPRESSION_NOTIFICATION;
+             case "enableGlobalContext": return DEFAULT_ENABLE_GLOBAL_CONTEXT;
+             case "globalContextPrompt": return DEFAULT_GLOBAL_CONTEXT_PROMPT;
+             case "enableTitleGeneration": return DEFAULT_ENABLE_TITLE_GENERATION;
+             case "titleGenerationModel": return DEFAULT_TITLE_GENERATION_MODEL;
+             case "wikiApiUrl": return DEFAULT_WIKI_API_URL;
+             case "wikiAllowedHosts": return createDefaultWikiAllowedHosts();
+diff --git a/src/main/java/com/riceawa/llm/config/LLMChatConfig.java b/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
+index b20c018..aae5200 100644
+--- a/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
++++ b/src/main/java/com/riceawa/llm/config/LLMChatConfig.java
+@@ -34,20 +34,21 @@ public class LLMChatConfig {
+     private String configVersion = CURRENT_CONFIG_VERSION;
+     private String defaultPromptTemplate = ConfigDefaults.DEFAULT_PROMPT_TEMPLATE;
+     private double defaultTemperature = ConfigDefaults.DEFAULT_TEMPERATURE;
+     private int defaultMaxTokens = ConfigDefaults.DEFAULT_MAX_TOKENS;
+     private int maxContextCharacters = ConfigDefaults.DEFAULT_MAX_CONTEXT_CHARACTERS;
+     private boolean enableHistory = ConfigDefaults.DEFAULT_ENABLE_HISTORY;
+     private boolean enableToolCall = ConfigDefaults.DEFAULT_ENABLE_TOOL_CALL;
+     private boolean enableBroadcast = ConfigDefaults.DEFAULT_ENABLE_BROADCAST;
+     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
+     private boolean enableExecuteCommand = ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
++    private boolean executeCommandReturnFullOutput = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
+     private Set<String> executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+     private int executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+     private int historyRetentionDays = ConfigDefaults.DEFAULT_HISTORY_RETENTION_DAYS;
+ 
+     // 上下文压缩配置
+     private String compressionModel = ConfigDefaults.DEFAULT_COMPRESSION_MODEL;
+     private boolean enableCompressionNotification = ConfigDefaults.DEFAULT_ENABLE_COMPRESSION_NOTIFICATION;
+ 
+     // 消息预览配置
+     private int messagePreviewCount = ConfigDefaults.DEFAULT_MESSAGE_PREVIEW_COUNT;
+@@ -284,20 +285,23 @@ public class LLMChatConfig {
+             this.maxContextCharacters = ConfigDefaults.DEFAULT_MAX_CONTEXT_CHARACTERS;
+             LogManager.getInstance().system("Applied default maxContextCharacters: " + this.maxContextCharacters);
+         }
+ 
+         this.enableHistory = data.enableHistory != null ? data.enableHistory : (Boolean) ConfigDefaults.getDefaultValue("enableHistory");
+         this.enableToolCall = data.enableToolCall != null ? data.enableToolCall : (Boolean) ConfigDefaults.getDefaultValue("enableToolCall");
+         this.enableBroadcast = data.enableBroadcast != null ? data.enableBroadcast : (Boolean) ConfigDefaults.getDefaultValue("enableBroadcast");
+         this.broadcastPlayers = data.broadcastPlayers != null ? new HashSet<>(data.broadcastPlayers) : ConfigDefaults.createDefaultBroadcastPlayers();
+         this.enableExecuteCommand = data.enableExecuteCommand != null
+                 ? data.enableExecuteCommand : ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
++        this.executeCommandReturnFullOutput = data.executeCommandReturnFullOutput != null
++                ? data.executeCommandReturnFullOutput
++                : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
+         this.executeCommandAllowlist = data.executeCommandAllowlist != null
+                 ? new HashSet<>(data.executeCommandAllowlist)
+                 : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+         this.executeCommandMaxLength = data.executeCommandMaxLength != null
+                 ? data.executeCommandMaxLength : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+         this.historyRetentionDays = data.historyRetentionDays != null ? data.historyRetentionDays : (Integer) ConfigDefaults.getDefaultValue("historyRetentionDays");
+         this.enableGlobalContext = data.enableGlobalContext != null ? data.enableGlobalContext : (Boolean) ConfigDefaults.getDefaultValue("enableGlobalContext");
+         this.globalContextPrompt = data.globalContextPrompt != null ? data.globalContextPrompt : (String) ConfigDefaults.getDefaultValue("globalContextPrompt");
+ 
+         // 处理上下文压缩配置
+@@ -415,20 +419,21 @@ public class LLMChatConfig {
+         data.defaultTemperature = this.defaultTemperature;
+         data.defaultMaxTokens = this.defaultMaxTokens;
+         data.maxContextCharacters = this.maxContextCharacters;
+ 
+         // 功能开关配置
+         data.enableHistory = this.enableHistory;
+         data.enableToolCall = this.enableToolCall;
+         data.enableBroadcast = this.enableBroadcast;
+         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
+         data.enableExecuteCommand = this.enableExecuteCommand;
++        data.executeCommandReturnFullOutput = this.executeCommandReturnFullOutput;
+         data.executeCommandAllowlist = new HashSet<>(this.executeCommandAllowlist);
+         data.executeCommandMaxLength = this.executeCommandMaxLength;
+         data.historyRetentionDays = this.historyRetentionDays;
+ 
+         // 全局上下文配置
+         data.enableGlobalContext = this.enableGlobalContext;
+         data.globalContextPrompt = this.globalContextPrompt;
+ 
+         // 压缩和标题生成功能配置
+         data.enableCompressionNotification = this.enableCompressionNotification;
+@@ -547,20 +552,29 @@ public class LLMChatConfig {
+ 
+     public boolean isEnableExecuteCommand() {
+         return enableExecuteCommand;
+     }
+ 
+     public void setEnableExecuteCommand(boolean enableExecuteCommand) {
+         this.enableExecuteCommand = enableExecuteCommand;
+         saveConfig();
+     }
+ 
++    public boolean isExecuteCommandReturnFullOutput() {
++        return executeCommandReturnFullOutput;
++    }
++
++    public void setExecuteCommandReturnFullOutput(boolean executeCommandReturnFullOutput) {
++        this.executeCommandReturnFullOutput = executeCommandReturnFullOutput;
++        saveConfig();
++    }
++
+     public Set<String> getExecuteCommandAllowlist() {
+         return new HashSet<>(executeCommandAllowlist);
+     }
+ 
+     public void setExecuteCommandAllowlist(Set<String> executeCommandAllowlist) {
+         this.executeCommandAllowlist = executeCommandAllowlist != null
+                 ? new HashSet<>(executeCommandAllowlist)
+                 : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+         saveConfig();
+     }
+@@ -1118,20 +1132,21 @@ public class LLMChatConfig {
+         Integer defaultMaxTokens;
+         Integer maxContextLength; // 保留用于向后兼容
+         Integer maxContextCharacters;
+ 
+         // 功能开关配置
+         Boolean enableHistory;
+         Boolean enableToolCall;
+         Boolean enableBroadcast;
+         Set<String> broadcastPlayers;
+         Boolean enableExecuteCommand;
++        Boolean executeCommandReturnFullOutput;
+         Set<String> executeCommandAllowlist;
+         Integer executeCommandMaxLength;
+         Integer historyRetentionDays;
+ 
+         // 全局上下文配置
+         Boolean enableGlobalContext;
+         String globalContextPrompt;
+ 
+         // 压缩和标题生成功能配置
+         Boolean enableCompressionNotification;
+diff --git a/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java b/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java
+index 0fec2c5..e75c77d 100644
+--- a/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java
++++ b/src/test/java/com/riceawa/llm/command/ToolCallHandlerTest.java
+@@ -1,38 +1,54 @@
+ package com.riceawa.llm.command;
+ 
+ import com.google.gson.JsonObject;
++import com.riceawa.llm.config.ConfigDefaults;
++import com.riceawa.llm.config.LLMChatConfig;
+ import com.riceawa.llm.context.ChatContext;
+ import com.riceawa.llm.context.ContextCompressor;
+ import com.riceawa.llm.core.LLMMessage;
+ import com.riceawa.llm.function.LLMFunction;
+ import org.junit.jupiter.api.Test;
++import sun.misc.Unsafe;
+ 
+ import java.lang.reflect.Constructor;
++import java.lang.reflect.Field;
+ import java.lang.reflect.Method;
+ import java.util.UUID;
+ import java.util.concurrent.Executor;
+ 
+ import static org.junit.jupiter.api.Assertions.assertEquals;
+ import static org.junit.jupiter.api.Assertions.assertFalse;
++import static org.junit.jupiter.api.Assertions.assertTrue;
+ 
+ class ToolCallHandlerTest {
+ 
+     @Test
+-    void sanitizesExecuteCommandOutputBeforeItCanBecomeAToolMessage() {
+-        JsonObject data = new JsonObject();
+-        data.addProperty("command_root", "list");
+-        data.addProperty("result_code", 1);
++    void returnsCompleteExecuteCommandOutputWhenConfigured() throws Exception {
++        JsonObject data = commandResultData();
++        data.addProperty("output", "secret command output");
+         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
+                 "命令执行成功: list (返回码: 1)\nsecret command output", data);
+ 
+-        String toolContent = toolMessageContent("execute_command", result);
++        assertTrue(ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT);
++        assertEquals("命令执行成功: list (返回码: 1)\nsecret command output",
++                toolMessageContent("execute_command", result, commandOutputConfig(true)));
++    }
++
++    @Test
++    void summarizesExecuteCommandOutputWhenConfigured() throws Exception {
++        JsonObject data = commandResultData();
++        data.addProperty("output", "secret command output");
++        LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
++                "命令执行成功: list (返回码: 1)\nsecret command output", data);
++
++        String toolContent = toolMessageContent("execute_command", result, commandOutputConfig(false));
+ 
+         assertEquals("命令执行成功: list (返回码: 1)", toolContent);
+         assertFalse(toolContent.contains("secret command output"));
+     }
+ 
+     @Test
+     void sanitizesExecuteCommandArgumentsInTheFollowUpToolExchange() throws Exception {
+         String secretCommand = "op SensitivePlayer --secret=never-log-this";
+         LLMMessage.ToolCall original = new LLMMessage.ToolCall(
+                 "execute_command", "{\"command\":\"" + secretCommand + "\"}", "call-command-1");
+@@ -52,51 +68,58 @@ class ToolCallHandlerTest {
+         LLMMessage.ToolCall original = new LLMMessage.ToolCall(
+                 "get_time", "{\"timezone\":\"UTC\"}", "call-time-1");
+         ChatContext context = newContext();
+ 
+         appendToolExchange(original, "get_time", "call-time-1", context);
+ 
+         assertEquals(original, context.getMessages().get(0).getMetadata().getToolCall());
+     }
+ 
+     @Test
+-    void preservesOtherFunctionResultsForToolMessages() {
++    void preservesOtherFunctionResultsWhenCommandOutputIsDisabled() throws Exception {
+         LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success("safe result");
+ 
+-        assertEquals("safe result", toolMessageContent("get_time", result));
++        assertEquals("safe result", toolMessageContent("get_time", result, commandOutputConfig(false)));
+     }
+ 
+-    @Test
+-    void usesTheSafeExecuteCommandSummaryForLegacyContext() {
++    private static JsonObject commandResultData() {
+         JsonObject data = new JsonObject();
+         data.addProperty("command_root", "list");
+         data.addProperty("result_code", 1);
+-        LLMFunction.FunctionResult result = LLMFunction.FunctionResult.success(
+-                "命令执行成功: list (返回码: 1)\nsecret command output", data);
+-
+-        assertEquals("命令执行成功: list (返回码: 1)",
+-                toolMessageContent("execute_command", result));
++        return data;
+     }
+ 
+     private static void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
+                                            String toolCallId, ChatContext context) throws Exception {
+         Method method = ToolCallHandler.class.getDeclaredMethod("appendToolExchange",
+                 LLMMessage.ToolCall.class, String.class, String.class,
+-                LLMFunction.FunctionResult.class, ChatContext.class);
++                LLMFunction.FunctionResult.class, ChatContext.class, LLMChatConfig.class);
+         method.setAccessible(true);
+         method.invoke(ToolCallHandler.getInstance(), toolCall, functionName, toolCallId,
+-                LLMFunction.FunctionResult.success("safe result"), context);
++                LLMFunction.FunctionResult.success("safe result"), context, commandOutputConfig(false));
+     }
+ 
+     private static ChatContext newContext() throws Exception {
+         Constructor<ChatContext> constructor = ChatContext.class.getDeclaredConstructor(UUID.class,
+                 String.class, int.class, Executor.class, ContextCompressor.class);
+         constructor.setAccessible(true);
+         Executor directExecutor = Runnable::run;
+         return constructor.newInstance(UUID.randomUUID(), "default", 1024, directExecutor,
+                 (ContextCompressor) messages -> "summary");
+     }
+ 
+-    private static String toolMessageContent(String functionName, LLMFunction.FunctionResult result) {
+-        return ToolCallHandler.toolResultContent(functionName, result);
++    private static LLMChatConfig commandOutputConfig(boolean returnFullOutput) throws Exception {
++        Field unsafeField = Unsafe.class.getDeclaredField("theUnsafe");
++        unsafeField.setAccessible(true);
++        Unsafe unsafe = (Unsafe) unsafeField.get(null);
++        LLMChatConfig config = (LLMChatConfig) unsafe.allocateInstance(LLMChatConfig.class);
++        Field outputFlag = LLMChatConfig.class.getDeclaredField("executeCommandReturnFullOutput");
++        outputFlag.setAccessible(true);
++        outputFlag.setBoolean(config, returnFullOutput);
++        return config;
++    }
++
++    private static String toolMessageContent(String functionName, LLMFunction.FunctionResult result,
++                                             LLMChatConfig config) {
++        return ToolCallHandler.toolResultContent(functionName, result, config);
+     }
+ }

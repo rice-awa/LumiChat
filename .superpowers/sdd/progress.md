@@ -18,4 +18,5 @@ Recon Tasks 13-15: complete (read-only; findings saved in `.superpowers/sdd/reco
 Task briefs: generated for Tasks 1-18; Tasks 7-18 regenerated as the pause checkpoint.
 Task 9: complete (commits c8dc750..1581ab4, final specification/code-quality review clean; focused and full 1.21.11 tests passed)
 Task 7 correction: complete (commits e2d95c4..current correction, final specification/code-quality review clean; logging, tool-call, policy tests and 1.19/1.21.11 builds passed)
-Current checkpoint: Task 7 correction is complete and ready to commit/push. Task 18 remains reserved for full-matrix acceptance and in-game smoke testing.
+Task 10: complete (commits 08a8ef3..f844567, final specification/code-quality review clean; focused HealthChecker/Factory tests and 1.19/1.21.11 builds passed)
+Current checkpoint: Task 10 is complete. Task 11 is next; Task 18 remains reserved for full-matrix acceptance and in-game smoke testing.

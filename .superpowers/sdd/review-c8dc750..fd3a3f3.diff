@@ -1,0 +1,334 @@
+# Review package: c8dc750..fd3a3f3
+
+## Commits
+fd3a3f3 fix(logging): 覆盖标量与授权凭据脱敏
+af1037b fix(logging): 加固日志元数据脱敏
+
+## Files changed
+ .../com/riceawa/llm/logging/LLMLogSanitizer.java   | 34 ++++++++-
+ .../riceawa/llm/logging/LLMRequestLogEntry.java    |  2 +-
+ .../riceawa/llm/logging/LLMResponseLogEntry.java   |  2 +-
+ .../riceawa/llm/logging/LLMLogSanitizerTest.java   | 85 ++++++++++++++++++++++
+ 4 files changed, 120 insertions(+), 3 deletions(-)
+
+## Diff
+diff --git a/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java b/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java
+index 4b2e6b6..20ca95c 100644
+--- a/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java
++++ b/src/main/java/com/riceawa/llm/logging/LLMLogSanitizer.java
+@@ -20,22 +20,24 @@ import java.util.Map;
+ import java.util.regex.Pattern;
+ 
+ /**
+  * Sanitizes and minimizes data written to LLM request/response logs.
+  */
+ public final class LLMLogSanitizer {
+     private static final String MASKED = "***MASKED***";
+     private static final String TRUNCATED = "... [TRUNCATED]";
+     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)\\bBearer\\s+[^\\s,\\\"}]+" );
+     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)\\b(?:sk|rk)-[a-z0-9_-]+\\b");
++    private static final Pattern AUTHORIZATION_PATTERN = Pattern.compile(
++            "(?i)(\\bauthorization\\s*[=:]\\s*)(?:([\\\"'])(?:\\\\.|(?!\\2).)*\\2|[^\\r\\n,;}]+)");
+     private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
+-            "(?i)(\\b(?:x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|secret|password)\\s*[=:]\\s*)([^\\s,\\\"}]+)");
++            "(?i)(\\b(?:x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|secret|password)\\s*[=:]\\s*)(?:([\\\"'])(?:\\\\.|(?!\\2).)*\\2|[^\\s,}]+)");
+     private static final String[] SAFE_RESPONSE_HEADERS = {
+             "content-type", "content-length", "x-request-id", "request-id", "retry-after"
+     };
+ 
+     private LLMLogSanitizer() {
+     }
+ 
+     /**
+      * Summarizes messages without retaining prompt, player, or tool argument text by default.
+      */
+@@ -88,20 +90,24 @@ public final class LLMLogSanitizer {
+ 
+     /**
+      * Sanitizes a JSON document. Invalid JSON is replaced by a non-reversible marker.
+      */
+     public static String sanitizeJson(String json) {
+         if (json == null) {
+             return null;
+         }
+         try {
+             JsonElement element = JsonParser.parseString(json);
++            if (element.isJsonPrimitive()) {
++                JsonPrimitive primitive = element.getAsJsonPrimitive();
++                return primitive.isString() ? sanitizeText(primitive.getAsString()) : element.toString();
++            }
+             sanitizeElement(element, null);
+             return element.toString();
+         } catch (Exception ignored) {
+             return "[UNPARSEABLE_REDACTED sha256=" + sha256(json)
+                     + " length=" + json.length() + "]";
+         }
+     }
+ 
+     /**
+      * Sanitizes HTTP headers, including values under non-standard secret header names.
+@@ -176,20 +182,21 @@ public final class LLMLogSanitizer {
+     }
+ 
+     /**
+      * Sanitizes plain text while retaining its non-sensitive structure.
+      */
+     public static String sanitizeText(String value) {
+         if (value == null) {
+             return null;
+         }
+         String sanitized = BEARER_PATTERN.matcher(value).replaceAll("Bearer " + MASKED);
++        sanitized = AUTHORIZATION_PATTERN.matcher(sanitized).replaceAll("$1" + MASKED);
+         sanitized = API_KEY_PATTERN.matcher(sanitized).replaceAll(MASKED);
+         return KEY_VALUE_PATTERN.matcher(sanitized).replaceAll("$1" + MASKED);
+     }
+ 
+     /**
+      * Sanitizes JSON-shaped content structurally and ordinary text with text redaction rules.
+      */
+     public static String sanitizeContent(String value) {
+         if (value == null) {
+             return null;
+@@ -202,20 +209,38 @@ public final class LLMLogSanitizer {
+     /**
+      * Replaces arbitrary content with non-reversible diagnostics for default log fields.
+      */
+     public static String summarizeContent(String value) {
+         if (value == null) {
+             return null;
+         }
+         return "[REDACTED sha256=" + sha256(value) + " length=" + value.length() + "]";
+     }
+ 
++    /**
++     * Retains metadata keys and fixed scalar values while replacing arbitrary text or objects.
++     */
++    public static Map<String, Object> summarizeMetadata(Map<String, Object> metadata) {
++        Map<String, Object> summaries = new LinkedHashMap<>();
++        if (metadata == null) {
++            return summaries;
++        }
++        for (Map.Entry<String, Object> entry : metadata.entrySet()) {
++            String key = entry.getKey();
++            if (key == null || !key.matches("[A-Za-z][A-Za-z0-9_.-]{0,63}")) {
++                continue;
++            }
++            summaries.put(key, summarizeMetadataValue(entry.getValue()));
++        }
++        return summaries;
++    }
++
+     /**
+      * Truncates to at most maxLength characters, including the truncation marker.
+      */
+     public static String truncateContent(String value, int maxLength) {
+         if (value == null || maxLength < 1 || value.length() <= maxLength) {
+             return maxLength < 1 && value != null ? "" : value;
+         }
+         if (maxLength <= TRUNCATED.length()) {
+             return TRUNCATED.substring(0, maxLength);
+         }
+@@ -227,20 +252,27 @@ public final class LLMLogSanitizer {
+         return value.matches("[A-Za-z0-9_-]{1,32}") ? value : "unknown";
+     }
+ 
+     private static int safeLength(Object length) {
+         if (length instanceof Number) {
+             return Math.max(0, ((Number) length).intValue());
+         }
+         return 0;
+     }
+ 
++    private static Object summarizeMetadataValue(Object value) {
++        if (value == null || value instanceof Boolean || value instanceof Number) {
++            return value;
++        }
++        return summarizeContent(String.valueOf(value));
++    }
++
+     private static String safeHash(Object hash) {
+         String value = hash == null ? "" : String.valueOf(hash);
+         return value.matches("[a-fA-F0-9]{64}") ? value.toLowerCase(Locale.ROOT) : sha256("");
+     }
+ 
+     private static String messageContent(LLMMessage message) {
+         if (message == null) {
+             return "";
+         }
+         String content = message.getContent();
+diff --git a/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java b/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java
+index 943b505..91acb08 100644
+--- a/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java
++++ b/src/main/java/com/riceawa/llm/logging/LLMRequestLogEntry.java
+@@ -68,21 +68,21 @@ public class LLMRequestLogEntry {
+                 : LLMLogSanitizer.sanitizeMessageSummaries(
+                         builder.messages, builder.includeMessageContent, builder.messageContentMaxLength);
+         this.config = builder.config;
+         this.rawRequestJson = builder.includeRawRequestContent
+                 ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawRequestJson), builder.rawRequestContentMaxLength)
+                 : LLMLogSanitizer.summarizeContent(builder.rawRequestJson);
+         this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(builder.requestUrl);
+         this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));
+         this.contextMessageCount = builder.contextMessageCount;
+         this.estimatedTokens = builder.estimatedTokens;
+-        this.metadata = new HashMap<>(builder.metadata);
++        this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
+     }
+ 
+     public String getRequestId() { return requestId; }
+     public LocalDateTime getTimestamp() { return timestamp; }
+     public String getPlayerName() { return playerName; }
+     public String getPlayerUuid() { return playerUuid; }
+     public String getServiceName() { return serviceName; }
+     public String getModel() { return model; }
+     public List<Map<String, Object>> getMessages() { return new ArrayList<>(messages); }
+     public LLMConfig getConfig() { return config; }
+diff --git a/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java b/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java
+index 8e4cdbe..af0f739 100644
+--- a/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java
++++ b/src/main/java/com/riceawa/llm/logging/LLMResponseLogEntry.java
+@@ -75,21 +75,21 @@ public class LLMResponseLogEntry {
+         this.rawResponseJson = builder.includeRawResponseContent
+                 ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeJson(builder.rawResponseJson), builder.rawResponseContentMaxLength)
+                 : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
+         this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
+         this.content = builder.content;
+         this.contentLength = builder.originalContent == null ? 0 : builder.originalContent.length();
+         this.contentSha256 = LLMLogSanitizer.sha256(builder.originalContent);
+         this.model = builder.model;
+         this.usage = builder.usage;
+         this.finishReason = builder.finishReason;
+-        this.metadata = new HashMap<>(builder.metadata);
++        this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
+     }
+ 
+     public String getResponseId() { return responseId; }
+     public String getRequestId() { return requestId; }
+     public LocalDateTime getTimestamp() { return timestamp; }
+     public long getResponseTimeMs() { return responseTimeMs; }
+     public int getHttpStatusCode() { return httpStatusCode; }
+     public boolean isSuccess() { return success; }
+     public String getErrorMessage() { return errorMessage; }
+     public LLMResponse getLlmResponse() { return llmResponse; }
+diff --git a/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java b/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java
+index eb6ba77..7a47858 100644
+--- a/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java
++++ b/src/test/java/com/riceawa/llm/logging/LLMLogSanitizerTest.java
+@@ -52,20 +52,57 @@ class LLMLogSanitizerTest {
+         String summary = new Gson().toJson(LLMLogSanitizer.summarizeMessages(List.of(
+                 new LLMMessage(LLMMessage.MessageRole.USER, content)
+         ), true, 64));
+ 
+         assertFalse(summary.contains(API_KEY));
+         assertTrue(summary.contains("***MASKED***"));
+         assertTrue(summary.contains("[TRUNCATED]"));
+         assertFalse(summary.contains("deliberately longer than the limit"));
+     }
+ 
++    @Test
++    void fullMessageSummaryMasksQuotedAndUnquotedPlainTextApiKeys() {
++        String opaqueKey = "opaque-provider-credential-value";
++        String content = "apiKey=\"" + opaqueKey + "\" APIKey='" + opaqueKey
++                + "' X-Api-Key=" + opaqueKey + " safe text";
++
++        String summary = new Gson().toJson(LLMLogSanitizer.summarizeMessages(List.of(
++                new LLMMessage(LLMMessage.MessageRole.USER, content)
++        ), true, 2048));
++
++        assertFalse(summary.contains(opaqueKey));
++        assertTrue(summary.contains("apiKey\\u003d***MASKED***"));
++        assertTrue(summary.contains("APIKey\\u003d***MASKED***"));
++        assertTrue(summary.contains("X-Api-Key\\u003d***MASKED***"));
++        assertTrue(summary.contains("safe text"));
++    }
++
++    @Test
++    void sanitizeJsonRedactsScalarCredentialText() {
++        String basicCredential = "Authorization: Basic dXNlcjpwYXNzd29yZA==";
++        String sanitized = LLMLogSanitizer.sanitizeJson("\"" + basicCredential + "\"");
++
++        assertFalse(sanitized.contains("dXNlcjpwYXNzd29yZA=="));
++        assertTrue(sanitized.contains("Authorization: ***MASKED***"));
++    }
++
++    @Test
++    void sanitizeTextRedactsPlainTextAuthorizationSchemes() {
++        String text = "Authorization: Basic dXNlcjpwYXNzd29yZA==; authorization='Digest opaque-secret'";
++        String sanitized = LLMLogSanitizer.sanitizeText(text);
++
++        assertFalse(sanitized.contains("dXNlcjpwYXNzd29yZA=="));
++        assertFalse(sanitized.contains("opaque-secret"));
++        assertTrue(sanitized.contains("Authorization: ***MASKED***"));
++        assertTrue(sanitized.contains("authorization=***MASKED***"));
++    }
++
+     @Test
+     void sanitizeJsonRedactsNestedSecretsAndNeverReturnsUnparseableInput() {
+         String json = "{\"api_key\":\"" + API_KEY
+                 + "\",\"authorization\":\"Bearer " + API_KEY
+                 + "\",\"nested\":{\"token\":\"nested-secret\"}}";
+ 
+         String sanitized = LLMLogSanitizer.sanitizeJson(json);
+         String invalid = "error body containing " + API_KEY;
+         String invalidSanitized = LLMLogSanitizer.sanitizeJson(invalid);
+ 
+@@ -145,11 +182,59 @@ class LLMLogSanitizerTest {
+         assertFalse(requestJson.contains(privatePrompt));
+         assertFalse(requestJson.contains("user:pass"));
+         assertFalse(requestJson.contains("/v1/chat"));
+         assertFalse(responseJson.contains(secret));
+         assertFalse(responseJson.contains(privateResponse));
+         assertFalse(responseJson.contains("X-Api-Key"));
+         assertFalse(responseJson.contains("X-Provider-Trace"));
+         assertTrue(responseJson.contains("Content-Type"));
+         assertTrue(responseJson.contains("[PRESENT]"));
+     }
++
++    @Test
++    void suppliedMessageContentCannotInvalidateRecordedSummaryMetadata() {
++        String privatePrompt = "message summary private prompt";
++        List<Map<String, Object>> suppliedSummaries = List.of(Map.of(
++                "role", "user",
++                "content", privatePrompt,
++                "length", 7,
++                "sha256", "0".repeat(64)
++        ));
++
++        LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("request-summary")
++                .serviceName("provider")
++                .messageSummaries(suppliedSummaries, true, 2048)
++                .build();
++
++        String requestJson = request.toJsonString();
++        assertTrue(requestJson.contains(privatePrompt));
++        assertTrue(requestJson.contains("\"length\": " + privatePrompt.length()));
++        assertTrue(requestJson.contains(LLMLogSanitizer.sha256(privatePrompt)));
++        assertFalse(requestJson.contains("\"length\": 7"));
++        assertFalse(requestJson.contains("\"sha256\": \"" + "0".repeat(64) + "\""));
++    }
++
++    @Test
++    void defaultLogEntrySerializationSummarizesArbitraryMetadata() {
++        String privatePrompt = "metadata must not serialize this private prompt";
++
++        LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("request-metadata")
++                .serviceName("provider")
++                .metadata("prompt", privatePrompt)
++                .metadata("attempt", 2)
++                .build();
++        LLMResponseLogEntry response = LLMLogUtils.createResponseLogBuilder("response-metadata", "request-metadata")
++                .metadata("response_content", privatePrompt)
++                .metadata("success", true)
++                .build();
++
++        String requestJson = request.toJsonString();
++        String responseJson = response.toJsonString();
++
++        assertFalse(requestJson.contains(privatePrompt));
++        assertFalse(responseJson.contains(privatePrompt));
++        assertTrue(requestJson.contains("[REDACTED sha256\\u003d"));
++        assertTrue(responseJson.contains("[REDACTED sha256\\u003d"));
++        assertTrue(requestJson.contains("\"attempt\": 2"));
++        assertTrue(responseJson.contains("\"success\": true"));
++    }
+ }
