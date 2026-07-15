@@ -28,7 +28,7 @@ public final class LLMLogSanitizer {
     private static final Pattern BEARER_PATTERN = Pattern.compile("(?i)\\bBearer\\s+[^\\s,\\\"}]+" );
     private static final Pattern API_KEY_PATTERN = Pattern.compile("(?i)\\b(?:sk|rk)-[a-z0-9_-]+\\b");
     private static final Pattern KEY_VALUE_PATTERN = Pattern.compile(
-            "(?i)(\\b(?:x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|secret|password)\\s*[=:]\\s*)([^\\s,\\\"}]+)");
+            "(?i)(\\b(?:x[-_]?api[-_]?key|api[-_]?key|access[-_]?token|secret|password)\\s*[=:]\\s*)(?:([\\\"'])(?:\\\\.|(?!\\2).)*\\2|[^\\s,}]+)");
     private static final String[] SAFE_RESPONSE_HEADERS = {
             "content-type", "content-length", "x-request-id", "request-id", "retry-after"
     };
@@ -210,6 +210,24 @@ public final class LLMLogSanitizer {
     }
 
     /**
+     * Retains metadata keys and fixed scalar values while replacing arbitrary text or objects.
+     */
+    public static Map<String, Object> summarizeMetadata(Map<String, Object> metadata) {
+        Map<String, Object> summaries = new LinkedHashMap<>();
+        if (metadata == null) {
+            return summaries;
+        }
+        for (Map.Entry<String, Object> entry : metadata.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || !key.matches("[A-Za-z][A-Za-z0-9_.-]{0,63}")) {
+                continue;
+            }
+            summaries.put(key, summarizeMetadataValue(entry.getValue()));
+        }
+        return summaries;
+    }
+
+    /**
      * Truncates to at most maxLength characters, including the truncation marker.
      */
     public static String truncateContent(String value, int maxLength) {
@@ -232,6 +250,13 @@ public final class LLMLogSanitizer {
             return Math.max(0, ((Number) length).intValue());
         }
         return 0;
+    }
+
+    private static Object summarizeMetadataValue(Object value) {
+        if (value == null || value instanceof Boolean || value instanceof Number) {
+            return value;
+        }
+        return summarizeContent(String.valueOf(value));
     }
 
     private static String safeHash(Object hash) {

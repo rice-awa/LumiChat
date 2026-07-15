@@ -60,6 +60,23 @@ class LLMLogSanitizerTest {
     }
 
     @Test
+    void fullMessageSummaryMasksQuotedAndUnquotedPlainTextApiKeys() {
+        String opaqueKey = "opaque-provider-credential-value";
+        String content = "apiKey=\"" + opaqueKey + "\" APIKey='" + opaqueKey
+                + "' X-Api-Key=" + opaqueKey + " safe text";
+
+        String summary = new Gson().toJson(LLMLogSanitizer.summarizeMessages(List.of(
+                new LLMMessage(LLMMessage.MessageRole.USER, content)
+        ), true, 2048));
+
+        assertFalse(summary.contains(opaqueKey));
+        assertTrue(summary.contains("apiKey\\u003d***MASKED***"));
+        assertTrue(summary.contains("APIKey\\u003d***MASKED***"));
+        assertTrue(summary.contains("X-Api-Key\\u003d***MASKED***"));
+        assertTrue(summary.contains("safe text"));
+    }
+
+    @Test
     void sanitizeJsonRedactsNestedSecretsAndNeverReturnsUnparseableInput() {
         String json = "{\"api_key\":\"" + API_KEY
                 + "\",\"authorization\":\"Bearer " + API_KEY
@@ -151,5 +168,53 @@ class LLMLogSanitizerTest {
         assertFalse(responseJson.contains("X-Provider-Trace"));
         assertTrue(responseJson.contains("Content-Type"));
         assertTrue(responseJson.contains("[PRESENT]"));
+    }
+
+    @Test
+    void suppliedMessageContentCannotInvalidateRecordedSummaryMetadata() {
+        String privatePrompt = "message summary private prompt";
+        List<Map<String, Object>> suppliedSummaries = List.of(Map.of(
+                "role", "user",
+                "content", privatePrompt,
+                "length", 7,
+                "sha256", "0".repeat(64)
+        ));
+
+        LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("request-summary")
+                .serviceName("provider")
+                .messageSummaries(suppliedSummaries, true, 2048)
+                .build();
+
+        String requestJson = request.toJsonString();
+        assertTrue(requestJson.contains(privatePrompt));
+        assertTrue(requestJson.contains("\"length\": " + privatePrompt.length()));
+        assertTrue(requestJson.contains(LLMLogSanitizer.sha256(privatePrompt)));
+        assertFalse(requestJson.contains("\"length\": 7"));
+        assertFalse(requestJson.contains("\"sha256\": \"" + "0".repeat(64) + "\""));
+    }
+
+    @Test
+    void defaultLogEntrySerializationSummarizesArbitraryMetadata() {
+        String privatePrompt = "metadata must not serialize this private prompt";
+
+        LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("request-metadata")
+                .serviceName("provider")
+                .metadata("prompt", privatePrompt)
+                .metadata("attempt", 2)
+                .build();
+        LLMResponseLogEntry response = LLMLogUtils.createResponseLogBuilder("response-metadata", "request-metadata")
+                .metadata("response_content", privatePrompt)
+                .metadata("success", true)
+                .build();
+
+        String requestJson = request.toJsonString();
+        String responseJson = response.toJsonString();
+
+        assertFalse(requestJson.contains(privatePrompt));
+        assertFalse(responseJson.contains(privatePrompt));
+        assertTrue(requestJson.contains("[REDACTED sha256\\u003d"));
+        assertTrue(responseJson.contains("[REDACTED sha256\\u003d"));
+        assertTrue(requestJson.contains("\"attempt\": 2"));
+        assertTrue(responseJson.contains("\"success\": true"));
     }
 }

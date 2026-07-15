@@ -75,7 +75,7 @@ public class LLMRequestLogEntry {
         this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));
         this.contextMessageCount = builder.contextMessageCount;
         this.estimatedTokens = builder.estimatedTokens;
-        this.metadata = new HashMap<>(builder.metadata);
+        this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
     }
 
     public String getRequestId() { return requestId; }

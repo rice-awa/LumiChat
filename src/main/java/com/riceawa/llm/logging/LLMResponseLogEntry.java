@@ -82,7 +82,7 @@ public class LLMResponseLogEntry {
         this.model = builder.model;
         this.usage = builder.usage;
         this.finishReason = builder.finishReason;
-        this.metadata = new HashMap<>(builder.metadata);
+        this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
     }
 
     public String getResponseId() { return responseId; }
