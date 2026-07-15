@@ -16,4 +16,5 @@ Task 7: complete (commits 440648a..5432f31; policy/audit/tool-call regression su
 Task 8: complete (commits 445d651..bb60122; Wiki/player interaction safeguards and alternate numeric IPv4 SSRF regressions passed; 1.19/1.20.6/1.21.11 builds passed; review blocker fixed; in-game smoke deferred to Task 18)
 Recon Tasks 13-15: complete (read-only; findings saved in `.superpowers/sdd/recon-tasks-13-15.md`)
 Task briefs: generated for Tasks 1-18; Tasks 7-18 regenerated as the pause checkpoint.
-Current checkpoint: local and remote `codex/multiversion-remediation` are aligned at `bb60122`; the next implementation task is Task 9. Task 18 remains reserved for full-matrix acceptance and in-game smoke testing.
+Task 9: complete (commits c8dc750..1581ab4, final specification/code-quality review clean; focused and full 1.21.11 tests passed)
+Current checkpoint: local `codex/multiversion-remediation` is at `1581ab4`; remote is behind and will be pushed before the next implementation task. The next implementation task is the Task 7 correction brief. Task 18 remains reserved for full-matrix acceptance and in-game smoke testing.
