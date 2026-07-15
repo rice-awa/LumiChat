@@ -72,11 +72,14 @@ public class LLMResponseLogEntry {
         this.success = builder.success;
         this.errorMessage = builder.errorMessage;
         this.llmResponse = builder.llmResponse;
-        this.rawResponseJson = builder.includeRawResponseContent
+        this.rawResponseJson = builder.includeRawResponseContent && !builder.containsExecuteCommand
                 ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawResponseJson), builder.rawResponseContentMaxLength)
                 : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
         this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
-        this.content = builder.content;
+        this.content = builder.includeContent && !builder.containsExecuteCommand
+                ? LLMLogSanitizer.truncateContent(
+                        LLMLogSanitizer.sanitizeLlmLogContent(builder.originalContent), builder.contentMaxLength)
+                : null;
         this.contentLength = builder.originalContent == null ? 0 : builder.originalContent.length();
         this.contentSha256 = LLMLogSanitizer.sha256(builder.originalContent);
         this.model = builder.model;
@@ -159,8 +162,10 @@ public class LLMResponseLogEntry {
         private boolean includeRawResponseContent;
         private int rawResponseContentMaxLength;
         private Map<String, String> responseHeaders = new HashMap<>();
-        private String content;
         private String originalContent;
+        private boolean includeContent;
+        private int contentMaxLength;
+        private boolean containsExecuteCommand;
         private String model;
         private TokenUsage usage;
         private String finishReason;
@@ -198,15 +203,23 @@ public class LLMResponseLogEntry {
 
         public Builder content(String content, boolean includeContent, int maxLength) {
             this.originalContent = content;
-            this.content = includeContent
-                    ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(content), maxLength)
-                    : null;
+            this.includeContent = includeContent;
+            this.contentMaxLength = maxLength;
+            return this;
+        }
+
+        /**
+         * Marks this response as associated with an execute_command request. Full provider content
+         * and raw response body are then omitted at serialization because the provider may echo
+         * captured command output in an otherwise ordinary assistant response.
+         */
+        public Builder containsExecuteCommand(boolean containsExecuteCommand) {
+            this.containsExecuteCommand = containsExecuteCommand;
             return this;
         }
 
         private void setContent(String content) {
             this.originalContent = content;
-            this.content = null;
         }
 
         public Builder rawResponseJson(String rawResponseJson) {

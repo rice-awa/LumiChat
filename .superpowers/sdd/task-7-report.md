@@ -383,3 +383,54 @@ Result: `BUILD SUCCESSFUL`; CommandExecutionPolicyTest passed 9/9 and both requi
 ### Concerns
 
 No live OpenAI-compatible provider/server smoke test was available, so the logging-path regression is validated at the exact DTO/sanitizer boundary used by `OpenAIService`, with both full-body overloads enabled. A live check should enable full request/response logging, issue an allowlisted `execute_command` call with distinctive command/output markers, verify those markers are present in the in-memory tool result but absent from INFO logs, and inspect the unchanged six-field audit event.
+
+## Final correction hardening — 2026-07-15
+
+### Review findings addressed
+
+- Added request-level `containsExecuteCommand` tracking in `OpenAIService`. When the current or retained context contains an `execute_command` request/result, full request message content and `raw_request_json` are disabled even if `logFullRequestBody` is enabled; role, length, hash, and irreversible raw-body summaries remain available.
+- Response DTOs use the same context to suppress full provider `content` and `raw_response_json`, preventing an ordinary assistant response from echoing captured command output into INFO logs.
+- Applied the command-output redaction to both `TOOL` and legacy `FUNCTION` `LLMMessage` summaries.
+- Replaced `Stream.toList()` with a Java 8-compatible `ArrayList` copy during recursive JSON traversal so the shared logging source remains compilable for older Minecraft targets.
+
+### Regression coverage
+
+`LLMLogSanitizerTest` now explicitly covers legacy `function_call`, real `FUNCTION` message summaries, ordinary assistant response echo, a follow-up request after an execute-command echo, and preservation of full request/response content for non-command responses. The tests assert that command/output markers do not occur in serialized request or response logs.
+
+### Final validation
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  --max-workers=1 :1.21.11:test --tests com.riceawa.llm.logging.LLMLogSanitizerTest \
+  --rerun-tasks --no-build-cache
+```
+
+Result: `BUILD SUCCESSFUL`.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  --max-workers=1 :1.21.11:test \
+  --tests com.riceawa.llm.command.ToolCallHandlerTest \
+  --tests com.riceawa.llm.function.CommandExecutionPolicyTest \
+  --rerun-tasks --no-build-cache
+```
+
+Result: `BUILD SUCCESSFUL`; ToolCallHandlerTest 5/5 and CommandExecutionPolicyTest 9/9.
+
+```bash
+JAVA_HOME=/tmp/lumichat-jdk21 \
+PATH=/tmp/lumichat-jdk21/bin:$PATH \
+./gradlew -Dorg.gradle.java.installations.paths=/tmp/lumichat-jdk17,/tmp/lumichat-jdk21 \
+  --max-workers=1 :1.19:build :1.21.11:build \
+  --rerun-tasks --no-build-cache
+```
+
+Result: `BUILD SUCCESSFUL`; both representative builds completed successfully. `git diff --check` passed.
+
+### Independent final review
+
+Specification: PASS. Code quality: PASS. Critical/Important/Minor findings: none. The reviewer confirmed that execute-command output remains available to the in-memory LLM tool result, while audit and INFO LLM logs retain only the existing six-field audit schema or safe summaries; non-command full logging remains enabled by configuration. No live provider/server smoke test was available.

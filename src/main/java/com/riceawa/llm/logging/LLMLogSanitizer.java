@@ -221,6 +221,37 @@ public final class LLMLogSanitizer {
     }
 
     /**
+     * Returns whether the conversation contains an execute_command request or result.
+     * This signal is used to disable full response-body logging for that request because a
+     * provider may echo command output in an ordinary assistant content field.
+     */
+    public static boolean containsExecuteCommand(List<LLMMessage> messages) {
+        if (messages == null) {
+            return false;
+        }
+        for (LLMMessage message : messages) {
+            if (message == null) {
+                continue;
+            }
+            if (message.getMetadata() != null && message.getMetadata().getToolCall() != null
+                    && "execute_command".equals(message.getMetadata().getToolCall().getName())) {
+                return true;
+            }
+            if ((message.getRole() == LLMMessage.MessageRole.TOOL
+                    || message.getRole() == LLMMessage.MessageRole.FUNCTION)
+                    && "execute_command".equals(message.getName())) {
+                return true;
+            }
+            if (message.getRole() == LLMMessage.MessageRole.ASSISTANT
+                    && message.getContent() != null
+                    && message.getContent().contains(EXECUTE_COMMAND_LEGACY_RESULT_MARKER)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Removes execute_command arguments and captured output before content can enter INFO logs.
      * The immediate tool response remains untouched; this boundary is only for log serialization.
      */
@@ -345,7 +376,8 @@ public final class LLMLogSanitizer {
                 && message.getContent().contains(EXECUTE_COMMAND_LEGACY_RESULT_MARKER)) {
             return EXECUTE_COMMAND_OUTPUT_REDACTED;
         }
-        if (message != null && message.getRole() == LLMMessage.MessageRole.TOOL
+        if (message != null && (message.getRole() == LLMMessage.MessageRole.TOOL
+                || message.getRole() == LLMMessage.MessageRole.FUNCTION)
                 && "execute_command".equals(message.getName())) {
             return EXECUTE_COMMAND_OUTPUT_REDACTED;
         }
@@ -419,7 +451,11 @@ public final class LLMLogSanitizer {
                 && stringValue(object.get("content")).contains(EXECUTE_COMMAND_LEGACY_RESULT_MARKER)) {
             object.addProperty("content", EXECUTE_COMMAND_OUTPUT_REDACTED);
         }
-        for (JsonElement child : object.entrySet().stream().map(Map.Entry::getValue).toList()) {
+        List<JsonElement> childElements = new ArrayList<>();
+        for (Map.Entry<String, JsonElement> entry : object.entrySet()) {
+            childElements.add(entry.getValue());
+        }
+        for (JsonElement child : childElements) {
             redactExecuteCommandFields(child);
         }
     }

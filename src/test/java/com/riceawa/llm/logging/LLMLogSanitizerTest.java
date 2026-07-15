@@ -11,6 +11,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LLMLogSanitizerTest {
@@ -87,6 +88,125 @@ class LLMLogSanitizerTest {
         assertTrue(sanitized.contains("12:00 UTC"));
     }
 
+    @Test
+    void fullLlmLogsRedactLegacyFunctionCallAndKeepOtherToolData() {
+        String command = "op SensitivePlayer --secret=function-call-never-log-this";
+        String output = "function call command output must never enter logs";
+        String timeArguments = "{\"timezone\":\"UTC\"}";
+        String payload = "{\"messages\":["
+                + "{\"role\":\"assistant\",\"function_call\":{\"name\":\"execute_command\",\"arguments\":\""
+                + command + "\"}},"
+                + "{\"role\":\"assistant\",\"function_call\":{\"name\":\"get_time\",\"arguments\":\""
+                + timeArguments.replace("\"", "\\\"") + "\"}},"
+                + "{\"role\":\"function\",\"name\":\"execute_command\",\"content\":\""
+                + output + "\"},"
+                + "{\"role\":\"function\",\"name\":\"get_time\",\"content\":\"12:00 UTC\"}]}";
+
+        String sanitized = LLMLogSanitizer.sanitizeLlmLogContent(payload);
+
+        assertFalse(sanitized.contains(command));
+        assertFalse(sanitized.contains(output));
+        assertTrue(sanitized.contains("[REDACTED execute_command arguments]"));
+        assertTrue(sanitized.contains("[REDACTED execute_command output]"));
+        assertTrue(sanitized.contains("get_time"));
+        assertTrue(sanitized.contains("UTC"));
+        assertTrue(sanitized.contains("12:00 UTC"));
+    }
+
+    @Test
+    void fullMessageSummaryRedactsExecuteCommandFunctionOutput() {
+        String output = "legacy function command output must never enter message summaries";
+        LLMMessage functionMessage = new LLMMessage(LLMMessage.MessageRole.FUNCTION, output);
+        functionMessage.setName("execute_command");
+
+        List<Map<String, Object>> summaries = LLMLogSanitizer.summarizeMessages(
+                List.of(functionMessage), true, 4096);
+        String summaryJson = new Gson().toJson(summaries);
+
+        assertEquals(1, summaries.size());
+        assertEquals("function", summaries.get(0).get("role"));
+        assertEquals("[REDACTED execute_command output]", summaries.get(0).get("content"));
+        assertFalse(summaryJson.contains(output));
+    }
+
+    @Test
+    void executeCommandContextSuppressesOrdinaryAssistantResponseEcho() {
+        String command = "execute say UNIQUE_COMMAND_MARKER";
+        String output = "UNIQUE_COMMAND_OUTPUT";
+        LLMMessage toolMessage = new LLMMessage(LLMMessage.MessageRole.TOOL,
+                "命令执行成功: execute (返回码: 1)\n" + output);
+        toolMessage.setName("execute_command");
+        String rawRequest = "{\"messages\":[{\"role\":\"tool\",\"name\":\"execute_command\",\"content\":\""
+                + command + " " + output + "\"}]}";
+        String rawResponse = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\""
+                + output + "\"}}]}";
+
+        assertTrue(LLMLogSanitizer.containsExecuteCommand(List.of(toolMessage)));
+        String requestJson = LLMLogUtils.createRequestLogBuilder("echo-request")
+                .serviceName("provider")
+                .rawRequestJson(rawRequest, true, 4096)
+                .build()
+                .toJsonString();
+        LLMResponseLogEntry response = LLMLogUtils.createResponseLogBuilder("echo-response", "echo-request")
+                .content(output, true, 4096)
+                .rawResponseJson(rawResponse, true, 4096)
+                .containsExecuteCommand(true)
+                .build();
+        String responseJson = response.toJsonString();
+
+        assertFalse(requestJson.contains(command));
+        assertFalse(requestJson.contains(output));
+        assertFalse(response.getRawResponseJson().contains(output));
+        assertFalse(responseJson.contains(output));
+        assertFalse(responseJson.contains("\\\"content\\\": \"" + output + "\""));
+        assertTrue(response.getRawResponseJson().startsWith("[REDACTED sha256="));
+        assertNull(response.getContent());
+    }
+
+
+    @Test
+    void followUpRequestSuppressesFullLoggingAfterExecuteCommandEcho() {
+        String output = "FOLLOW_UP_COMMAND_OUTPUT";
+        LLMMessage toolMessage = new LLMMessage(LLMMessage.MessageRole.TOOL,
+                "命令执行成功: execute (返回码: 1)\n" + output);
+        toolMessage.setName("execute_command");
+        LLMMessage assistantEcho = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, output);
+        List<LLMMessage> messages = List.of(toolMessage, assistantEcho);
+        String rawRequest = "{\"messages\":[{\"role\":\"assistant\",\"content\":\""
+                + output + "\"}]}";
+        boolean includeRequestContent = true && !LLMLogSanitizer.containsExecuteCommand(messages);
+
+        LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("follow-up-request")
+                .serviceName("provider")
+                .messageSummaries(
+                        LLMLogSanitizer.summarizeMessages(messages, includeRequestContent, 4096),
+                        includeRequestContent, 4096)
+                .rawRequestJson(rawRequest, includeRequestContent, 4096)
+                .build();
+
+        String requestJson = request.toJsonString();
+        assertFalse(includeRequestContent);
+        assertFalse(requestJson.contains(output));
+        assertFalse(request.getRawRequestJson().contains(output));
+        assertTrue(request.getRawRequestJson().startsWith("[REDACTED sha256="));
+        assertTrue(request.getMessages().stream().allMatch(message -> !message.containsValue(output)));
+    }
+
+    @Test
+    void nonExecuteCommandResponseRetainsConfiguredFullContent() {
+        String content = "ordinary assistant response";
+        String rawResponse = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\""
+                + content + "\"}}]}";
+
+        LLMResponseLogEntry response = LLMLogUtils.createResponseLogBuilder("ordinary-response", "ordinary-request")
+                .content(content, true, 4096)
+                .rawResponseJson(rawResponse, true, 4096)
+                .build();
+
+        assertEquals(content, response.getContent());
+        assertTrue(response.getRawResponseJson().contains(content));
+        assertTrue(response.toJsonString().contains(content));
+    }
 
     @Test
     void defaultMessageSummaryContainsOnlyMetadata() {
