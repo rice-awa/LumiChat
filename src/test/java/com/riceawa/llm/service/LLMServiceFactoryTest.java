@@ -31,6 +31,14 @@ class LLMServiceFactoryTest {
     }
 
     @Test
+    void oldProviderDefaultsToOpenAICompatibleProtocol() {
+        Provider provider = new Provider(
+                "legacy", "https://example.test/v1", "test-api-key", List.of("test-model"));
+
+        assertEquals("openai-compatible", provider.getProtocol());
+        assertTrue(new LLMServiceFactory().supportsProtocol(provider.getProtocol()));
+    }
+    @Test
     void rejectsUnknownProtocolExplicitly() {
         Provider provider = provider("unknown", "unsupported-protocol");
 
@@ -41,6 +49,7 @@ class LLMServiceFactoryTest {
         assertTrue(exception.getMessage().contains("Unsupported provider protocol"));
         assertTrue(exception.getMessage().contains("unsupported-protocol"));
     }
+
 
     @Test
     void passesCompleteProviderToMatchedAdapter() {

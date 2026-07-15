@@ -44,6 +44,13 @@ public final class LLMServiceFactory {
     }
 
     /**
+     * Checks whether an adapter is registered for the given protocol.
+     */
+    public boolean supportsProtocol(String protocol) {
+        return adapters.containsKey(normalizeProtocol(protocol));
+    }
+
+    /**
      * Creates a service for the provider's declared protocol.
      *
      * @throws IllegalArgumentException when the provider or its protocol is unsupported

@@ -55,6 +55,13 @@ public class ProviderHealthChecker {
             );
         }
         
+        if (!serviceFactory.supportsProtocol(provider.getProtocol())) {
+            return CompletableFuture.completedFuture(
+                new HealthStatus(false, getUnsupportedProtocolMessage(provider),
+                    HealthStatus.ErrorType.CONFIG_ERROR, LocalDateTime.now())
+            );
+        }
+
         // 检查缓存
         HealthStatus cached = healthCache.get(provider.getName());
         if (cached != null && !cached.isExpired(CACHE_DURATION_MS)) {
@@ -121,6 +128,10 @@ public class ProviderHealthChecker {
         healthCache.clear();
     }
     
+    private String getUnsupportedProtocolMessage(Provider provider) {
+        return "不支持的Provider协议: " + provider.getProtocol();
+    }
+
     /**
      * 执行实际的健康检查
      */
