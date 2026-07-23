@@ -88,11 +88,10 @@ java {
     targetCompatibility = requiredJava
     sourceCompatibility = requiredJava
 
-    // Toolchain：让 Gradle 按各版本 requiredJava 自动解析/下载对应 JDK（CI 单 job 跑
+    // Toolchain：让 Gradle 按各版本 requiredJava 自动解析对应 JDK（CI 单 job 跑
     // buildAndCollect 时跨 1.19.4→26.x 需要 Java 8/21/25 共存）。
-    // 配合 settings.gradle.kts 的 foojay-resolver-convention 实现 auto-download。
+    // vendor 不限定，优先使用 gradle.properties 的 org.gradle.java.installations.paths 中注册的本地 JDK。
     toolchain {
-        vendor = JvmVendorSpec.ADOPTIUM
         languageVersion = JavaLanguageVersion.of(requiredJava.majorVersion)
     }
 }
