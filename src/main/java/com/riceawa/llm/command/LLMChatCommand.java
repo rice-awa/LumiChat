@@ -16,6 +16,7 @@ public class LLMChatCommand {
         root.then(ProviderCommands.build());
         root.then(ModelCommands.build());
         root.then(BroadcastCommands.build());
+        root.then(ChatModeCommands.build());
 
         dispatcher.register(root);
     }
