@@ -1,5 +1,9 @@
 # LumiChat 开发规范
 
+## 项目概述
+
+LumiChat 是一个 Fabric 模组，将 LLM/AI 对话能力集成到 Minecraft 游戏内。基于 Stonecutter 多版本构建，支持从 1.19.4 到 26.2 共 27 个 Minecraft 版本。模组 ID: `lumichat`，主包 `com.riceawa.llm`。
+
 ## 项目结构
 
 ```
