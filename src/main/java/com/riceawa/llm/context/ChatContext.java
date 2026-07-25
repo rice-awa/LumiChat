@@ -70,6 +70,7 @@ public class ChatContext {
     private int maxContextCharacters;
     private volatile long lastActivity;
     private volatile ContextEventListener eventListener;
+    private volatile ChatMode chatMode = ChatMode.OFF;
     private final Executor compressionExecutor;
     private final ContextCompressor compressor;
 
@@ -629,6 +630,14 @@ public class ChatContext {
         synchronized (messageLock) {
             return messages.size();
         }
+    }
+
+    public ChatMode getChatMode() {
+        return chatMode;
+    }
+
+    public void setChatMode(ChatMode mode) {
+        this.chatMode = mode;
     }
 
     /**
