@@ -260,6 +260,9 @@ public final class LLMLogSanitizer {
             return null;
         }
         String trimmed = value.trim();
+        if (trimmed.startsWith("[REDACTED") || trimmed.startsWith("[UNPARSEABLE_REDACTED")) {
+            return value;
+        }
         if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
             try {
                 JsonElement element = JsonParser.parseString(value);

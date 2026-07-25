@@ -11,7 +11,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LLMLogSanitizerTest {
@@ -130,7 +129,7 @@ class LLMLogSanitizerTest {
     }
 
     @Test
-    void executeCommandContextSuppressesOrdinaryAssistantResponseEcho() {
+    void executeCommandMessagesRedactedButOtherContentRetainedWhenFullBodyEnabled() {
         String command = "execute say UNIQUE_COMMAND_MARKER";
         String output = "UNIQUE_COMMAND_OUTPUT";
         LLMMessage toolMessage = new LLMMessage(LLMMessage.MessageRole.TOOL,
@@ -150,22 +149,19 @@ class LLMLogSanitizerTest {
         LLMResponseLogEntry response = LLMLogUtils.createResponseLogBuilder("echo-response", "echo-request")
                 .content(output, true, 4096)
                 .rawResponseJson(rawResponse, true, 4096)
-                .containsExecuteCommand(true)
                 .build();
         String responseJson = response.toJsonString();
 
         assertFalse(requestJson.contains(command));
         assertFalse(requestJson.contains(output));
-        assertFalse(response.getRawResponseJson().contains(output));
-        assertFalse(responseJson.contains(output));
-        assertFalse(responseJson.contains("\\\"content\\\": \"" + output + "\""));
-        assertTrue(response.getRawResponseJson().startsWith("[REDACTED sha256="));
-        assertNull(response.getContent());
+        assertEquals(output, response.getContent());
+        assertFalse(response.getRawResponseJson().startsWith("[REDACTED sha256="));
+        assertTrue(responseJson.contains(output));
     }
 
 
     @Test
-    void followUpRequestSuppressesFullLoggingAfterExecuteCommandEcho() {
+    void followUpRequestRetainsContentWithExecuteCommandMessagesRedacted() {
         String output = "FOLLOW_UP_COMMAND_OUTPUT";
         LLMMessage toolMessage = new LLMMessage(LLMMessage.MessageRole.TOOL,
                 "命令执行成功: execute (返回码: 1)\n" + output);
@@ -174,7 +170,7 @@ class LLMLogSanitizerTest {
         List<LLMMessage> messages = List.of(toolMessage, assistantEcho);
         String rawRequest = "{\"messages\":[{\"role\":\"assistant\",\"content\":\""
                 + output + "\"}]}";
-        boolean includeRequestContent = true && !LLMLogSanitizer.containsExecuteCommand(messages);
+        boolean includeRequestContent = true;
 
         LLMRequestLogEntry request = LLMLogUtils.createRequestLogBuilder("follow-up-request")
                 .serviceName("provider")
@@ -185,11 +181,14 @@ class LLMLogSanitizerTest {
                 .build();
 
         String requestJson = request.toJsonString();
-        assertFalse(includeRequestContent);
-        assertFalse(requestJson.contains(output));
-        assertFalse(request.getRawRequestJson().contains(output));
-        assertTrue(request.getRawRequestJson().startsWith("[REDACTED sha256="));
-        assertTrue(request.getMessages().stream().allMatch(message -> !message.containsValue(output)));
+        assertTrue(includeRequestContent);
+        List<Map<String, Object>> requestMessages = request.getMessages();
+        assertEquals(2, requestMessages.size());
+        assertTrue(requestJson.contains(output));
+        assertTrue(request.getRawRequestJson().contains(output));
+        assertFalse(request.getRawRequestJson().startsWith("[REDACTED sha256="));
+        assertEquals("[REDACTED execute_command output]", requestMessages.get(0).get("content"));
+        assertEquals(output, requestMessages.get(1).get("content"));
     }
 
     @Test

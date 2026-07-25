@@ -72,11 +72,11 @@ public class LLMResponseLogEntry {
         this.success = builder.success;
         this.errorMessage = builder.errorMessage;
         this.llmResponse = builder.llmResponse;
-        this.rawResponseJson = builder.includeRawResponseContent && !builder.containsExecuteCommand
+        this.rawResponseJson = builder.includeRawResponseContent
                 ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawResponseJson), builder.rawResponseContentMaxLength)
                 : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
         this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
-        this.content = builder.includeContent && !builder.containsExecuteCommand
+        this.content = builder.includeContent
                 ? LLMLogSanitizer.truncateContent(
                         LLMLogSanitizer.sanitizeLlmLogContent(builder.originalContent), builder.contentMaxLength)
                 : null;
@@ -165,7 +165,6 @@ public class LLMResponseLogEntry {
         private String originalContent;
         private boolean includeContent;
         private int contentMaxLength;
-        private boolean containsExecuteCommand;
         private String model;
         private TokenUsage usage;
         private String finishReason;
@@ -208,15 +207,6 @@ public class LLMResponseLogEntry {
             return this;
         }
 
-        /**
-         * Marks this response as associated with an execute_command request. Full provider content
-         * and raw response body are then omitted at serialization because the provider may echo
-         * captured command output in an otherwise ordinary assistant response.
-         */
-        public Builder containsExecuteCommand(boolean containsExecuteCommand) {
-            this.containsExecuteCommand = containsExecuteCommand;
-            return this;
-        }
 
         private void setContent(String content) {
             this.originalContent = content;

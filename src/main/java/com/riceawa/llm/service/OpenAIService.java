@@ -180,8 +180,7 @@ public class OpenAIService implements LLMService {
 
         // 记录请求日志：默认仅记录消息摘要和请求元数据
         LogConfig logConfig = LLMChatConfig.getInstance().getLogConfig();
-        boolean containsExecuteCommand = LLMLogSanitizer.containsExecuteCommand(messages);
-        boolean includeRequestContent = logConfig.isLogFullRequestBody() && !containsExecuteCommand;
+        boolean includeRequestContent = logConfig.isLogFullRequestBody();
         LLMRequestLogEntry.Builder requestLogBuilder = LLMLogUtils.createRequestLogBuilder(requestId)
                 .serviceName(getServiceName())
                 .playerName(playerName)
@@ -231,8 +230,7 @@ public class OpenAIService implements LLMService {
                         .errorMessage("HTTP " + response.code() + ": " + sanitizedErrorBody)
                         .responseHeaders(responseHeaders)
                         .responseTimeMs(responseTime)
-                        .content(sanitizedErrorBody, logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength())
-                        .containsExecuteCommand(containsExecuteCommand);
+                        .content(sanitizedErrorBody, logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength());
                 if (logConfig.isLogFullResponseBody()) {
                     responseLogBuilder.rawResponseJson(
                             responseBody, true, logConfig.getMaxLogContentLength());
@@ -257,8 +255,7 @@ public class OpenAIService implements LLMService {
                     .responseHeaders(responseHeaders)
                     .responseTimeMs(responseTime)
                     .model(llmResponse.getModel())
-                    .content(llmResponse.getContent(), logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength())
-                    .containsExecuteCommand(containsExecuteCommand);
+                    .content(llmResponse.getContent(), logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength());
             if (llmResponse.getUsage() != null) {
                 LLMResponse.Usage usage = llmResponse.getUsage();
                 responseLogBuilder.usage(usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
