@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import com.riceawa.llm.compat.DimensionCompat;
 import com.riceawa.llm.compat.MessageCompat;
 import com.riceawa.llm.compat.PlayerCompat;
+import com.riceawa.llm.compat.TeleportCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
@@ -148,13 +149,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                     return FunctionResult.error("无法获取目标玩家所在世界信息");
                 }
 
-                //? >=1.21.2 {
-                targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
-                                    java.util.Set.of(), targetPlayer.getYRot(), targetPlayer.getXRot(), true);
-                //?} else {
-                /*targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
+                TeleportCompat.teleport(targetPlayer, targetLevel, targetPos.x, targetPos.y, targetPos.z,
                                     targetPlayer.getYRot(), targetPlayer.getXRot());
-                *//*?}*/
                 
                 // 发送消息
                 String message = String.format("已将 %s 传送到 %s 身边", 
@@ -204,13 +200,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                 }
                 
                 // 执行传送
-                //? >=1.21.2 {
-                targetPlayer.teleportTo(targetLevel, x, y, z, java.util.Set.of(),
-                                     targetPlayer.getYRot(), targetPlayer.getXRot(), true);
-                //?} else {
-                /*targetPlayer.teleportTo(targetLevel, x, y, z,
+                TeleportCompat.teleport(targetPlayer, targetLevel, x, y, z,
                                      targetPlayer.getYRot(), targetPlayer.getXRot());
-                *//*?}*/
                 
                 // 发送消息
                 String dimensionName = getDimensionName(targetLevel);
