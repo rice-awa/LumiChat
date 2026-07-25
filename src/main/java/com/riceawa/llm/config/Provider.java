@@ -8,6 +8,7 @@ import java.util.Objects;
  */
 public class Provider {
     private String name;
+    private String protocol = ConfigDefaults.DEFAULT_PROVIDER_PROTOCOL;
     private String apiBaseUrl;
     private String apiKey;
     private List<String> models;
@@ -16,10 +17,25 @@ public class Provider {
     }
 
     public Provider(String name, String apiBaseUrl, String apiKey, List<String> models) {
+        this(name, ConfigDefaults.DEFAULT_PROVIDER_PROTOCOL, apiBaseUrl, apiKey, models);
+    }
+
+    public Provider(String name, String protocol, String apiBaseUrl, String apiKey, List<String> models) {
         this.name = name;
+        setProtocol(protocol);
         this.apiBaseUrl = apiBaseUrl;
         this.apiKey = apiKey;
         this.models = models;
+    }
+
+    public String getProtocol() {
+        return protocol == null || protocol.trim().isEmpty()
+                ? ConfigDefaults.DEFAULT_PROVIDER_PROTOCOL : protocol;
+    }
+
+    public void setProtocol(String protocol) {
+        this.protocol = protocol == null || protocol.trim().isEmpty()
+                ? ConfigDefaults.DEFAULT_PROVIDER_PROTOCOL : protocol;
     }
 
     public String getName() {
@@ -88,6 +104,7 @@ public class Provider {
     public String toString() {
         return "Provider{" +
                 "name='" + name + '\'' +
+                ", protocol='" + getProtocol() + '\'' +
                 ", apiBaseUrl='" + apiBaseUrl + '\'' +
                 ", models=" + models +
                 '}';

@@ -49,9 +49,17 @@ public class NearbyEntitiesFunction implements LLMFunction {
         entityType.addProperty("type", "string");
         entityType.addProperty("description", "实体类型过滤：all(全部), players(玩家), mobs(生物), hostile(敌对), passive(友好)");
         entityType.addProperty("default", "all");
+        com.google.gson.JsonArray entityTypeEnum = new com.google.gson.JsonArray();
+        entityTypeEnum.add("all");
+        entityTypeEnum.add("players");
+        entityTypeEnum.add("mobs");
+        entityTypeEnum.add("hostile");
+        entityTypeEnum.add("passive");
+        entityType.add("enum", entityTypeEnum);
         properties.add("entity_type", entityType);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         return schema;
     }
     

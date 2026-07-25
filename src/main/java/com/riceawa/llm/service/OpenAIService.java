@@ -7,18 +7,24 @@ import com.google.gson.JsonElement;
 import com.riceawa.llm.core.*;
 import com.riceawa.llm.config.ConcurrencySettings;
 import com.riceawa.llm.config.LLMChatConfig;
+import com.riceawa.llm.logging.LLMLogSanitizer;
 import com.riceawa.llm.logging.LLMLogUtils;
 import com.riceawa.llm.logging.LLMRequestLogEntry;
 import com.riceawa.llm.logging.LLMResponseLogEntry;
+import com.riceawa.llm.logging.LogConfig;
 import okhttp3.*;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
@@ -28,18 +34,35 @@ import java.util.UUID;
 public class OpenAIService implements LLMService {
     private final OkHttpClient httpClient;
     private final Gson gson;
+    private final String providerName;
     private final String apiKey;
     private final String baseUrl;
+    private final RetrySleeper retrySleeper;
 
     public OpenAIService(String apiKey) {
-        this(apiKey, "https://api.openai.com/v1");
+        this("OpenAI", apiKey, "https://api.openai.com/v1");
     }
 
     public OpenAIService(String apiKey, String baseUrl) {
+        this("OpenAI", apiKey, baseUrl);
+    }
+
+    public OpenAIService(String providerName, String apiKey, String baseUrl) {
+        this(providerName, apiKey, baseUrl, Thread::sleep);
+    }
+
+    OpenAIService(String providerName, String apiKey, String baseUrl, RetrySleeper retrySleeper) {
+        this.providerName = providerName == null || providerName.trim().isEmpty() ? "OpenAI" : providerName;
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
+        this.retrySleeper = retrySleeper == null ? Thread::sleep : retrySleeper;
         this.httpClient = createOptimizedHttpClient();
         this.gson = new Gson();
+    }
+
+    @FunctionalInterface
+    interface RetrySleeper {
+        void sleep(long delayMillis) throws InterruptedException;
     }
 
     /**
@@ -112,12 +135,17 @@ public class OpenAIService implements LLMService {
                 lastException = e;
 
                 if (attempt < maxAttempts && shouldRetry(e)) {
-                    long delay = (long) (settings.getRetryDelayMs() * Math.pow(settings.getRetryBackoffMultiplier(), attempt - 1));
+                    RetryPolicy retryPolicy = new RetryPolicy(
+                            settings.getRetryDelayMs(), settings.getRetryBackoffMultiplier());
+                    long retryAfterMs = e instanceof HttpStatusException
+                            ? ((HttpStatusException) e).retryAfterMs() : -1L;
+                    long delay = retryPolicy.nextDelayMillis(attempt, retryAfterMs,
+                            () -> ThreadLocalRandom.current().nextDouble(0.5D, 1.5D));
                     try {
-                        Thread.sleep(delay);
+                        retrySleeper.sleep(delay);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        throw new RuntimeException("Request interrupted", ie);
+                        throw ie;
                     }
                 } else {
                     break;
@@ -150,20 +178,28 @@ public class OpenAIService implements LLMService {
         requestHeaders.put("Content-Type", "application/json");
         requestHeaders.put("X-Request-ID", requestId);
 
-        // 记录请求日志
-        LLMRequestLogEntry requestLog = LLMLogUtils.createRequestLogBuilder(requestId)
+        // 记录请求日志：默认仅记录消息摘要和请求元数据
+        LogConfig logConfig = LLMChatConfig.getInstance().getLogConfig();
+        boolean containsExecuteCommand = LLMLogSanitizer.containsExecuteCommand(messages);
+        boolean includeRequestContent = logConfig.isLogFullRequestBody() && !containsExecuteCommand;
+        LLMRequestLogEntry.Builder requestLogBuilder = LLMLogUtils.createRequestLogBuilder(requestId)
                 .serviceName(getServiceName())
                 .playerName(playerName)
                 .playerUuid(playerUuid)
-                .messages(messages)
+                .messageSummaries(
+                        LLMLogSanitizer.summarizeMessages(
+                                messages, includeRequestContent, logConfig.getMaxLogContentLength()),
+                        includeRequestContent,
+                        logConfig.getMaxLogContentLength())
                 .config(config)
-                .rawRequestJson(requestBody.toString())
                 .requestUrl(requestUrl)
-                .requestHeaders(LLMLogUtils.sanitizeHeaders(requestHeaders))
-                .estimatedTokens(LLMLogUtils.estimateTokens(messages))
-                .build();
-
-        LLMLogUtils.logRequest(requestLog);
+                .requestHeaders(requestHeaders)
+                .estimatedTokens(LLMLogUtils.estimateTokens(messages));
+        if (includeRequestContent) {
+            requestLogBuilder.rawRequestJson(
+                    requestBody.toString(), true, logConfig.getMaxLogContentLength());
+        }
+        LLMLogUtils.logRequest(requestLogBuilder.build());
 
         Request request = new Request.Builder()
                 .url(requestUrl)
@@ -186,36 +222,55 @@ public class OpenAIService implements LLMService {
             }
 
             if (!response.isSuccessful()) {
-                // 记录错误响应日志
-                LLMResponseLogEntry responseLog = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+                HttpStatusException statusException = new HttpStatusException(response.code(), responseBody,
+                        parseRetryAfterMillis(response.header("Retry-After")));
+                String sanitizedErrorBody = statusException.responseSummary();
+                LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
                         .httpStatusCode(response.code())
                         .success(false)
-                        .errorMessage("HTTP " + response.code() + ": " + responseBody)
-                        .rawResponseJson(responseBody)
+                        .errorMessage("HTTP " + response.code() + ": " + sanitizedErrorBody)
                         .responseHeaders(responseHeaders)
                         .responseTimeMs(responseTime)
-                        .build();
+                        .content(sanitizedErrorBody, logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength())
+                        .containsExecuteCommand(containsExecuteCommand);
+                if (logConfig.isLogFullResponseBody()) {
+                    responseLogBuilder.rawResponseJson(
+                            responseBody, true, logConfig.getMaxLogContentLength());
+                }
+                LLMLogUtils.logResponse(responseLogBuilder.build());
 
-                LLMLogUtils.logResponse(responseLog);
+                if (RetryPolicy.isRetryable(response.code())) {
+                    throw statusException;
+                }
 
                 LLMResponse errorResponse = new LLMResponse();
-                errorResponse.setError("HTTP " + response.code() + ": " + responseBody);
+                errorResponse.setError("HTTP " + response.code() + ": " + sanitizedErrorBody);
                 return errorResponse;
             }
 
             LLMResponse llmResponse = parseResponse(responseBody);
 
-            // 记录成功响应日志
-            LLMResponseLogEntry responseLog = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+            // 默认只记录状态、usage、finish reason及响应摘要
+            LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
                     .httpStatusCode(response.code())
                     .success(llmResponse.isSuccess())
-                    .llmResponse(llmResponse)
-                    .rawResponseJson(responseBody)
                     .responseHeaders(responseHeaders)
                     .responseTimeMs(responseTime)
-                    .build();
-
-            LLMLogUtils.logResponse(responseLog);
+                    .model(llmResponse.getModel())
+                    .content(llmResponse.getContent(), logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength())
+                    .containsExecuteCommand(containsExecuteCommand);
+            if (llmResponse.getUsage() != null) {
+                LLMResponse.Usage usage = llmResponse.getUsage();
+                responseLogBuilder.usage(usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
+            }
+            if (llmResponse.getChoices() != null && !llmResponse.getChoices().isEmpty()) {
+                responseLogBuilder.finishReason(llmResponse.getChoices().get(0).getFinishReason());
+            }
+            if (logConfig.isLogFullResponseBody()) {
+                responseLogBuilder.rawResponseJson(
+                        responseBody, true, logConfig.getMaxLogContentLength());
+            }
+            LLMLogUtils.logResponse(responseLogBuilder.build());
 
             // 记录token使用情况
             if (llmResponse.isSuccess() && llmResponse.getUsage() != null) {
@@ -235,20 +290,29 @@ public class OpenAIService implements LLMService {
      * 判断是否应该重试
      */
     private boolean shouldRetry(Exception e) {
-        if (e instanceof IOException) {
-            return true; // 网络错误通常可以重试
+        if (e instanceof HttpStatusException) {
+            return RetryPolicy.isRetryable(((HttpStatusException) e).statusCode());
         }
+        return e instanceof IOException;
+    }
 
-        String message = e.getMessage();
-        if (message != null) {
-            // 检查是否是可重试的HTTP错误
-            return message.contains("HTTP 429") || // 速率限制
-                   message.contains("HTTP 502") || // 网关错误
-                   message.contains("HTTP 503") || // 服务不可用
-                   message.contains("HTTP 504");   // 网关超时
+    private long parseRetryAfterMillis(String retryAfter) {
+        if (retryAfter == null || retryAfter.trim().isEmpty()) {
+            return -1L;
         }
-
-        return false;
+        String value = retryAfter.trim();
+        try {
+            long seconds = Long.parseLong(value);
+            return seconds < 0L || seconds > Long.MAX_VALUE / 1_000L ? -1L : seconds * 1_000L;
+        } catch (NumberFormatException ignored) {
+            try {
+                long delay = ZonedDateTime.parse(value, DateTimeFormatter.RFC_1123_DATE_TIME)
+                        .toInstant().toEpochMilli() - System.currentTimeMillis();
+                return delay > 0L ? delay : -1L;
+            } catch (DateTimeParseException ignoredDate) {
+                return -1L;
+            }
+        }
     }
 
     @Override
@@ -315,7 +379,7 @@ public class OpenAIService implements LLMService {
 
     @Override
     public String getServiceName() {
-        return "OpenAI";
+        return providerName;
     }
 
     /**

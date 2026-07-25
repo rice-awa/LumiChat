@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -21,11 +22,18 @@ import java.util.concurrent.TimeUnit;
  */
 public class ProviderHealthChecker {
     
-    private static ProviderHealthChecker instance;
+    private static volatile ProviderHealthChecker instance;
     private final Map<String, HealthStatus> healthCache = new ConcurrentHashMap<>();
     private final long CACHE_DURATION_MS = TimeUnit.MINUTES.toMillis(5); // 5分钟缓存
-    
-    private ProviderHealthChecker() {}
+    private final LLMServiceFactory serviceFactory;
+
+    private ProviderHealthChecker() {
+        this(LLMServiceFactory.getDefaultInstance());
+    }
+
+    ProviderHealthChecker(LLMServiceFactory serviceFactory) {
+        this.serviceFactory = serviceFactory;
+    }
     
     public static ProviderHealthChecker getInstance() {
         if (instance == null) {
@@ -48,6 +56,13 @@ public class ProviderHealthChecker {
             );
         }
         
+        if (!serviceFactory.supportsProtocol(provider.getProtocol())) {
+            return CompletableFuture.completedFuture(
+                new HealthStatus(false, getUnsupportedProtocolMessage(provider),
+                    HealthStatus.ErrorType.CONFIG_ERROR, LocalDateTime.now())
+            );
+        }
+
         // 检查缓存
         HealthStatus cached = healthCache.get(provider.getName());
         if (cached != null && !cached.isExpired(CACHE_DURATION_MS)) {
@@ -76,17 +91,18 @@ public class ProviderHealthChecker {
             return CompletableFuture.completedFuture(Map.of());
         }
         
-        CompletableFuture<?>[] futures = providers.stream()
+        List<CompletableFuture<HealthStatus>> futures = providers.stream()
             .map(this::checkProviderHealth)
-            .toArray(CompletableFuture[]::new);
-        
-        return CompletableFuture.allOf(futures)
+            .collect(Collectors.toList());
+
+        CompletableFuture<?>[] allFutures = futures.toArray(new CompletableFuture<?>[0]);
+        return CompletableFuture.allOf(allFutures)
             .thenApply(v -> {
                 Map<String, HealthStatus> results = new ConcurrentHashMap<>();
-                for (Provider provider : providers) {
-                    HealthStatus status = healthCache.get(provider.getName());
+                for (int i = 0; i < providers.size(); i++) {
+                    HealthStatus status = futures.get(i).join();
                     if (status != null) {
-                        results.put(provider.getName(), status);
+                        results.put(providers.get(i).getName(), status);
                     }
                 }
                 return results;
@@ -114,26 +130,23 @@ public class ProviderHealthChecker {
         healthCache.clear();
     }
     
+    private String getUnsupportedProtocolMessage(Provider provider) {
+        return "不支持的Provider协议: " + provider.getProtocol();
+    }
+
     /**
      * 执行实际的健康检查
      */
     private HealthStatus performHealthCheck(Provider provider) {
         LocalDateTime checkTime = LocalDateTime.now();
         
-        // 基本配置检查
+        // Basic configuration and protocol validation must complete before any network request.
         if (!isProviderConfigValid(provider)) {
-            return new HealthStatus(false, getConfigErrorMessage(provider), 
+            return new HealthStatus(false, getConfigErrorMessage(provider),
                 HealthStatus.ErrorType.CONFIG_ERROR, checkTime);
         }
-        
         try {
-            // 创建服务实例进行测试
-            LLMService service = createServiceForProvider(provider);
-            if (service == null) {
-                return new HealthStatus(false, "无法创建服务实例", 
-                    HealthStatus.ErrorType.CONFIG_ERROR, checkTime);
-            }
-            
+            LLMService service = serviceFactory.create(provider);
             // 发送测试请求
             LLMMessage testMessage = new LLMMessage(LLMMessage.MessageRole.USER, "test");
             LLMConfig testConfig = new LLMConfig();
@@ -158,6 +171,9 @@ public class ProviderHealthChecker {
                 return new HealthStatus(false, "API错误: " + error, errorType, checkTime);
             }
             
+        } catch (IllegalArgumentException e) {
+            return new HealthStatus(false, "配置错误: " + e.getMessage(),
+                    HealthStatus.ErrorType.CONFIG_ERROR, checkTime);
         } catch (java.util.concurrent.TimeoutException e) {
             return new HealthStatus(false, "连接超时", HealthStatus.ErrorType.NETWORK_ERROR, checkTime);
         } catch (Exception e) {
@@ -199,15 +215,7 @@ public class ProviderHealthChecker {
         if (provider.getModels() == null || provider.getModels().isEmpty()) return "模型列表为空";
         return "配置无效";
     }
-    
-    /**
-     * 为provider创建服务实例
-     */
-    private LLMService createServiceForProvider(Provider provider) {
-        // 目前只支持OpenAI兼容的服务
-        return new OpenAIService(provider.getApiKey(), provider.getApiBaseUrl());
-    }
-    
+
     /**
      * 根据错误信息分类错误类型
      */

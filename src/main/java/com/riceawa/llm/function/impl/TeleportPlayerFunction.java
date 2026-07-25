@@ -1,7 +1,10 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.DimensionCompat;
 import com.riceawa.llm.compat.MessageCompat;
+import com.riceawa.llm.compat.PlayerCompat;
+import com.riceawa.llm.compat.TeleportCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
@@ -15,7 +18,7 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 传送玩家的函数
- * 权限：OP可传送任何玩家，普通玩家只能传送自己
+ * 权限：仅OP可使用
  */
 public class TeleportPlayerFunction implements LLMFunction {
     
@@ -26,13 +29,14 @@ public class TeleportPlayerFunction implements LLMFunction {
     
     @Override
     public String getDescription() {
-        return "传送玩家到指定位置或其他玩家身边";
+        return "传送玩家到指定位置或其他玩家身边（仅OP）";
     }
     
     @Override
     public JsonObject getParametersSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
+        schema.addProperty("additionalProperties", false);
         
         JsonObject properties = new JsonObject();
         
@@ -40,12 +44,14 @@ public class TeleportPlayerFunction implements LLMFunction {
         JsonObject playerParam = new JsonObject();
         playerParam.addProperty("type", "string");
         playerParam.addProperty("description", "要传送的玩家名称（不指定则传送自己）");
+        playerParam.addProperty("maxLength", 16);
         properties.add("player_name", playerParam);
         
         // 目标玩家（传送到其他玩家身边）
         JsonObject targetPlayerParam = new JsonObject();
         targetPlayerParam.addProperty("type", "string");
         targetPlayerParam.addProperty("description", "传送到此玩家身边（与坐标参数二选一）");
+        targetPlayerParam.addProperty("maxLength", 16);
         properties.add("target_player", targetPlayerParam);
         
         // X坐标
@@ -58,6 +64,8 @@ public class TeleportPlayerFunction implements LLMFunction {
         JsonObject yParam = new JsonObject();
         yParam.addProperty("type", "number");
         yParam.addProperty("description", "目标Y坐标");
+        yParam.addProperty("minimum", -64);
+        yParam.addProperty("maximum", 320);
         properties.add("y", yParam);
         
         // Z坐标
@@ -71,9 +79,29 @@ public class TeleportPlayerFunction implements LLMFunction {
         dimensionParam.addProperty("type", "string");
         dimensionParam.addProperty("description", "目标维度（overworld/nether/end）");
         dimensionParam.addProperty("default", "overworld");
+        com.google.gson.JsonArray dimensionEnum = new com.google.gson.JsonArray();
+        dimensionEnum.add("overworld");
+        dimensionEnum.add("nether");
+        dimensionEnum.add("end");
+        dimensionParam.add("enum", dimensionEnum);
         properties.add("dimension", dimensionParam);
         
         schema.add("properties", properties);
+
+        com.google.gson.JsonArray oneOf = new com.google.gson.JsonArray();
+        JsonObject opt1 = new JsonObject();
+        com.google.gson.JsonArray req1 = new com.google.gson.JsonArray();
+        req1.add("target_player");
+        opt1.add("required", req1);
+        oneOf.add(opt1);
+        JsonObject opt2 = new JsonObject();
+        com.google.gson.JsonArray req2 = new com.google.gson.JsonArray();
+        req2.add("x");
+        req2.add("y");
+        req2.add("z");
+        opt2.add("required", req2);
+        oneOf.add(opt2);
+        schema.add("oneOf", oneOf);
         
         return schema;
     }
@@ -86,12 +114,8 @@ public class TeleportPlayerFunction implements LLMFunction {
             
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
-                //? >=1.21.11 {
-                ServerPlayer foundPlayer = server.getPlayerList().getPlayer(playerName);
-                //?} else {
-                /*ServerPlayer foundPlayer = server.getPlayerList().getPlayerByName(playerName);
-                *//*?}*/
-                
+                ServerPlayer foundPlayer = PlayerCompat.getPlayerByName(server, playerName);
+
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
                 }
@@ -108,12 +132,8 @@ public class TeleportPlayerFunction implements LLMFunction {
             if (arguments.has("target_player")) {
                 // 传送到其他玩家身边
                 String targetPlayerName = arguments.get("target_player").getAsString();
-                //? >=1.21.11 {
-                ServerPlayer destinationPlayer = server.getPlayerList().getPlayer(targetPlayerName);
-                //?} else {
-                /*ServerPlayer destinationPlayer = server.getPlayerList().getPlayerByName(targetPlayerName);
-                *//*?}*/
-                
+                ServerPlayer destinationPlayer = PlayerCompat.getPlayerByName(server, targetPlayerName);
+
                 if (destinationPlayer == null) {
                     return FunctionResult.error("找不到目标玩家: " + targetPlayerName);
                 }
@@ -129,13 +149,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                     return FunctionResult.error("无法获取目标玩家所在世界信息");
                 }
 
-                //? >=1.21.2 {
-                targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
-                                    java.util.Set.of(), targetPlayer.getYRot(), targetPlayer.getXRot(), true);
-                //?} else {
-                /*targetPlayer.teleportTo(targetLevel, targetPos.x, targetPos.y, targetPos.z,
+                TeleportCompat.teleport(targetPlayer, targetLevel, targetPos.x, targetPos.y, targetPos.z,
                                     targetPlayer.getYRot(), targetPlayer.getXRot());
-                *//*?}*/
                 
                 // 发送消息
                 String message = String.format("已将 %s 传送到 %s 身边", 
@@ -185,13 +200,8 @@ public class TeleportPlayerFunction implements LLMFunction {
                 }
                 
                 // 执行传送
-                //? >=1.21.2 {
-                targetPlayer.teleportTo(targetLevel, x, y, z, java.util.Set.of(),
-                                     targetPlayer.getYRot(), targetPlayer.getXRot(), true);
-                //?} else {
-                /*targetPlayer.teleportTo(targetLevel, x, y, z,
+                TeleportCompat.teleport(targetPlayer, targetLevel, x, y, z,
                                      targetPlayer.getYRot(), targetPlayer.getXRot());
-                *//*?}*/
                 
                 // 发送消息
                 String dimensionName = getDimensionName(targetLevel);
@@ -213,26 +223,16 @@ public class TeleportPlayerFunction implements LLMFunction {
     }
     
     private String getDimensionName(ServerLevel world) {
-        //? >=1.21.11 {
-        String dimensionId = world.dimension().identifier().toString();
-        //?} else {
-        /*String dimensionId = world.dimension().location().toString();
-        *//*?}*/
-        switch (dimensionId) {
-            case "minecraft:overworld":
-                return "主世界";
-            case "minecraft:the_nether":
-                return "下界";
-            case "minecraft:the_end":
-                return "末地";
-            default:
-                return dimensionId;
-        }
+        return DimensionCompat.getDisplayName(world);
     }
     
+    public static boolean isOperatorOnly(boolean operator) {
+        return operator;
+    }
+
     @Override
     public boolean hasPermission(Player player) {
-        return true; // 所有玩家都可以传送自己，OP可以传送其他玩家
+        return isOperatorOnly(PermissionHelper.isOperator(player));
     }
     
     @Override

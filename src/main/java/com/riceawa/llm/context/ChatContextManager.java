@@ -3,9 +3,12 @@ package com.riceawa.llm.context;
 import com.riceawa.llm.compat.MessageCompat;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.core.LLMMessage;
+import com.riceawa.llm.logging.LogLevel;
 import com.riceawa.llm.logging.LogManager;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +22,7 @@ import java.util.concurrent.TimeUnit;
  * 聊天上下文管理器，管理所有玩家的聊天上下文
  */
 public class ChatContextManager {
-    private static ChatContextManager instance;
+    private static volatile ChatContextManager instance;
     private final Map<UUID, ChatContext> contexts;
     private final ScheduledExecutorService scheduler;
     private final long contextTimeoutMs;
@@ -230,97 +233,89 @@ public class ChatContextManager {
     private class CompressionNotificationListener implements ChatContext.ContextEventListener {
         @Override
         public void onContextCompressionStarted(UUID playerId, int messagesToCompress) {
-            // 检查是否启用压缩通知
-            LLMChatConfig config = LLMChatConfig.getInstance();
-            if (!config.isEnableCompressionNotification()) {
+            if (!LLMChatConfig.getInstance().isEnableCompressionNotification()) {
                 return;
             }
-
-            // 查找玩家并发送通知
-            Player player = findPlayerByUuid(playerId);
-            if (player != null) {
-                MessageCompat.displayClientMessage(player, Component.literal("⚠️ 已达到最大上下文长度，您的之前上下文将被压缩")
-                    .withStyle(ChatFormatting.YELLOW), false);
-
-                LogManager.getInstance().chat("Compression notification sent to player " +
-                    player.getName().getString() + " for " + messagesToCompress + " messages");
-            }
+            logNotificationSkipped(playerId, "started", "server unavailable");
         }
 
         @Override
-        public void onContextCompressionStarted(UUID playerId, int messagesToCompress, Player player) {
-            // 检查是否启用压缩通知
-            LLMChatConfig config = LLMChatConfig.getInstance();
-            if (!config.isEnableCompressionNotification()) {
+        public void onContextCompressionStarted(UUID playerId, int messagesToCompress,
+                                                MinecraftServer server) {
+            if (!LLMChatConfig.getInstance().isEnableCompressionNotification()) {
                 return;
             }
-
-            // 直接使用传入的玩家实体发送通知
-            if (player != null) {
-                LogManager.getInstance().chat("Compression started for player " +
-                    player.getName().getString() + " for " + messagesToCompress + " messages");
+            // LLMChatCommand already emits the started notice on the server thread.
+            // Keep this callback informational so the player receives it only once.
+            if (server == null) {
+                logNotificationSkipped(playerId, "started", "server unavailable");
+                return;
             }
+            server.execute(() -> {
+                ServerPlayer onlinePlayer = server.getPlayerList().getPlayer(playerId);
+                if (onlinePlayer == null) {
+                    logNotificationSkipped(playerId, "started", "player offline");
+                    return;
+                }
+                LogManager.getInstance().log(LogLevel.DEBUG, "chat",
+                        "Compression started for player " + playerId
+                                + ", messages=" + messagesToCompress);
+            });
         }
 
         @Override
         public void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount, int compressedCount) {
-            // 检查是否启用压缩通知
-            LLMChatConfig config = LLMChatConfig.getInstance();
-            if (!config.isEnableCompressionNotification()) {
-                return;
-            }
-
-            // 查找玩家并发送完成通知
-            Player player = findPlayerByUuid(playerId);
-            if (player != null) {
-                if (success) {
-                    MessageCompat.displayClientMessage(player, Component.literal("✅ 上下文压缩完成，对话历史已优化")
-                        .withStyle(ChatFormatting.GREEN), false);
-                } else {
-                    MessageCompat.displayClientMessage(player, Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
-                        .withStyle(ChatFormatting.YELLOW), false);
-                }
-            }
+            scheduleNotification(playerId, null, completionMessage(success),
+                    "completed", originalCount, compressedCount);
         }
 
         @Override
-        public void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount, int compressedCount, Player player) {
-            // 检查是否启用压缩通知
+        public void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount,
+                                                  int compressedCount, MinecraftServer server) {
+            scheduleNotification(playerId, server, completionMessage(success),
+                    "completed", originalCount, compressedCount);
+        }
+
+        private Component completionMessage(boolean success) {
+            if (success) {
+                return Component.literal("✅ 上下文压缩完成，对话历史已优化")
+                        .withStyle(ChatFormatting.GREEN);
+            }
+            return Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
+                    .withStyle(ChatFormatting.YELLOW);
+        }
+
+        private void scheduleNotification(UUID playerId, MinecraftServer server,
+                                          Component message, String phase,
+                                          int originalCount, int compressedCount) {
             LLMChatConfig config = LLMChatConfig.getInstance();
             if (!config.isEnableCompressionNotification()) {
                 return;
             }
 
-            // 直接使用传入的玩家实体发送通知
-            if (player != null) {
-                if (success) {
-                    MessageCompat.displayClientMessage(player, Component.literal("✅ 上下文压缩完成，对话历史已优化")
-                        .withStyle(ChatFormatting.GREEN), false);
-                } else {
-                    MessageCompat.displayClientMessage(player, Component.literal("⚠️ 上下文压缩失败，已删除部分旧消息")
-                        .withStyle(ChatFormatting.YELLOW), false);
-                }
-
-                LogManager.getInstance().chat("Compression completed for player " +
-                    player.getName().getString() + " - success: " + success +
-                    ", original: " + originalCount + ", compressed: " + compressedCount);
+            if (server == null) {
+                logNotificationSkipped(playerId, phase, "server unavailable");
+                return;
             }
+
+            server.execute(() -> {
+                ServerPlayer onlinePlayer = server.getPlayerList().getPlayer(playerId);
+                if (onlinePlayer == null) {
+                    logNotificationSkipped(playerId, phase, "player offline");
+                    return;
+                }
+                MessageCompat.displayClientMessage(onlinePlayer, message, false);
+                LogManager.getInstance().log(LogLevel.DEBUG, "chat",
+                        "Compression notification " + phase + " for player " + playerId
+                                + ", original=" + originalCount
+                                + ", compressed=" + compressedCount);
+            });
         }
 
-        /**
-         * 根据UUID查找在线玩家
-         */
-        private Player findPlayerByUuid(UUID playerId) {
-            // 遍历所有上下文，找到第一个有效的玩家来获取服务器实例
-            for (ChatContext context : contexts.values()) {
-                // 尝试通过其他方式获取服务器实例
-                // 这是一个简化的实现，在实际使用中可能需要更好的方法
-                break;
-            }
-
-            // 暂时返回null，实际的通知会在LLMChatCommand中处理
-            // 这样可以避免复杂的服务器实例获取问题
-            return null;
+        private void logNotificationSkipped(UUID playerId, String phase, String reason) {
+            LogManager.getInstance().log(LogLevel.DEBUG, "chat",
+                    "Skipped compression notification " + phase + " for player "
+                            + playerId + ": " + reason);
         }
     }
 }

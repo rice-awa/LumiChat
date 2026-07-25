@@ -38,6 +38,7 @@ public class ServerInfoFunction implements LLMFunction {
         properties.add("include_performance", includePerformance);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         return schema;
     }
     

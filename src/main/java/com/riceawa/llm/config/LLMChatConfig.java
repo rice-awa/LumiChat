@@ -3,6 +3,7 @@ package com.riceawa.llm.config;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.riceawa.llm.logging.LogConfig;
+import com.riceawa.llm.logging.LogManager;
 
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -20,7 +21,7 @@ import java.util.Set;
  * LLM聊天配置管理
  */
 public class LLMChatConfig {
-    private static LLMChatConfig instance;
+    private static volatile LLMChatConfig instance;
     private final Gson gson;
     private final Path configFile;
     private boolean isInitializing = false;
@@ -39,6 +40,10 @@ public class LLMChatConfig {
     private boolean enableToolCall = ConfigDefaults.DEFAULT_ENABLE_TOOL_CALL;
     private boolean enableBroadcast = ConfigDefaults.DEFAULT_ENABLE_BROADCAST;
     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
+    private boolean enableExecuteCommand = ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
+    private boolean executeCommandReturnFullOutput = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
+    private Set<String> executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+    private int executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
     private int historyRetentionDays = ConfigDefaults.DEFAULT_HISTORY_RETENTION_DAYS;
 
     // 上下文压缩配置
@@ -59,6 +64,7 @@ public class LLMChatConfig {
 
     // Wiki API 配置
     private String wikiApiUrl = ConfigDefaults.DEFAULT_WIKI_API_URL;
+    private Set<String> wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
     
     // 多轮工具调用配置
     private boolean enableRecursiveToolCalls = ConfigDefaults.DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
@@ -101,7 +107,7 @@ public class LLMChatConfig {
 
         this.isInitializing = false;
 
-        System.out.println("LLMChatConfig initialized successfully");
+        LogManager.getInstance().system("LLMChatConfig initialized successfully");
     }
 
     public static LLMChatConfig getInstance() {
@@ -121,11 +127,11 @@ public class LLMChatConfig {
     private void loadConfig() {
         if (!Files.exists(configFile)) {
             // 创建默认配置文件
-            System.out.println("Config file does not exist, creating default configuration...");
+            LogManager.getInstance().system("Config file does not exist, creating default configuration...");
             createDefaultConfig();
-            System.out.println("Default configuration created with maxContextCharacters: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Default configuration created with maxContextCharacters: " + this.maxContextCharacters);
             saveConfig();
-            System.out.println("Default configuration saved to file");
+            LogManager.getInstance().system("Default configuration saved to file");
             return;
         }
 
@@ -135,13 +141,13 @@ public class LLMChatConfig {
             if (data != null) {
                 applyConfigData(data);
             } else {
-                System.err.println("Failed to parse config file, creating default configuration");
+                LogManager.getInstance().error("Failed to parse config file, creating default configuration");
                 createDefaultConfig();
                 saveConfig();
             }
         } catch (Exception e) {
-            System.err.println("Failed to load config: " + e.getMessage());
-            System.err.println("Creating backup and using default configuration...");
+            LogManager.getInstance().error("Failed to load config: " + e.getMessage());
+            LogManager.getInstance().error("Creating backup and using default configuration...");
 
             // 备份损坏的配置文件
             backupCorruptedConfig();
@@ -159,11 +165,11 @@ public class LLMChatConfig {
         try (OutputStreamWriter writer = new OutputStreamWriter(
                 Files.newOutputStream(configFile), StandardCharsets.UTF_8)) {
             ConfigData data = createConfigData();
-            System.out.println("Saving config with maxContextCharacters: " + data.maxContextCharacters);
+            LogManager.getInstance().system("Saving config with maxContextCharacters: " + data.maxContextCharacters);
             gson.toJson(data, writer);
-            System.out.println("Configuration saved successfully");
+            LogManager.getInstance().system("Configuration saved successfully");
         } catch (IOException e) {
-            System.err.println("Failed to save config: " + e.getMessage());
+            LogManager.getInstance().error("Failed to save config: " + e.getMessage());
         }
     }
 
@@ -178,7 +184,7 @@ public class LLMChatConfig {
             try {
                 com.riceawa.llm.context.ChatContextManager.getInstance().updateMaxContextLength();
             } catch (Exception e) {
-                System.err.println("Failed to update existing contexts after reload: " + e.getMessage());
+                LogManager.getInstance().error("Failed to update existing contexts after reload: " + e.getMessage());
             }
 
             // 触发异步健康检查
@@ -194,13 +200,13 @@ public class LLMChatConfig {
             ProviderManager providerManager = new ProviderManager(this.providers);
             providerManager.checkAllProvidersHealth().whenComplete((healthMap, throwable) -> {
                 if (throwable != null) {
-                    System.err.println("Provider health check failed: " + throwable.getMessage());
+                    LogManager.getInstance().error("Provider health check failed: " + throwable.getMessage());
                 } else {
-                    System.out.println("Provider health check completed for " + healthMap.size() + " providers");
+                    LogManager.getInstance().system("Provider health check completed for " + healthMap.size() + " providers");
                 }
             });
         } catch (Exception e) {
-            System.err.println("Failed to trigger health check: " + e.getMessage());
+            LogManager.getInstance().error("Failed to trigger health check: " + e.getMessage());
         }
     }
 
@@ -215,9 +221,9 @@ public class LLMChatConfig {
         try {
             Path backupFile = configFile.getParent().resolve("config.json.backup." + System.currentTimeMillis());
             Files.copy(configFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
-            System.out.println("Corrupted config backed up to: " + backupFile);
+            LogManager.getInstance().system("Corrupted config backed up to: " + backupFile);
         } catch (IOException e) {
-            System.err.println("Failed to backup corrupted config: " + e.getMessage());
+            LogManager.getInstance().error("Failed to backup corrupted config: " + e.getMessage());
         }
     }
 
@@ -235,7 +241,7 @@ public class LLMChatConfig {
         // 自动选择第一个有效的Provider和Model
         selectInitialProviderAndModel();
 
-        System.out.println("Created default configuration with " + this.providers.size() + " providers");
+        LogManager.getInstance().system("Created default configuration with " + this.providers.size() + " providers");
     }
 
     /**
@@ -248,11 +254,11 @@ public class LLMChatConfig {
         if (result.isSuccess()) {
             this.currentProvider = result.getProviderName();
             this.currentModel = result.getModelName();
-            System.out.println("Selected initial provider: " + this.currentProvider + ", model: " + this.currentModel);
+            LogManager.getInstance().system("Selected initial provider: " + this.currentProvider + ", model: " + this.currentModel);
         } else {
             this.currentProvider = ConfigDefaults.EMPTY_STRING;
             this.currentModel = ConfigDefaults.EMPTY_STRING;
-            System.out.println("No valid provider configuration found: " + result.getMessage());
+            LogManager.getInstance().system("No valid provider configuration found: " + result.getMessage());
         }
     }
 
@@ -271,19 +277,29 @@ public class LLMChatConfig {
         // 兼容旧配置：如果有maxContextLength，使用它作为maxContextCharacters
         if (data.maxContextLength != null) {
             this.maxContextCharacters = data.maxContextLength;
-            System.out.println("Using legacy maxContextLength as maxContextCharacters: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Using legacy maxContextLength as maxContextCharacters: " + this.maxContextCharacters);
         } else if (data.maxContextCharacters != null) {
             this.maxContextCharacters = data.maxContextCharacters;
-            System.out.println("Loaded maxContextCharacters from config: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Loaded maxContextCharacters from config: " + this.maxContextCharacters);
         } else {
             this.maxContextCharacters = ConfigDefaults.DEFAULT_MAX_CONTEXT_CHARACTERS;
-            System.out.println("Applied default maxContextCharacters: " + this.maxContextCharacters);
+            LogManager.getInstance().system("Applied default maxContextCharacters: " + this.maxContextCharacters);
         }
 
         this.enableHistory = data.enableHistory != null ? data.enableHistory : (Boolean) ConfigDefaults.getDefaultValue("enableHistory");
         this.enableToolCall = data.enableToolCall != null ? data.enableToolCall : (Boolean) ConfigDefaults.getDefaultValue("enableToolCall");
         this.enableBroadcast = data.enableBroadcast != null ? data.enableBroadcast : (Boolean) ConfigDefaults.getDefaultValue("enableBroadcast");
         this.broadcastPlayers = data.broadcastPlayers != null ? new HashSet<>(data.broadcastPlayers) : ConfigDefaults.createDefaultBroadcastPlayers();
+        this.enableExecuteCommand = data.enableExecuteCommand != null
+                ? data.enableExecuteCommand : ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
+        this.executeCommandReturnFullOutput = data.executeCommandReturnFullOutput != null
+                ? data.executeCommandReturnFullOutput
+                : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
+        this.executeCommandAllowlist = data.executeCommandAllowlist != null
+                ? new HashSet<>(data.executeCommandAllowlist)
+                : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+        this.executeCommandMaxLength = data.executeCommandMaxLength != null
+                ? data.executeCommandMaxLength : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
         this.historyRetentionDays = data.historyRetentionDays != null ? data.historyRetentionDays : (Integer) ConfigDefaults.getDefaultValue("historyRetentionDays");
         this.enableGlobalContext = data.enableGlobalContext != null ? data.enableGlobalContext : (Boolean) ConfigDefaults.getDefaultValue("enableGlobalContext");
         this.globalContextPrompt = data.globalContextPrompt != null ? data.globalContextPrompt : (String) ConfigDefaults.getDefaultValue("globalContextPrompt");
@@ -298,6 +314,8 @@ public class LLMChatConfig {
 
         // 处理Wiki API配置
         this.wikiApiUrl = data.wikiApiUrl != null ? data.wikiApiUrl : (String) ConfigDefaults.getDefaultValue("wikiApiUrl");
+        this.wikiAllowedHosts = data.wikiAllowedHosts != null
+                ? new HashSet<>(data.wikiAllowedHosts) : ConfigDefaults.createDefaultWikiAllowedHosts();
 
         // 处理多轮工具调用配置
         this.enableRecursiveToolCalls = data.enableRecursiveToolCalls != null ? data.enableRecursiveToolCalls : (Boolean) ConfigDefaults.getDefaultValue("enableRecursiveToolCalls");
@@ -333,20 +351,35 @@ public class LLMChatConfig {
 
         // 验证基础配置值
         if (!ConfigDefaults.isValidConfigValue("maxContextCharacters", this.maxContextCharacters)) {
-            System.out.println("Invalid maxContextCharacters (" + this.maxContextCharacters + "), resetting to default");
+            LogManager.getInstance().system("Invalid maxContextCharacters (" + this.maxContextCharacters + "), resetting to default");
             this.maxContextCharacters = ConfigDefaults.DEFAULT_MAX_CONTEXT_CHARACTERS;
             needsSave = true;
         }
 
         if (!ConfigDefaults.isValidConfigValue("defaultTemperature", this.defaultTemperature)) {
-            System.out.println("Invalid defaultTemperature (" + this.defaultTemperature + "), resetting to default");
+            LogManager.getInstance().system("Invalid defaultTemperature (" + this.defaultTemperature + "), resetting to default");
             this.defaultTemperature = ConfigDefaults.DEFAULT_TEMPERATURE;
             needsSave = true;
         }
 
         if (!ConfigDefaults.isValidConfigValue("defaultMaxTokens", this.defaultMaxTokens)) {
-            System.out.println("Invalid defaultMaxTokens (" + this.defaultMaxTokens + "), resetting to default");
+            LogManager.getInstance().system("Invalid defaultMaxTokens (" + this.defaultMaxTokens + "), resetting to default");
             this.defaultMaxTokens = ConfigDefaults.DEFAULT_MAX_TOKENS;
+            needsSave = true;
+        }
+
+        if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", this.executeCommandMaxLength)) {
+            LogManager.getInstance().system("Invalid executeCommandMaxLength (" + this.executeCommandMaxLength
+                    + "), resetting to default");
+            this.executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+            needsSave = true;
+        }
+        if (this.executeCommandAllowlist == null) {
+            this.executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+            needsSave = true;
+        }
+        if (this.wikiAllowedHosts == null) {
+            this.wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
             needsSave = true;
         }
 
@@ -360,10 +393,10 @@ public class LLMChatConfig {
                 this.currentProvider = result.getProviderName();
                 this.currentModel = result.getModelName();
                 needsSave = true;
-                System.out.println("Provider configuration fixed: " + result.getMessage());
+                LogManager.getInstance().system("Provider configuration fixed: " + result.getMessage());
             }
         } else {
-            System.out.println("Provider configuration issue: " + result.getMessage());
+            LogManager.getInstance().system("Provider configuration issue: " + result.getMessage());
         }
 
         // 如果有修复，保存配置
@@ -392,6 +425,10 @@ public class LLMChatConfig {
         data.enableToolCall = this.enableToolCall;
         data.enableBroadcast = this.enableBroadcast;
         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
+        data.enableExecuteCommand = this.enableExecuteCommand;
+        data.executeCommandReturnFullOutput = this.executeCommandReturnFullOutput;
+        data.executeCommandAllowlist = new HashSet<>(this.executeCommandAllowlist);
+        data.executeCommandMaxLength = this.executeCommandMaxLength;
         data.historyRetentionDays = this.historyRetentionDays;
 
         // 全局上下文配置
@@ -404,6 +441,7 @@ public class LLMChatConfig {
 
         // Wiki API 配置
         data.wikiApiUrl = this.wikiApiUrl;
+        data.wikiAllowedHosts = new HashSet<>(this.wikiAllowedHosts);
         
         // 多轮工具调用配置
         data.enableRecursiveToolCalls = this.enableRecursiveToolCalls;
@@ -469,7 +507,7 @@ public class LLMChatConfig {
             try {
                 com.riceawa.llm.context.ChatContextManager.getInstance().updateMaxContextLength();
             } catch (Exception e) {
-                System.err.println("Failed to update existing contexts with new max context characters: " + e.getMessage());
+                LogManager.getInstance().error("Failed to update existing contexts with new max context characters: " + e.getMessage());
             }
         }
     }
@@ -509,6 +547,46 @@ public class LLMChatConfig {
 
     public void setEnableBroadcast(boolean enableBroadcast) {
         this.enableBroadcast = enableBroadcast;
+        saveConfig();
+    }
+
+    public boolean isEnableExecuteCommand() {
+        return enableExecuteCommand;
+    }
+
+    public void setEnableExecuteCommand(boolean enableExecuteCommand) {
+        this.enableExecuteCommand = enableExecuteCommand;
+        saveConfig();
+    }
+
+    public boolean isExecuteCommandReturnFullOutput() {
+        return executeCommandReturnFullOutput;
+    }
+
+    public void setExecuteCommandReturnFullOutput(boolean executeCommandReturnFullOutput) {
+        this.executeCommandReturnFullOutput = executeCommandReturnFullOutput;
+        saveConfig();
+    }
+
+    public Set<String> getExecuteCommandAllowlist() {
+        return new HashSet<>(executeCommandAllowlist);
+    }
+
+    public void setExecuteCommandAllowlist(Set<String> executeCommandAllowlist) {
+        this.executeCommandAllowlist = executeCommandAllowlist != null
+                ? new HashSet<>(executeCommandAllowlist)
+                : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+        saveConfig();
+    }
+
+    public int getExecuteCommandMaxLength() {
+        return executeCommandMaxLength;
+    }
+
+    public void setExecuteCommandMaxLength(int executeCommandMaxLength) {
+        this.executeCommandMaxLength = ConfigDefaults.isValidConfigValue(
+                "executeCommandMaxLength", executeCommandMaxLength)
+                ? executeCommandMaxLength : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
         saveConfig();
     }
 
@@ -722,11 +800,11 @@ public class LLMChatConfig {
             if (result.isSuccess()) {
                 this.currentProvider = result.getProviderName();
                 this.currentModel = result.getModelName();
-                System.out.println("Switched to provider: " + this.currentProvider + ", model: " + this.currentModel);
+                LogManager.getInstance().system("Switched to provider: " + this.currentProvider + ", model: " + this.currentModel);
             } else {
                 this.currentProvider = ConfigDefaults.EMPTY_STRING;
                 this.currentModel = ConfigDefaults.EMPTY_STRING;
-                System.out.println("No valid provider available after removal");
+                LogManager.getInstance().system("No valid provider available after removal");
             }
         }
 
@@ -939,6 +1017,18 @@ public class LLMChatConfig {
             broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
             updated = true;
         }
+        if (executeCommandAllowlist == null) {
+            executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+            updated = true;
+        }
+        if (wikiAllowedHosts == null) {
+            wikiAllowedHosts = ConfigDefaults.createDefaultWikiAllowedHosts();
+            updated = true;
+        }
+        if (!ConfigDefaults.isValidConfigValue("executeCommandMaxLength", executeCommandMaxLength)) {
+            executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
+            updated = true;
+        }
 
         // 如果有更新，保存配置
         if (updated) {
@@ -967,6 +1057,22 @@ public class LLMChatConfig {
      */
     public void setWikiApiUrl(String wikiApiUrl) {
         this.wikiApiUrl = wikiApiUrl != null ? wikiApiUrl : ConfigDefaults.DEFAULT_WIKI_API_URL;
+        saveConfig();
+    }
+
+    /**
+     * 获取Wiki API允许的主机名。
+     */
+    public Set<String> getWikiAllowedHosts() {
+        return new HashSet<>(wikiAllowedHosts);
+    }
+
+    /**
+     * 设置Wiki API允许的主机名。
+     */
+    public void setWikiAllowedHosts(Set<String> wikiAllowedHosts) {
+        this.wikiAllowedHosts = wikiAllowedHosts != null
+                ? new HashSet<>(wikiAllowedHosts) : ConfigDefaults.createDefaultWikiAllowedHosts();
         saveConfig();
     }
 
@@ -1032,6 +1138,10 @@ public class LLMChatConfig {
         Boolean enableToolCall;
         Boolean enableBroadcast;
         Set<String> broadcastPlayers;
+        Boolean enableExecuteCommand;
+        Boolean executeCommandReturnFullOutput;
+        Set<String> executeCommandAllowlist;
+        Integer executeCommandMaxLength;
         Integer historyRetentionDays;
 
         // 全局上下文配置
@@ -1044,7 +1154,8 @@ public class LLMChatConfig {
 
         // Wiki API 配置
         String wikiApiUrl;
-        
+        Set<String> wikiAllowedHosts;
+
         // 多轮工具调用配置
         Boolean enableRecursiveToolCalls;
         Integer maxToolCallDepth;

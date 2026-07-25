@@ -11,7 +11,7 @@ import java.util.function.Supplier;
  * 并发管理器 - 管理LLM请求的并发执行和资源控制
  */
 public class ConcurrencyManager {
-    private static ConcurrencyManager instance;
+    private static volatile ConcurrencyManager instance;
     
     // 配置参数
     private final int maxConcurrentRequests;
@@ -20,6 +20,7 @@ public class ConcurrencyManager {
     private final int corePoolSize;
     private final int maximumPoolSize;
     private final long keepAliveTimeMs;
+    private final boolean loggingEnabled;
     
     // 线程池和信号量
     private final ThreadPoolExecutor executorService;
@@ -38,12 +39,17 @@ public class ConcurrencyManager {
     private final AtomicLong totalTokens = new AtomicLong(0);
     
     private ConcurrencyManager(ConcurrencyConfig config) {
+        this(config, true);
+    }
+
+    private ConcurrencyManager(ConcurrencyConfig config, boolean loggingEnabled) {
         this.maxConcurrentRequests = config.maxConcurrentRequests;
         this.queueCapacity = config.queueCapacity;
         this.requestTimeoutMs = config.requestTimeoutMs;
         this.corePoolSize = config.corePoolSize;
         this.maximumPoolSize = config.maximumPoolSize;
         this.keepAliveTimeMs = config.keepAliveTimeMs;
+        this.loggingEnabled = loggingEnabled;
         
         // 创建自定义线程池
         this.executorService = new ThreadPoolExecutor(
@@ -61,18 +67,20 @@ public class ConcurrencyManager {
                     return t;
                 }
             },
-            new ThreadPoolExecutor.CallerRunsPolicy() // 当队列满时，在调用者线程中执行
+            new ThreadPoolExecutor.AbortPolicy()
         );
         
         // 创建信号量来控制并发请求数
         this.requestSemaphore = new Semaphore(maxConcurrentRequests, true);
         
-        LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.INFO, "system",
-            "ConcurrencyManager initialized with config: " +
-            "maxConcurrent=" + maxConcurrentRequests +
-            ", queueCapacity=" + queueCapacity +
-            ", corePoolSize=" + corePoolSize +
-            ", maxPoolSize=" + maximumPoolSize);
+        if (loggingEnabled) {
+            LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.INFO, "system",
+                "ConcurrencyManager initialized with config: " +
+                "maxConcurrent=" + maxConcurrentRequests +
+                ", queueCapacity=" + queueCapacity +
+                ", corePoolSize=" + corePoolSize +
+                ", maxPoolSize=" + maximumPoolSize);
+        }
     }
     
     public static synchronized void initialize(ConcurrencyConfig config) {
@@ -80,6 +88,10 @@ public class ConcurrencyManager {
             instance.shutdown();
         }
         instance = new ConcurrencyManager(config);
+    }
+
+    static ConcurrencyManager createForTest(ConcurrencyConfig config) {
+        return new ConcurrencyManager(config, false);
     }
     
     public static ConcurrencyManager getInstance() {
@@ -102,59 +114,72 @@ public class ConcurrencyManager {
         
         CompletableFuture<T> future = new CompletableFuture<>();
         
-        // 检查是否可以获取信号量（非阻塞）
-        if (!requestSemaphore.tryAcquire()) {
-            // 如果无法立即获取信号量，说明已达到最大并发数
-            queuedRequests.incrementAndGet();
-            LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.DEBUG, "system",
-                "Request queued due to concurrency limit: " + requestId);
-        }
-        
         try {
             executorService.submit(() -> {
                 long startTime = System.currentTimeMillis();
+                boolean acquired = false;
+                boolean active = false;
                 try {
-                    // 获取信号量（如果之前没有获取到）
-                    if (!requestSemaphore.tryAcquire(requestTimeoutMs, TimeUnit.MILLISECONDS)) {
-                        future.completeExceptionally(new TimeoutException("Request timeout waiting for concurrency slot"));
-                        failedRequests.incrementAndGet();
-                        return;
+                    acquired = requestSemaphore.tryAcquire();
+                    if (!acquired) {
+                        if (loggingEnabled) {
+                            LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.DEBUG, "system",
+                                "Request queued due to concurrency limit: " + requestId);
+                        }
+                        queuedRequests.incrementAndGet();
+                        try {
+                            acquired = requestSemaphore.tryAcquire(requestTimeoutMs, TimeUnit.MILLISECONDS);
+                        } finally {
+                            queuedRequests.decrementAndGet();
+                        }
                     }
-                    
+                    if (!acquired) {
+                        throw new TimeoutException("Request timeout waiting for concurrency slot");
+                    }
+
                     activeRequests.incrementAndGet();
-                    queuedRequests.decrementAndGet();
+                    active = true;
                     
-                    LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.DEBUG, "system",
-                        "Starting LLM request: " + requestId +
-                        " (active: " + activeRequests.get() + "/" + maxConcurrentRequests + ")");
+                    if (loggingEnabled) {
+                        LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.DEBUG, "system",
+                            "Starting LLM request: " + requestId +
+                            " (active: " + activeRequests.get() + "/" + maxConcurrentRequests + ")");
+                    }
                     
                     // 执行实际任务
                     T result = task.get();
-                    future.complete(result);
                     completedRequests.incrementAndGet();
+                    future.complete(result);
                     
-                    long duration = System.currentTimeMillis() - startTime;
-                    LogManager.getInstance().performance("LLM request completed: " + requestId,
-                        java.util.Map.of(
-                            "duration_ms", duration,
-                            "active_requests", activeRequests.get(),
-                            "queued_requests", queuedRequests.get()
-                        ));
+                    if (loggingEnabled) {
+                        long duration = System.currentTimeMillis() - startTime;
+                        LogManager.getInstance().performance("LLM request completed: " + requestId,
+                            java.util.Map.of(
+                                "duration_ms", duration,
+                                "active_requests", activeRequests.get(),
+                                "queued_requests", queuedRequests.get()
+                            ));
+                    }
                     
-                } catch (Exception e) {
-                    future.completeExceptionally(e);
+                } catch (Throwable throwable) {
                     failedRequests.incrementAndGet();
-                    LogManager.getInstance().error("LLM request failed: " + requestId, e);
+                    future.completeExceptionally(throwable);
+                    if (loggingEnabled) {
+                        LogManager.getInstance().error("LLM request failed: " + requestId, throwable);
+                    }
                 } finally {
-                    activeRequests.decrementAndGet();
-                    requestSemaphore.release();
+                    if (active) {
+                        activeRequests.decrementAndGet();
+                    }
+                    if (acquired) {
+                        requestSemaphore.release();
+                    }
                 }
             });
         } catch (RejectedExecutionException e) {
             // 线程池队列已满
             future.completeExceptionally(new RuntimeException("Request rejected: thread pool queue is full", e));
             failedRequests.incrementAndGet();
-            requestSemaphore.release(); // 释放可能已获取的信号量
         }
         
         return future;
@@ -207,8 +232,10 @@ public class ConcurrencyManager {
      * 关闭并发管理器
      */
     public void shutdown() {
-        LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.INFO, "system",
-            "Shutting down ConcurrencyManager...");
+        if (loggingEnabled) {
+            LogManager.getInstance().log(com.riceawa.llm.logging.LogLevel.INFO, "system",
+                "Shutting down ConcurrencyManager...");
+        }
         executorService.shutdown();
         try {
             if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {

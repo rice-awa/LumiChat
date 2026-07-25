@@ -1,17 +1,11 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
-import com.riceawa.llm.compat.IdentifierCompat;
+import com.riceawa.llm.compat.RegistryCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-//? >=1.21.11 {
-import net.minecraft.resources.Identifier;
-//?} else {
-/*import net.minecraft.resources.ResourceLocation;
-*//*?}*/
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -40,6 +34,7 @@ public class SetBlockFunction implements LLMFunction {
     public JsonObject getParametersSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
+        schema.addProperty("additionalProperties", false);
         
         JsonObject properties = new JsonObject();
         
@@ -53,6 +48,8 @@ public class SetBlockFunction implements LLMFunction {
         JsonObject yParam = new JsonObject();
         yParam.addProperty("type", "integer");
         yParam.addProperty("description", "Y坐标");
+        yParam.addProperty("minimum", -64);
+        yParam.addProperty("maximum", 320);
         properties.add("y", yParam);
         
         // Z坐标
@@ -65,6 +62,7 @@ public class SetBlockFunction implements LLMFunction {
         JsonObject blockParam = new JsonObject();
         blockParam.addProperty("type", "string");
         blockParam.addProperty("description", "方块类型（如：stone, dirt, air等）");
+        blockParam.addProperty("maxLength", 100);
         properties.add("block_type", blockParam);
         
         // 是否替换现有方块
@@ -117,20 +115,7 @@ public class SetBlockFunction implements LLMFunction {
             }
             
             // 获取方块类型 - 使用兼容层
-            //? >=1.21.11 {
-            Identifier blockId = IdentifierCompat.parse(blockType);
-            //?} else {
-            /*ResourceLocation blockId = IdentifierCompat.parse(blockType);
-            *//*?}*/
-            if (blockId == null) {
-                blockId = IdentifierCompat.forBlockType(blockType);
-            }
-            
-            //? >=1.21.2 {
-            Block block = BuiltInRegistries.BLOCK.getValue(blockId);
-            //?} else {
-            /*Block block = BuiltInRegistries.BLOCK.get(blockId);
-            *//*?}*/
+            Block block = RegistryCompat.getBlock(blockType);
             if (block == null) {
                 return FunctionResult.error("未知的方块类型: " + blockType);
             }

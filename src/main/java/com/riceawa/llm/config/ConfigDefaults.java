@@ -19,6 +19,9 @@ public class ConfigDefaults {
     public static final boolean DEFAULT_ENABLE_HISTORY = true;
     public static final boolean DEFAULT_ENABLE_TOOL_CALL = true;
     public static final boolean DEFAULT_ENABLE_BROADCAST = false;
+    public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = false;
+    public static final boolean DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT = true;
+    public static final int DEFAULT_EXECUTE_COMMAND_MAX_LENGTH = 256;
     public static final int DEFAULT_HISTORY_RETENTION_DAYS = 30;
     
     // 上下文压缩配置默认值
@@ -44,6 +47,7 @@ public class ConfigDefaults {
 
     // Wiki API 配置默认值
     public static final String DEFAULT_WIKI_API_URL = "https://mcwiki.rice-awa.top";
+    public static final Set<String> DEFAULT_WIKI_ALLOWED_HOSTS = Set.of("mcwiki.rice-awa.top");
 
     // 多轮工具调用配置默认值
     public static final boolean DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS = true;
@@ -52,6 +56,9 @@ public class ConfigDefaults {
 
     // API密钥占位符（用于检测无效密钥）
     public static final String API_KEY_PLACEHOLDER = "your-api-key-here";
+    public static final String DEFAULT_PROVIDER_PROTOCOL = "openai-compatible";
+    public static final String ANTHROPIC_PROVIDER_PROTOCOL = "anthropic";
+    public static final String GOOGLE_PROVIDER_PROTOCOL = "google";
 
     // 空字符串默认值（用于Provider和Model）
     public static final String EMPTY_STRING = "";
@@ -95,6 +102,7 @@ public class ConfigDefaults {
         // Anthropic Provider
         providers.add(new Provider(
             "anthropic",
+            ANTHROPIC_PROVIDER_PROTOCOL,
             "https://api.anthropic.com/v1",
             API_KEY_PLACEHOLDER,
             List.of("claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku")
@@ -103,6 +111,7 @@ public class ConfigDefaults {
         // Google AI Provider
         providers.add(new Provider(
             "google",
+            GOOGLE_PROVIDER_PROTOCOL,
             "https://generativelanguage.googleapis.com/v1beta",
             API_KEY_PLACEHOLDER,
             List.of("gemini-2.5-pro-preview", "gemini-1.5-pro", "gemini-1.5-flash")
@@ -115,6 +124,17 @@ public class ConfigDefaults {
      * 创建默认的广播玩家集合
      */
     public static Set<String> createDefaultBroadcastPlayers() {
+        return new HashSet<>();
+    }
+
+    public static Set<String> createDefaultWikiAllowedHosts() {
+        return new HashSet<>(DEFAULT_WIKI_ALLOWED_HOSTS);
+    }
+
+    /**
+     * 创建默认的可执行命令允许列表。
+     */
+    public static Set<String> createDefaultExecuteCommandAllowlist() {
         return new HashSet<>();
     }
     
@@ -146,6 +166,9 @@ public class ConfigDefaults {
             case "enableHistory": return "启用历史记录";
             case "enableToolCall": return "启用工具调用";
             case "enableBroadcast": return "启用广播";
+            case "enableExecuteCommand": return "启用命令执行";
+            case "executeCommandReturnFullOutput": return "命令执行返回完整输出";
+            case "executeCommandMaxLength": return "命令执行最大长度";
             case "compressionModel": return "压缩模型";
             case "enableCompressionNotification": return "启用压缩通知";
             case "enableGlobalContext": return "启用全局上下文";
@@ -172,6 +195,13 @@ public class ConfigDefaults {
                 if (value instanceof Number) {
                     int num = ((Number) value).intValue();
                     return num > 0 && num <= 1000000; // 合理的上限
+                }
+                return false;
+
+            case "executeCommandMaxLength":
+                if (value instanceof Number) {
+                    int num = ((Number) value).intValue();
+                    return num > 0 && num <= DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
                 }
                 return false;
 
@@ -202,6 +232,9 @@ public class ConfigDefaults {
             case "maxToolCallDepth": return DEFAULT_MAX_TOOL_CALL_DEPTH;
             case "toolCallTimeoutMs": return DEFAULT_TOOL_CALL_TIMEOUT_MS;
             case "enableBroadcast": return DEFAULT_ENABLE_BROADCAST;
+            case "enableExecuteCommand": return DEFAULT_ENABLE_EXECUTE_COMMAND;
+            case "executeCommandReturnFullOutput": return DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
+            case "executeCommandMaxLength": return DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
             case "historyRetentionDays": return DEFAULT_HISTORY_RETENTION_DAYS;
             case "compressionModel": return DEFAULT_COMPRESSION_MODEL;
             case "enableCompressionNotification": return DEFAULT_ENABLE_COMPRESSION_NOTIFICATION;
@@ -210,6 +243,7 @@ public class ConfigDefaults {
             case "enableTitleGeneration": return DEFAULT_ENABLE_TITLE_GENERATION;
             case "titleGenerationModel": return DEFAULT_TITLE_GENERATION_MODEL;
             case "wikiApiUrl": return DEFAULT_WIKI_API_URL;
+            case "wikiAllowedHosts": return createDefaultWikiAllowedHosts();
             case "currentProvider": return EMPTY_STRING;
             case "currentModel": return EMPTY_STRING;
             default: return null;

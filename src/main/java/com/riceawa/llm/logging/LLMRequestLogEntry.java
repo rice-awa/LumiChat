@@ -6,54 +6,54 @@ import com.riceawa.llm.core.LLMMessage;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 /**
- * LLM请求日志条目
- * 记录完整的LLM API请求信息
+ * LLM请求日志条目。消息内容默认只记录长度和摘要。
  */
 public class LLMRequestLogEntry {
     @SerializedName("request_id")
     private final String requestId;
-    
+
     @SerializedName("timestamp")
     private final LocalDateTime timestamp;
-    
+
     @SerializedName("player_name")
     private final String playerName;
-    
+
     @SerializedName("player_uuid")
     private final String playerUuid;
-    
+
     @SerializedName("service_name")
     private final String serviceName;
-    
+
     @SerializedName("model")
     private final String model;
-    
+
     @SerializedName("messages")
-    private final List<LLMMessage> messages;
-    
-    @SerializedName("config")
-    private final LLMConfig config;
-    
+    private final List<Map<String, Object>> messages;
+
+    /** Kept for source compatibility, but never serialized into logs. */
+    private final transient LLMConfig config;
+
     @SerializedName("raw_request_json")
     private final String rawRequestJson;
-    
+
     @SerializedName("request_url")
     private final String requestUrl;
-    
+
     @SerializedName("request_headers")
     private final Map<String, String> requestHeaders;
-    
+
     @SerializedName("context_message_count")
     private final int contextMessageCount;
-    
+
     @SerializedName("estimated_tokens")
     private final Integer estimatedTokens;
-    
+
     @SerializedName("metadata")
     private final Map<String, Object> metadata;
 
@@ -64,24 +64,27 @@ public class LLMRequestLogEntry {
         this.playerUuid = builder.playerUuid;
         this.serviceName = builder.serviceName;
         this.model = builder.model;
-        this.messages = builder.messages;
+        this.messages = builder.messages == null ? new ArrayList<>()
+                : LLMLogSanitizer.sanitizeMessageSummaries(
+                        builder.messages, builder.includeMessageContent, builder.messageContentMaxLength);
         this.config = builder.config;
-        this.rawRequestJson = builder.rawRequestJson;
-        this.requestUrl = builder.requestUrl;
-        this.requestHeaders = new HashMap<>(builder.requestHeaders);
+        this.rawRequestJson = builder.includeRawRequestContent
+                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawRequestJson), builder.rawRequestContentMaxLength)
+                : LLMLogSanitizer.summarizeContent(builder.rawRequestJson);
+        this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(builder.requestUrl);
+        this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));
         this.contextMessageCount = builder.contextMessageCount;
         this.estimatedTokens = builder.estimatedTokens;
-        this.metadata = new HashMap<>(builder.metadata);
+        this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
     }
 
-    // Getters
     public String getRequestId() { return requestId; }
     public LocalDateTime getTimestamp() { return timestamp; }
     public String getPlayerName() { return playerName; }
     public String getPlayerUuid() { return playerUuid; }
     public String getServiceName() { return serviceName; }
     public String getModel() { return model; }
-    public List<LLMMessage> getMessages() { return messages; }
+    public List<Map<String, Object>> getMessages() { return new ArrayList<>(messages); }
     public LLMConfig getConfig() { return config; }
     public String getRawRequestJson() { return rawRequestJson; }
     public String getRequestUrl() { return requestUrl; }
@@ -90,16 +93,10 @@ public class LLMRequestLogEntry {
     public Integer getEstimatedTokens() { return estimatedTokens; }
     public Map<String, Object> getMetadata() { return new HashMap<>(metadata); }
 
-    /**
-     * 转换为JSON字符串（用于日志输出）
-     */
     public String toJsonString() {
         return LLMLogUtils.toJsonString(this);
     }
 
-    /**
-     * 转换为格式化的可读字符串
-     */
     public String toFormattedString() {
         StringBuilder sb = new StringBuilder();
         sb.append("[").append(timestamp.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"))).append("] ");
@@ -121,47 +118,46 @@ public class LLMRequestLogEntry {
         private String playerUuid;
         private String serviceName;
         private String model;
-        private List<LLMMessage> messages;
+        private List<Map<String, Object>> messages;
+        private boolean includeMessageContent;
+        private int messageContentMaxLength;
         private LLMConfig config;
         private String rawRequestJson;
+        private boolean includeRawRequestContent;
+        private int rawRequestContentMaxLength;
         private String requestUrl;
         private Map<String, String> requestHeaders = new HashMap<>();
         private int contextMessageCount;
         private Integer estimatedTokens;
         private Map<String, Object> metadata = new HashMap<>();
 
-        public Builder requestId(String requestId) {
-            this.requestId = requestId;
-            return this;
-        }
-
-        public Builder timestamp(LocalDateTime timestamp) {
-            this.timestamp = timestamp;
-            return this;
-        }
-
-        public Builder playerName(String playerName) {
-            this.playerName = playerName;
-            return this;
-        }
-
-        public Builder playerUuid(String playerUuid) {
-            this.playerUuid = playerUuid;
-            return this;
-        }
-
-        public Builder serviceName(String serviceName) {
-            this.serviceName = serviceName;
-            return this;
-        }
-
-        public Builder model(String model) {
-            this.model = model;
-            return this;
-        }
+        public Builder requestId(String requestId) { this.requestId = requestId; return this; }
+        public Builder timestamp(LocalDateTime timestamp) { this.timestamp = timestamp; return this; }
+        public Builder playerName(String playerName) { this.playerName = playerName; return this; }
+        public Builder playerUuid(String playerUuid) { this.playerUuid = playerUuid; return this; }
+        public Builder serviceName(String serviceName) { this.serviceName = serviceName; return this; }
+        public Builder model(String model) { this.model = model; return this; }
 
         public Builder messages(List<LLMMessage> messages) {
-            this.messages = messages;
+            this.includeMessageContent = false;
+            this.messageContentMaxLength = 0;
+            this.messages = LLMLogSanitizer.summarizeMessages(messages, false, 0);
+            this.contextMessageCount = messages != null ? messages.size() : 0;
+            return this;
+        }
+
+        public Builder messageSummaries(List<Map<String, Object>> messages) {
+            this.includeMessageContent = false;
+            this.messageContentMaxLength = 0;
+            this.messages = LLMLogSanitizer.sanitizeMessageSummaries(messages, false, 0);
+            this.contextMessageCount = messages != null ? messages.size() : 0;
+            return this;
+        }
+
+        public Builder messageSummaries(List<Map<String, Object>> messages, boolean includeContent, int maxLength) {
+            this.includeMessageContent = includeContent;
+            this.messageContentMaxLength = maxLength;
+            this.messages = LLMLogSanitizer.sanitizeMessageSummaries(messages, includeContent, maxLength);
             this.contextMessageCount = messages != null ? messages.size() : 0;
             return this;
         }
@@ -176,35 +172,37 @@ public class LLMRequestLogEntry {
 
         public Builder rawRequestJson(String rawRequestJson) {
             this.rawRequestJson = rawRequestJson;
+            this.includeRawRequestContent = false;
+            this.rawRequestContentMaxLength = 0;
+            return this;
+        }
+
+        public Builder rawRequestJson(String rawRequestJson, boolean includeContent, int maxLength) {
+            this.rawRequestJson = rawRequestJson;
+            this.includeRawRequestContent = includeContent;
+            this.rawRequestContentMaxLength = maxLength;
             return this;
         }
 
         public Builder requestUrl(String requestUrl) {
-            this.requestUrl = requestUrl;
+            this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(requestUrl);
             return this;
         }
 
         public Builder requestHeaders(Map<String, String> headers) {
             if (headers != null) {
-                this.requestHeaders.putAll(headers);
+                this.requestHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(headers));
             }
             return this;
         }
 
         public Builder requestHeader(String key, String value) {
-            this.requestHeaders.put(key, value);
+            this.requestHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(Map.of(key, value)));
             return this;
         }
 
-        public Builder estimatedTokens(Integer estimatedTokens) {
-            this.estimatedTokens = estimatedTokens;
-            return this;
-        }
-
-        public Builder metadata(String key, Object value) {
-            this.metadata.put(key, value);
-            return this;
-        }
+        public Builder estimatedTokens(Integer estimatedTokens) { this.estimatedTokens = estimatedTokens; return this; }
+        public Builder metadata(String key, Object value) { this.metadata.put(key, value); return this; }
 
         public Builder metadata(Map<String, Object> metadata) {
             if (metadata != null) {

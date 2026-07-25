@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 聊天历史记录管理器
  */
 public class ChatHistory {
-    private static ChatHistory instance;
+    private static volatile ChatHistory instance;
     private final Gson gson;
     private final Path historyDir;
     private final Map<UUID, List<ChatSession>> playerHistories;

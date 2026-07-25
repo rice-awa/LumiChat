@@ -20,6 +20,7 @@ classes/
 
 .settings/
 .vscode/
+.worktrees/
 bin/
 .classpath
 .project

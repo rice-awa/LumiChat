@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecraft 版本构建。模组提供 `/llmchat` 聊天命令、OpenAI 兼容 Provider、提示词模板、Tool Call、历史记录、日志、上下文压缩和游戏内广播等功能。
 
-当前构建矩阵在 `settings.gradle.kts` 中定义：历史版本组覆盖 1.16.5/1.17/1.18/1.19，独立节点覆盖 1.20-1.20.6、1.21-1.21.11；如果本机 Java 支持 25，也会启用 26.1 节点。`vcsVersion` 和默认 active 版本都是 `1.21.11`。
+当前构建矩阵在 `settings.gradle.kts` 中定义：历史版本组覆盖 1.19，独立节点覆盖 1.20-1.20.6、1.21-1.21.11；如果本机 Java 支持 25，也会启用 26.1/26.2 节点。`vcsVersion` 和默认 active 版本都是 `1.21.11`。
 
 ## 常用命令
 
