@@ -19,6 +19,7 @@ public class ConfigDefaults {
     public static final boolean DEFAULT_ENABLE_HISTORY = true;
     public static final boolean DEFAULT_ENABLE_TOOL_CALL = true;
     public static final boolean DEFAULT_ENABLE_BROADCAST = false;
+    public static final boolean DEFAULT_ENABLE_CHAT_INTEGRATION = true;
     public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = true;
     public static final boolean DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT = true;
     public static final int DEFAULT_EXECUTE_COMMAND_MAX_LENGTH = 256;
@@ -166,6 +167,7 @@ public class ConfigDefaults {
             case "enableHistory": return "启用历史记录";
             case "enableToolCall": return "启用工具调用";
             case "enableBroadcast": return "启用广播";
+            case "enableChatIntegration": return "启用聊天集成";
             case "enableExecuteCommand": return "启用命令执行";
             case "executeCommandReturnFullOutput": return "命令执行返回完整输出";
             case "executeCommandMaxLength": return "命令执行最大长度";
@@ -232,6 +234,7 @@ public class ConfigDefaults {
             case "maxToolCallDepth": return DEFAULT_MAX_TOOL_CALL_DEPTH;
             case "toolCallTimeoutMs": return DEFAULT_TOOL_CALL_TIMEOUT_MS;
             case "enableBroadcast": return DEFAULT_ENABLE_BROADCAST;
+            case "enableChatIntegration": return DEFAULT_ENABLE_CHAT_INTEGRATION;
             case "enableExecuteCommand": return DEFAULT_ENABLE_EXECUTE_COMMAND;
             case "executeCommandReturnFullOutput": return DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
             case "executeCommandMaxLength": return DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;

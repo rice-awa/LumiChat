@@ -40,6 +40,7 @@ public class LLMChatConfig {
     private boolean enableToolCall = ConfigDefaults.DEFAULT_ENABLE_TOOL_CALL;
     private boolean enableBroadcast = ConfigDefaults.DEFAULT_ENABLE_BROADCAST;
     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
+    private boolean enableChatIntegration = ConfigDefaults.DEFAULT_ENABLE_CHAT_INTEGRATION;
     private boolean enableExecuteCommand = ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
     private boolean executeCommandReturnFullOutput = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
     private Set<String> executeCommandBlocklist = ConfigDefaults.createDefaultExecuteCommandBlocklist();
@@ -290,6 +291,7 @@ public class LLMChatConfig {
         this.enableToolCall = data.enableToolCall != null ? data.enableToolCall : (Boolean) ConfigDefaults.getDefaultValue("enableToolCall");
         this.enableBroadcast = data.enableBroadcast != null ? data.enableBroadcast : (Boolean) ConfigDefaults.getDefaultValue("enableBroadcast");
         this.broadcastPlayers = data.broadcastPlayers != null ? new HashSet<>(data.broadcastPlayers) : ConfigDefaults.createDefaultBroadcastPlayers();
+        this.enableChatIntegration = data.enableChatIntegration != null ? data.enableChatIntegration : (Boolean) ConfigDefaults.getDefaultValue("enableChatIntegration");
         this.enableExecuteCommand = data.enableExecuteCommand != null
                 ? data.enableExecuteCommand : ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
         this.executeCommandReturnFullOutput = data.executeCommandReturnFullOutput != null
@@ -425,6 +427,7 @@ public class LLMChatConfig {
         data.enableToolCall = this.enableToolCall;
         data.enableBroadcast = this.enableBroadcast;
         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
+        data.enableChatIntegration = this.enableChatIntegration;
         data.enableExecuteCommand = this.enableExecuteCommand;
         data.executeCommandReturnFullOutput = this.executeCommandReturnFullOutput;
         data.executeCommandBlocklist = new HashSet<>(this.executeCommandBlocklist);
@@ -547,6 +550,15 @@ public class LLMChatConfig {
 
     public void setEnableBroadcast(boolean enableBroadcast) {
         this.enableBroadcast = enableBroadcast;
+        saveConfig();
+    }
+
+    public boolean isEnableChatIntegration() {
+        return enableChatIntegration;
+    }
+
+    public void setChatIntegrationEnabled(boolean enableChatIntegration) {
+        this.enableChatIntegration = enableChatIntegration;
         saveConfig();
     }
 
@@ -1138,6 +1150,7 @@ public class LLMChatConfig {
         Boolean enableToolCall;
         Boolean enableBroadcast;
         Set<String> broadcastPlayers;
+        Boolean enableChatIntegration;
         Boolean enableExecuteCommand;
         Boolean executeCommandReturnFullOutput;
         Set<String> executeCommandBlocklist;
