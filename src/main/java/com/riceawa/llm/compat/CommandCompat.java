@@ -4,10 +4,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
-//? >=1.21.11 {
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-//?}
 
 /**
  * 命令执行兼容层
@@ -37,16 +33,11 @@ public final class CommandCompat {
      */
     public static int executeCommand(MinecraftServer server, CommandSourceStack source, String command) {
         //? >=1.21.11 {
-        AtomicBoolean completed = new AtomicBoolean();
-        AtomicBoolean succeeded = new AtomicBoolean();
-        AtomicInteger resultCode = new AtomicInteger();
-        CommandSourceStack callbackSource = source.withCallback((success, result) -> {
-            completed.set(true);
-            succeeded.set(success);
-            resultCode.set(result);
-        });
-        server.getCommands().performPrefixedCommand(callbackSource, command);
-        return resultCodeForCallback(completed.get(), succeeded.get(), resultCode.get());
+        try {
+            return server.getCommands().getDispatcher().execute(command, source);
+        } catch (CommandSyntaxException e) {
+            return 0;
+        }
         //?} else {
         /*try {
             return server.getCommands().getDispatcher().execute(command, source);
@@ -55,12 +46,6 @@ public final class CommandCompat {
         }
         *//*?}*/
     }
-
-    //? >=1.21.11 {
-    static int resultCodeForCallback(boolean completed, boolean succeeded, int resultCode) {
-        return completed && succeeded ? resultCode : 0;
-    }
-    //?}
     
     /**
      * 执行命令并捕获输出
@@ -78,16 +63,11 @@ public final class CommandCompat {
         CommandSourceStack captureSource = server.createCommandSourceStack().withSource(outputCapture);
 
         //? >=1.21.11 {
-        AtomicBoolean completed = new AtomicBoolean();
-        AtomicBoolean succeeded = new AtomicBoolean();
-        AtomicInteger resultCode = new AtomicInteger();
-        CommandSourceStack callbackSource = captureSource.withCallback((success, result) -> {
-            completed.set(true);
-            succeeded.set(success);
-            resultCode.set(result);
-        });
-        server.getCommands().performPrefixedCommand(callbackSource, command);
-        return resultCodeForCallback(completed.get(), succeeded.get(), resultCode.get());
+        try {
+            return server.getCommands().getDispatcher().execute(command, captureSource);
+        } catch (CommandSyntaxException e) {
+            return 0;
+        }
         //?} else {
         /*try {
             return server.getCommands().getDispatcher().execute(command, captureSource);

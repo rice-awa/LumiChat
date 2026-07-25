@@ -48,7 +48,7 @@ class ToolCallHandlerTest {
     }
 
     @Test
-    void sanitizesExecuteCommandArgumentsInTheFollowUpToolExchange() throws Exception {
+    void preservesExecuteCommandArgumentsInTheFollowUpToolExchange() throws Exception {
         String secretCommand = "op SensitivePlayer --secret=never-log-this";
         LLMMessage.ToolCall original = new LLMMessage.ToolCall(
                 "execute_command", "{\"command\":\"" + secretCommand + "\"}", "call-command-1");
@@ -59,8 +59,8 @@ class ToolCallHandlerTest {
         LLMMessage.ToolCall followUp = context.getMessages().get(0).getMetadata().getToolCall();
         assertEquals("execute_command", followUp.getName());
         assertEquals("call-command-1", followUp.getToolCallId());
-        assertEquals("{}", followUp.getArguments());
-        assertFalse(followUp.getArguments().contains(secretCommand));
+        assertEquals(original.getArguments(), followUp.getArguments());
+        assertTrue(followUp.getArguments().contains(secretCommand));
     }
 
     @Test
