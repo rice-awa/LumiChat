@@ -42,7 +42,7 @@ public class LLMChatConfig {
     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
     private boolean enableExecuteCommand = ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
     private boolean executeCommandReturnFullOutput = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
-    private Set<String> executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+    private Set<String> executeCommandBlocklist = ConfigDefaults.createDefaultExecuteCommandBlocklist();
     private int executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
     private int historyRetentionDays = ConfigDefaults.DEFAULT_HISTORY_RETENTION_DAYS;
 
@@ -295,9 +295,9 @@ public class LLMChatConfig {
         this.executeCommandReturnFullOutput = data.executeCommandReturnFullOutput != null
                 ? data.executeCommandReturnFullOutput
                 : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
-        this.executeCommandAllowlist = data.executeCommandAllowlist != null
-                ? new HashSet<>(data.executeCommandAllowlist)
-                : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+        this.executeCommandBlocklist = data.executeCommandBlocklist != null
+                ? new HashSet<>(data.executeCommandBlocklist)
+                : ConfigDefaults.createDefaultExecuteCommandBlocklist();
         this.executeCommandMaxLength = data.executeCommandMaxLength != null
                 ? data.executeCommandMaxLength : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
         this.historyRetentionDays = data.historyRetentionDays != null ? data.historyRetentionDays : (Integer) ConfigDefaults.getDefaultValue("historyRetentionDays");
@@ -374,8 +374,8 @@ public class LLMChatConfig {
             this.executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
             needsSave = true;
         }
-        if (this.executeCommandAllowlist == null) {
-            this.executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+        if (this.executeCommandBlocklist == null) {
+            this.executeCommandBlocklist = ConfigDefaults.createDefaultExecuteCommandBlocklist();
             needsSave = true;
         }
         if (this.wikiAllowedHosts == null) {
@@ -427,7 +427,7 @@ public class LLMChatConfig {
         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
         data.enableExecuteCommand = this.enableExecuteCommand;
         data.executeCommandReturnFullOutput = this.executeCommandReturnFullOutput;
-        data.executeCommandAllowlist = new HashSet<>(this.executeCommandAllowlist);
+        data.executeCommandBlocklist = new HashSet<>(this.executeCommandBlocklist);
         data.executeCommandMaxLength = this.executeCommandMaxLength;
         data.historyRetentionDays = this.historyRetentionDays;
 
@@ -568,14 +568,14 @@ public class LLMChatConfig {
         saveConfig();
     }
 
-    public Set<String> getExecuteCommandAllowlist() {
-        return new HashSet<>(executeCommandAllowlist);
+    public Set<String> getExecuteCommandBlocklist() {
+        return new HashSet<>(executeCommandBlocklist);
     }
 
-    public void setExecuteCommandAllowlist(Set<String> executeCommandAllowlist) {
-        this.executeCommandAllowlist = executeCommandAllowlist != null
-                ? new HashSet<>(executeCommandAllowlist)
-                : ConfigDefaults.createDefaultExecuteCommandAllowlist();
+    public void setExecuteCommandBlocklist(Set<String> executeCommandBlocklist) {
+        this.executeCommandBlocklist = executeCommandBlocklist != null
+                ? new HashSet<>(executeCommandBlocklist)
+                : ConfigDefaults.createDefaultExecuteCommandBlocklist();
         saveConfig();
     }
 
@@ -1017,8 +1017,8 @@ public class LLMChatConfig {
             broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
             updated = true;
         }
-        if (executeCommandAllowlist == null) {
-            executeCommandAllowlist = ConfigDefaults.createDefaultExecuteCommandAllowlist();
+        if (executeCommandBlocklist == null) {
+            executeCommandBlocklist = ConfigDefaults.createDefaultExecuteCommandBlocklist();
             updated = true;
         }
         if (wikiAllowedHosts == null) {
@@ -1140,7 +1140,7 @@ public class LLMChatConfig {
         Set<String> broadcastPlayers;
         Boolean enableExecuteCommand;
         Boolean executeCommandReturnFullOutput;
-        Set<String> executeCommandAllowlist;
+        Set<String> executeCommandBlocklist;
         Integer executeCommandMaxLength;
         Integer historyRetentionDays;
 
