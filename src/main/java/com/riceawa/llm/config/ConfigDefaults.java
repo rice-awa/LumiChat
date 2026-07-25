@@ -19,7 +19,7 @@ public class ConfigDefaults {
     public static final boolean DEFAULT_ENABLE_HISTORY = true;
     public static final boolean DEFAULT_ENABLE_TOOL_CALL = true;
     public static final boolean DEFAULT_ENABLE_BROADCAST = false;
-    public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = false;
+    public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = true;
     public static final boolean DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT = true;
     public static final int DEFAULT_EXECUTE_COMMAND_MAX_LENGTH = 256;
     public static final int DEFAULT_HISTORY_RETENTION_DAYS = 30;
@@ -134,8 +134,8 @@ public class ConfigDefaults {
     /**
      * 创建默认的可执行命令允许列表。
      */
-    public static Set<String> createDefaultExecuteCommandAllowlist() {
-        return new HashSet<>();
+    public static Set<String> createDefaultExecuteCommandBlocklist() {
+        return new HashSet<>(Set.of("ban", "ban-ip", "deop", "kick", "op", "pardon", "reload", "stop", "whitelist"));
     }
     
     /**

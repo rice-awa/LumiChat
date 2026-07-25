@@ -4,7 +4,8 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Fail-closed policy for LLM-initiated command execution.
+ * Policy for LLM-initiated command execution. Commands are enabled by default;
+ * only commands whose root appears in the blocklist are rejected.
  */
 public final class CommandExecutionPolicy {
     public static final int DEFAULT_MAX_COMMAND_LENGTH = 256;
@@ -16,16 +17,16 @@ public final class CommandExecutionPolicy {
      * Evaluates a command against the default maximum command length.
      */
     public static Decision evaluate(String command, boolean operator, boolean enabled,
-                                    Set<String> allowlist) {
-        return evaluate(command, operator, enabled, allowlist, DEFAULT_MAX_COMMAND_LENGTH);
+                                    Set<String> blocklist) {
+        return evaluate(command, operator, enabled, blocklist, DEFAULT_MAX_COMMAND_LENGTH);
     }
 
     /**
      * Evaluates one Brigadier command input. Commands must be explicitly enabled,
-     * initiated by an operator, and have an allowlisted top-level command root.
+     * initiated by an operator, and must not have a blocklisted top-level command root.
      */
     public static Decision evaluate(String command, boolean operator, boolean enabled,
-                                    Set<String> allowlist, int maxLength) {
+                                    Set<String> blocklist, int maxLength) {
         if (!enabled) {
             return new Decision(false, "", "disabled");
         }
@@ -44,21 +45,22 @@ public final class CommandExecutionPolicy {
         if (normalizedCommand.length() > normalizeMaxLength(maxLength)) {
             return new Decision(false, commandRoot(normalizedCommand), "too_long");
         }
-        if (allowlist == null || allowlist.isEmpty()) {
-            return new Decision(false, commandRoot(normalizedCommand), "allowlist_empty");
-        }
 
         String root = commandRoot(normalizedCommand);
         if (root.isEmpty()) {
             return new Decision(false, "", "invalid_command");
         }
-        for (String allowedCommand : allowlist) {
-            String allowedRoot = normalizeAllowlistRoot(allowedCommand);
-            if (root.equals(allowedRoot)) {
-                return new Decision(true, root, "allowed");
+
+        if (blocklist != null && !blocklist.isEmpty()) {
+            for (String blockedCommand : blocklist) {
+                String blockedRoot = normalizeBlocklistRoot(blockedCommand);
+                if (root.equals(blockedRoot)) {
+                    return new Decision(false, root, "blocked");
+                }
             }
         }
-        return new Decision(false, root, "not_allowlisted");
+
+        return new Decision(true, root, "allowed");
     }
 
     /**
@@ -82,7 +84,7 @@ public final class CommandExecutionPolicy {
         return Math.max(1, Math.min(DEFAULT_MAX_COMMAND_LENGTH, maxLength));
     }
 
-    private static String normalizeAllowlistRoot(String command) {
+    private static String normalizeBlocklistRoot(String command) {
         if (command == null) {
             return "";
         }

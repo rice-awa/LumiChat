@@ -21,7 +21,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Executes explicitly allowlisted server commands as the initiating player.
+ * Executes server commands as the initiating player.
+ * Blocklisted commands are rejected at the policy layer.
  */
 public class ExecuteCommandFunction implements LLMFunction {
 
@@ -32,7 +33,7 @@ public class ExecuteCommandFunction implements LLMFunction {
 
     @Override
     public String getDescription() {
-        return "执行已由服务器管理员显式允许的Minecraft指令。仅OP可用，并以发起玩家身份执行。";
+        return "执行Minecraft指令。仅OP可用，并以发起玩家身份执行。黑名单中的命令将被拒绝。";
     }
 
     @Override
@@ -79,7 +80,7 @@ public class ExecuteCommandFunction implements LLMFunction {
                 requestedCommand,
                 PermissionHelper.isOperator(serverPlayer),
                 config.isEnableExecuteCommand(),
-                config.getExecuteCommandAllowlist(),
+                config.getExecuteCommandBlocklist(),
                 config.getExecuteCommandMaxLength());
         String commandHash = sha256(requestedCommand);
         if (!decision.allowed()) {
@@ -138,7 +139,7 @@ public class ExecuteCommandFunction implements LLMFunction {
         return switch (reason) {
             case "disabled" -> "命令执行功能已禁用";
             case "not_operator" -> "没有权限执行命令（需要OP权限）";
-            case "allowlist_empty", "not_allowlisted" -> "该命令未在允许列表中";
+            case "blocked" -> "该命令已被列入黑名单，禁止执行";
             case "too_long" -> "命令长度超过允许的最大值";
             default -> "命令格式无效";
         };
