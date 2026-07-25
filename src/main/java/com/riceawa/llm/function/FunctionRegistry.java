@@ -2,6 +2,7 @@ package com.riceawa.llm.function;
 
 import com.google.gson.JsonObject;
 import com.riceawa.llm.compat.ServerThreadCompat;
+import com.riceawa.llm.compat.WorldTimeCompat;
 import com.riceawa.llm.core.LLMConfig;
 import com.riceawa.llm.function.impl.WikiBatchPagesFunction;
 import com.riceawa.llm.function.impl.WikiPageFunction;
@@ -431,7 +432,7 @@ public class FunctionRegistry {
             if (world == null) {
                 return FunctionResult.error("无法获取世界信息");
             }
-            long time = EntityHelper.getDayTime(world);
+            long time = WorldTimeCompat.getDayTime(world);
             int hours = (int) ((time / 1000 + 6) % 24);
             int minutes = (int) ((time % 1000) * 60 / 1000);
             

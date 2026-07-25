@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.MobEffectCompat;
 import com.riceawa.llm.compat.PlayerCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
@@ -100,7 +101,7 @@ public class PlayerEffectsFunction implements LLMFunction {
                     }
                     
                     // 显示效果类型
-                    if (isBeneficialEffect(effect)) {
+                    if (MobEffectCompat.isBeneficial(effect)) {
                         effects.append(" [有益]");
                     } else {
                         effects.append(" [有害]");
@@ -121,7 +122,7 @@ public class PlayerEffectsFunction implements LLMFunction {
                 
                 // 统计信息
                 long beneficialCount = statusEffects.stream()
-                    .mapToLong(effect -> isBeneficialEffect(effect) ? 1 : 0)
+                    .mapToLong(effect -> MobEffectCompat.isBeneficial(effect) ? 1 : 0)
                     .sum();
                 long harmfulCount = statusEffects.size() - beneficialCount;
                 
@@ -138,11 +139,11 @@ public class PlayerEffectsFunction implements LLMFunction {
     }
     
     private String getEffectDisplayName(MobEffectInstance effect) {
-        String effectId = effect.getEffect().toString();
+        String effectId = MobEffectCompat.getId(effect);
         
         // 尝试获取本地化名称
         try {
-            String translationKey = getEffectTranslationKey(effect);
+            String translationKey = MobEffectCompat.getTranslationKey(effect);
             // 这里可以添加中文翻译映射
             return getChineseEffectName(effectId);
         } catch (Exception e) {
@@ -150,22 +151,6 @@ public class PlayerEffectsFunction implements LLMFunction {
         }
     }
 
-    private boolean isBeneficialEffect(MobEffectInstance effect) {
-        //? if >=1.20.5 {
-        return effect.getEffect().value().isBeneficial();
-        //?} else {
-        /*return effect.getEffect().isBeneficial();*/
-        //?}
-    }
-
-    private String getEffectTranslationKey(MobEffectInstance effect) {
-        //? if >=1.20.5 {
-        return effect.getEffect().value().getDescriptionId();
-        //?} else {
-        /*return effect.getEffect().getDescriptionId();*/
-        //?}
-    }
-    
     private String getChineseEffectName(String effectId) {
         // 常见状态效果的中文翻译
         switch (effectId.toLowerCase()) {
