@@ -221,7 +221,19 @@
 
 ## 📝 更新日志
 
-### v2.2.0 (2026-07-25) - 最新版本
+### v2.3.0 (2026-07-25) - 最新版本
+
+- 🔥 **聊天集成** - 新增聊天集成事件拦截，支持 `@AI` 触发和连续模式
+- 🔥 **ChatMode 命令** - 新增 `/llmchat chatmode` 命令，支持 `trigger`/`continuous`/`off`/`status` 四种模式
+- ⚙️ **全局开关配置** - 添加 `enableChatIntegration` 全局开关，灵活控制聊天集成行为
+- 🛡️ **命令执行安全** - 命令执行由白名单模式改为黑名单模式，默认开启（PR #22）
+- 🔧 **execute_command 修复** - 修复 LLM 忘记传 `command` 参数导致执行失败及命令输出丢失的问题
+- 🔧 **思考模型兼容修复** - 修复思考模型下 `reasoning_content` 丢失导致工具调用报 400 错误
+- 📊 **日志完整性修复** - 移除 `containsExecuteCommand` 对日志内容完整性的覆盖
+- 🏷️ **Mod Menu 修复** - 修复 Mod Menu 描述显示原始翻译键的问题
+- 📝 **文档更新** - 新增聊天集成设计文档、UX 审查文档，更新 AGENTS.md
+
+### v2.2.0 (2026-07-25)
 - 🎮 **Minecraft 26.x 版本扩展** - 新增 26.1.1、26.1.2、26.2 支持，拆分 26.1 版本组（26.1 独立，26.1.1 与 26.1.2 合并）
 - 🛠️ **CI/CD 优化** - 单 job buildAndCollect 多版本构建对齐 Stonecutter 官方模板，恢复 dev-build 多版本并行构建，新增 opencode 工作流
 - 🔧 **构建修复** - 移除不存在的 foojay-resolver-convention 插件（Gradle 9.4 已内置 toolchain 供应），补充缺失的 kotlin-stdlib 依赖
