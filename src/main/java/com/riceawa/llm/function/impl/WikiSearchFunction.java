@@ -49,6 +49,7 @@ public class WikiSearchFunction implements LLMFunction {
         JsonObject query = new JsonObject();
         query.addProperty("type", "string");
         query.addProperty("description", "搜索关键词，支持中文和英文，(尽量使用中文)");
+        query.addProperty("maxLength", 200);
         properties.add("query", query);
         
         // 可选参数：结果数量限制
@@ -67,8 +68,8 @@ public class WikiSearchFunction implements LLMFunction {
         properties.add("namespaces", namespaces);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         
-        // 必需参数列表
         JsonArray required = new JsonArray();
         required.add("query");
         schema.add("required", required);

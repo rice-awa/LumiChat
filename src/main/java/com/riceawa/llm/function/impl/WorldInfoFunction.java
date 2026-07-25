@@ -41,6 +41,7 @@ public class WorldInfoFunction implements LLMFunction {
         properties.add("include_details", includeDetails);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         return schema;
     }
     

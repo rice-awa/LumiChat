@@ -48,6 +48,7 @@ public class WikiPageFunction implements LLMFunction {
         JsonObject pageName = new JsonObject();
         pageName.addProperty("type", "string");
         pageName.addProperty("description", "Wiki页面名称，如：钻石、金锭、红石等");
+        pageName.addProperty("maxLength", 200);
         properties.add("page_name", pageName);
         
         // 可选参数：输出格式
@@ -78,6 +79,7 @@ public class WikiPageFunction implements LLMFunction {
         properties.add("max_length", maxLength);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         
         // 必需参数列表
         JsonArray required = new JsonArray();

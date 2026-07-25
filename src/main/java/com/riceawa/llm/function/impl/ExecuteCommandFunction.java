@@ -39,11 +39,13 @@ public class ExecuteCommandFunction implements LLMFunction {
     public JsonObject getParametersSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
+        schema.addProperty("additionalProperties", false);
 
         JsonObject properties = new JsonObject();
         JsonObject commandParam = new JsonObject();
         commandParam.addProperty("type", "string");
         commandParam.addProperty("description", "要执行的已允许Minecraft指令（可省略开头的斜杠）。");
+        commandParam.addProperty("maxLength", 256);
         properties.add("command", commandParam);
         schema.add("properties", properties);
 

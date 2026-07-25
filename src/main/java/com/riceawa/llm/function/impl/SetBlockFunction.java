@@ -40,6 +40,7 @@ public class SetBlockFunction implements LLMFunction {
     public JsonObject getParametersSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
+        schema.addProperty("additionalProperties", false);
         
         JsonObject properties = new JsonObject();
         
@@ -53,6 +54,8 @@ public class SetBlockFunction implements LLMFunction {
         JsonObject yParam = new JsonObject();
         yParam.addProperty("type", "integer");
         yParam.addProperty("description", "Y坐标");
+        yParam.addProperty("minimum", -64);
+        yParam.addProperty("maximum", 320);
         properties.add("y", yParam);
         
         // Z坐标
@@ -65,6 +68,7 @@ public class SetBlockFunction implements LLMFunction {
         JsonObject blockParam = new JsonObject();
         blockParam.addProperty("type", "string");
         blockParam.addProperty("description", "方块类型（如：stone, dirt, air等）");
+        blockParam.addProperty("maxLength", 100);
         properties.add("block_type", blockParam);
         
         // 是否替换现有方块

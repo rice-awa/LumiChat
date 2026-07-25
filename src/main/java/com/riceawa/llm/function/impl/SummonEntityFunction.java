@@ -42,6 +42,7 @@ public class SummonEntityFunction implements LLMFunction {
     public JsonObject getParametersSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
+        schema.addProperty("additionalProperties", false);
         
         JsonObject properties = new JsonObject();
         
@@ -49,6 +50,7 @@ public class SummonEntityFunction implements LLMFunction {
         JsonObject entityParam = new JsonObject();
         entityParam.addProperty("type", "string");
         entityParam.addProperty("description", "实体类型（如：cow, pig, zombie等）");
+        entityParam.addProperty("maxLength", 100);
         properties.add("entity_type", entityParam);
         
         // X坐标

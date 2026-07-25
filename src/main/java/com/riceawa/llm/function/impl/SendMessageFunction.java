@@ -60,6 +60,7 @@ public class SendMessageFunction implements LLMFunction {
         properties.add("message_type", messageType);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         schema.add("required", new com.google.gson.JsonArray());
         schema.getAsJsonArray("required").add("message");
         

@@ -33,6 +33,7 @@ public class TeleportPlayerFunction implements LLMFunction {
     public JsonObject getParametersSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
+        schema.addProperty("additionalProperties", false);
         
         JsonObject properties = new JsonObject();
         
@@ -40,12 +41,14 @@ public class TeleportPlayerFunction implements LLMFunction {
         JsonObject playerParam = new JsonObject();
         playerParam.addProperty("type", "string");
         playerParam.addProperty("description", "要传送的玩家名称（不指定则传送自己）");
+        playerParam.addProperty("maxLength", 16);
         properties.add("player_name", playerParam);
         
         // 目标玩家（传送到其他玩家身边）
         JsonObject targetPlayerParam = new JsonObject();
         targetPlayerParam.addProperty("type", "string");
         targetPlayerParam.addProperty("description", "传送到此玩家身边（与坐标参数二选一）");
+        targetPlayerParam.addProperty("maxLength", 16);
         properties.add("target_player", targetPlayerParam);
         
         // X坐标
@@ -58,6 +61,8 @@ public class TeleportPlayerFunction implements LLMFunction {
         JsonObject yParam = new JsonObject();
         yParam.addProperty("type", "number");
         yParam.addProperty("description", "目标Y坐标");
+        yParam.addProperty("minimum", -64);
+        yParam.addProperty("maximum", 320);
         properties.add("y", yParam);
         
         // Z坐标
@@ -71,9 +76,29 @@ public class TeleportPlayerFunction implements LLMFunction {
         dimensionParam.addProperty("type", "string");
         dimensionParam.addProperty("description", "目标维度（overworld/nether/end）");
         dimensionParam.addProperty("default", "overworld");
+        com.google.gson.JsonArray dimensionEnum = new com.google.gson.JsonArray();
+        dimensionEnum.add("overworld");
+        dimensionEnum.add("nether");
+        dimensionEnum.add("end");
+        dimensionParam.add("enum", dimensionEnum);
         properties.add("dimension", dimensionParam);
         
         schema.add("properties", properties);
+
+        com.google.gson.JsonArray oneOf = new com.google.gson.JsonArray();
+        JsonObject opt1 = new JsonObject();
+        com.google.gson.JsonArray req1 = new com.google.gson.JsonArray();
+        req1.add("target_player");
+        opt1.add("required", req1);
+        oneOf.add(opt1);
+        JsonObject opt2 = new JsonObject();
+        com.google.gson.JsonArray req2 = new com.google.gson.JsonArray();
+        req2.add("x");
+        req2.add("y");
+        req2.add("z");
+        opt2.add("required", req2);
+        oneOf.add(opt2);
+        schema.add("oneOf", oneOf);
         
         return schema;
     }

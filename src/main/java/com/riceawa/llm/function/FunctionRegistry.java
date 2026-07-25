@@ -226,7 +226,13 @@ public class FunctionRegistry {
         if (function.executionMode() != LLMFunction.ExecutionMode.SERVER_THREAD) {
             return LLMFunction.FunctionResult.error("异步函数不能通过同步接口执行: " + functionName);
         }
-        
+
+        FunctionSchemaValidator.ValidationResult validation = FunctionSchemaValidator.validate(
+                arguments, function.getParametersSchema());
+        if (!validation.isValid()) {
+            return LLMFunction.FunctionResult.error("参数验证失败: " + validation.error());
+        }
+
         try {
             JsonObject argumentsSnapshot = arguments == null ? new JsonObject() : arguments.deepCopy();
             auditExecutionIfGeneric(functionName, player, function.executionMode());
@@ -264,6 +270,13 @@ public class FunctionRegistry {
             }
             if (!function.hasPermission(player)) {
                 resultFuture.complete(LLMFunction.FunctionResult.error("没有权限调用函数: " + functionName));
+                return;
+            }
+
+            FunctionSchemaValidator.ValidationResult validation = FunctionSchemaValidator.validate(
+                    arguments, function.getParametersSchema());
+            if (!validation.isValid()) {
+                resultFuture.complete(LLMFunction.FunctionResult.error("参数验证失败: " + validation.error()));
                 return;
             }
 
@@ -407,6 +420,7 @@ public class FunctionRegistry {
         public JsonObject getParametersSchema() {
             JsonObject schema = new JsonObject();
             schema.addProperty("type", "object");
+            schema.addProperty("additionalProperties", false);
             schema.add("properties", new JsonObject());
             return schema;
         }
@@ -459,6 +473,7 @@ public class FunctionRegistry {
         public JsonObject getParametersSchema() {
             JsonObject schema = new JsonObject();
             schema.addProperty("type", "object");
+            schema.addProperty("additionalProperties", false);
             schema.add("properties", new JsonObject());
             return schema;
         }
@@ -508,6 +523,7 @@ public class FunctionRegistry {
         public JsonObject getParametersSchema() {
             JsonObject schema = new JsonObject();
             schema.addProperty("type", "object");
+            schema.addProperty("additionalProperties", false);
             schema.add("properties", new JsonObject());
             return schema;
         }

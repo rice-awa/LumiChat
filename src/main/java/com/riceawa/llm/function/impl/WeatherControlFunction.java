@@ -52,9 +52,15 @@ public class WeatherControlFunction implements LLMFunction {
         worldParam.addProperty("type", "string");
         worldParam.addProperty("description", "目标世界：overworld（主世界）、nether（下界）、end（末地）");
         worldParam.addProperty("default", "overworld");
+        com.google.gson.JsonArray worldEnum = new com.google.gson.JsonArray();
+        worldEnum.add("overworld");
+        worldEnum.add("nether");
+        worldEnum.add("end");
+        worldParam.add("enum", worldEnum);
         properties.add("world", worldParam);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         
         // 必需参数
         com.google.gson.JsonArray required = new com.google.gson.JsonArray();

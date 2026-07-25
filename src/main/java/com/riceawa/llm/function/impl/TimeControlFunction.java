@@ -36,6 +36,15 @@ public class TimeControlFunction implements LLMFunction {
         JsonObject timeTypeParam = new JsonObject();
         timeTypeParam.addProperty("type", "string");
         timeTypeParam.addProperty("description", "时间类型：day（白天）、night（夜晚）、noon（正午）、midnight（午夜）、sunrise（日出）、sunset（日落）、specific（指定时间）");
+        com.google.gson.JsonArray timeEnum = new com.google.gson.JsonArray();
+        timeEnum.add("day");
+        timeEnum.add("night");
+        timeEnum.add("noon");
+        timeEnum.add("midnight");
+        timeEnum.add("sunrise");
+        timeEnum.add("sunset");
+        timeEnum.add("specific");
+        timeTypeParam.add("enum", timeEnum);
         properties.add("time_type", timeTypeParam);
         
         // 具体时间值（当time_type为specific时使用）
@@ -51,9 +60,15 @@ public class TimeControlFunction implements LLMFunction {
         worldParam.addProperty("type", "string");
         worldParam.addProperty("description", "目标世界：overworld（主世界）、nether（下界）、end（末地）");
         worldParam.addProperty("default", "overworld");
+        com.google.gson.JsonArray worldEnum = new com.google.gson.JsonArray();
+        worldEnum.add("overworld");
+        worldEnum.add("nether");
+        worldEnum.add("end");
+        worldParam.add("enum", worldEnum);
         properties.add("world", worldParam);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         
         // 必需参数
         com.google.gson.JsonArray required = new com.google.gson.JsonArray();

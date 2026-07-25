@@ -98,6 +98,7 @@ public class WikiBatchPagesFunction implements LLMFunction {
         properties.add("max_length", maxLength);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         
         // 必需参数列表
         JsonArray required = new JsonArray();
