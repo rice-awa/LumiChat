@@ -161,6 +161,25 @@ LogManager.getInstance().audit("审计事件", Map.of("key", value));
 4. **Minecraft API 适配**：**先在 compat 层抽象**，再写业务逻辑
 5. **新配置项**：在 `ConfigData` 中加字段（可空），在 `validateAndCompleteConfig()` 中补默认值
 
+## 分支工作流
+
+- **基线分支**：`dev` — 所有功能开发和 bug 修复都从此分支拉出
+- **功能/修复分支**：任何功能或修复都**必须新建分支**（基线为 `dev`），命名如 `feat/xxx`、`fix/xxx`
+- **例外**：仅当改动极小（仅需一个提交即可完成）时，可直接在 `dev` 上提交
+- **完成后**：review 代码，然后合并回 `dev` 分支
+- **发布分支**：`main` 仅用于版本发布，不直接提交，从 `dev` 合并
+
+```bash
+# 标准流程
+git checkout dev
+git checkout -b feat/new-feature
+# 开发、提交...
+git checkout dev
+git merge feat/new-feature
+git branch -d feat/new-feature
+git push origin dev
+```
+
 ## 提交规范
 
 使用 Conventional Commits（中文）：
