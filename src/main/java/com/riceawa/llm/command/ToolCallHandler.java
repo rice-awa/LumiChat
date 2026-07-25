@@ -168,7 +168,7 @@ public final class ToolCallHandler {
                 && message.getMetadata().getToolCall() != null;
 
         if (hasContent) {
-            if (ChatRequestHandler.shouldBroadcast(config, player.getName().getString())) {
+            if (BroadcastCommands.shouldBroadcast(config, player.getName().getString())) {
                 EntityHelper.getServer(player).getPlayerList().broadcastSystemMessage(
                         Component.literal("[AI回复给 " + player.getName().getString() + "] " + content)
                                 .withStyle(ChatFormatting.AQUA), false);
@@ -268,7 +268,7 @@ public final class ToolCallHandler {
                                 String content = response.getContent();
                                 if (content != null && !content.trim().isEmpty()) {
                                     chatContext.addAssistantMessage(content);
-                                    if (ChatRequestHandler.shouldBroadcast(
+                                    if (BroadcastCommands.shouldBroadcast(
                                             config, player.getName().getString())) {
                                         server.getPlayerList().broadcastSystemMessage(
                                                 Component.literal("[AI回复给 "

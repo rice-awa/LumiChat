@@ -54,7 +54,7 @@ public final class ChatRequestHandler {
         LLMChatConfig config = LLMChatConfig.getInstance();
 
         if (config.isFirstTimeUse()) {
-            LLMChatCommand.showFirstTimeSetupGuide(serverPlayer);
+            ChatCommands.showFirstTimeSetupGuide(serverPlayer);
             return;
         }
 
@@ -114,7 +114,7 @@ public final class ChatRequestHandler {
             }
         }
 
-        if (shouldBroadcast(config, serverPlayer.getName().getString())) {
+        if (BroadcastCommands.shouldBroadcast(config, serverPlayer.getName().getString())) {
             EntityHelper.getServer(serverPlayer).getPlayerList().broadcastSystemMessage(
                     Component.literal("[" + serverPlayer.getName().getString() + " 问AI] " + message)
                             .withStyle(ChatFormatting.LIGHT_PURPLE), false);
@@ -123,7 +123,7 @@ public final class ChatRequestHandler {
                     Component.literal("你问 AI " + message).withStyle(ChatFormatting.LIGHT_PURPLE), false);
         }
 
-        if (shouldBroadcast(config, serverPlayer.getName().getString())) {
+        if (BroadcastCommands.shouldBroadcast(config, serverPlayer.getName().getString())) {
             EntityHelper.getServer(serverPlayer).getPlayerList().broadcastSystemMessage(
                     Component.literal("[AI正在为 " + serverPlayer.getName().getString() + " 思考...]")
                             .withStyle(ChatFormatting.GRAY), false);
@@ -203,7 +203,7 @@ public final class ChatRequestHandler {
                 && message.getMetadata().getToolCall() != null;
 
         if (hasContent) {
-            if (shouldBroadcast(config, player.getName().getString())) {
+            if (BroadcastCommands.shouldBroadcast(config, player.getName().getString())) {
                 EntityHelper.getServer(player).getPlayerList().broadcastSystemMessage(
                         Component.literal("[AI回复给 " + player.getName().getString() + "] " + content)
                                 .withStyle(ChatFormatting.AQUA), false);
@@ -245,11 +245,4 @@ public final class ChatRequestHandler {
         chatContext.scheduleCompressionIfNeeded();
     }
 
-    static boolean shouldBroadcast(LLMChatConfig config, String playerName) {
-        if (!config.isEnableBroadcast()) {
-            return false;
-        }
-        java.util.Set<String> broadcastPlayers = config.getBroadcastPlayers();
-        return broadcastPlayers.isEmpty() || broadcastPlayers.contains(playerName);
-    }
 }
