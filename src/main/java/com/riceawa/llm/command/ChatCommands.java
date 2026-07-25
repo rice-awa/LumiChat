@@ -405,6 +405,7 @@ public final class ChatCommands {
         MessageCompat.displayClientMessage(player, Component.literal("  template - 提示词模板管理").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal("  provider - AI服务提供商管理").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal("  model - AI模型管理").withStyle(ChatFormatting.WHITE), false);
+        MessageCompat.displayClientMessage(player, Component.literal("  chatmode - 聊天模式管理（@AI触发/连续模式）").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal("  broadcast - AI聊天广播功能").withStyle(ChatFormatting.WHITE), false);
         MessageCompat.displayClientMessage(player, Component.literal(""), false);
 

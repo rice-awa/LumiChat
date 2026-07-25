@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.riceawa.llm.logging.LogConfig;
 import com.riceawa.llm.logging.LogManager;
+import com.riceawa.llm.context.ChatMode;
 
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -41,6 +42,7 @@ public class LLMChatConfig {
     private boolean enableBroadcast = ConfigDefaults.DEFAULT_ENABLE_BROADCAST;
     private Set<String> broadcastPlayers = ConfigDefaults.createDefaultBroadcastPlayers();
     private boolean enableChatIntegration = ConfigDefaults.DEFAULT_ENABLE_CHAT_INTEGRATION;
+    private String defaultChatMode = ConfigDefaults.DEFAULT_DEFAULT_CHAT_MODE;
     private boolean enableExecuteCommand = ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
     private boolean executeCommandReturnFullOutput = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
     private Set<String> executeCommandBlocklist = ConfigDefaults.createDefaultExecuteCommandBlocklist();
@@ -292,6 +294,7 @@ public class LLMChatConfig {
         this.enableBroadcast = data.enableBroadcast != null ? data.enableBroadcast : (Boolean) ConfigDefaults.getDefaultValue("enableBroadcast");
         this.broadcastPlayers = data.broadcastPlayers != null ? new HashSet<>(data.broadcastPlayers) : ConfigDefaults.createDefaultBroadcastPlayers();
         this.enableChatIntegration = data.enableChatIntegration != null ? data.enableChatIntegration : (Boolean) ConfigDefaults.getDefaultValue("enableChatIntegration");
+        this.defaultChatMode = data.defaultChatMode != null ? data.defaultChatMode : (String) ConfigDefaults.getDefaultValue("defaultChatMode");
         this.enableExecuteCommand = data.enableExecuteCommand != null
                 ? data.enableExecuteCommand : ConfigDefaults.DEFAULT_ENABLE_EXECUTE_COMMAND;
         this.executeCommandReturnFullOutput = data.executeCommandReturnFullOutput != null
@@ -428,6 +431,7 @@ public class LLMChatConfig {
         data.enableBroadcast = this.enableBroadcast;
         data.broadcastPlayers = new HashSet<>(this.broadcastPlayers);
         data.enableChatIntegration = this.enableChatIntegration;
+        data.defaultChatMode = this.defaultChatMode;
         data.enableExecuteCommand = this.enableExecuteCommand;
         data.executeCommandReturnFullOutput = this.executeCommandReturnFullOutput;
         data.executeCommandBlocklist = new HashSet<>(this.executeCommandBlocklist);
@@ -559,6 +563,15 @@ public class LLMChatConfig {
 
     public void setChatIntegrationEnabled(boolean enableChatIntegration) {
         this.enableChatIntegration = enableChatIntegration;
+        saveConfig();
+    }
+
+    public ChatMode getDefaultChatMode() {
+        return ChatMode.fromName(defaultChatMode);
+    }
+
+    public void setDefaultChatMode(ChatMode mode) {
+        this.defaultChatMode = mode.getName();
         saveConfig();
     }
 
@@ -1151,6 +1164,7 @@ public class LLMChatConfig {
         Boolean enableBroadcast;
         Set<String> broadcastPlayers;
         Boolean enableChatIntegration;
+        String defaultChatMode;
         Boolean enableExecuteCommand;
         Boolean executeCommandReturnFullOutput;
         Set<String> executeCommandBlocklist;

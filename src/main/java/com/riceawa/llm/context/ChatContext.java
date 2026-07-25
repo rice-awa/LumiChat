@@ -90,6 +90,7 @@ public class ChatContext {
                 LLMChatConfig.getInstance().getMaxContextCharacters(),
                 command -> ChatContextManager.getInstance().getScheduler().execute(command),
                 null);
+        this.chatMode = LLMChatConfig.getInstance().getDefaultChatMode();
     }
 
     ChatContext(UUID playerId, String promptTemplate, int maxContextCharacters,

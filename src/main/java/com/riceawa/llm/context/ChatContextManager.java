@@ -106,11 +106,12 @@ public class ChatContextManager {
      * 为指定玩家创建新的会话（清空当前对话并开始新会话）
      */
     public void renewSession(UUID playerId) {
-        // 创建新的ChatContext实例，这样会有新的sessionId
+        ChatContext oldContext = contexts.get(playerId);
         ChatContext newContext = new ChatContext(playerId);
-        // 设置事件监听器
         newContext.setEventListener(new CompressionNotificationListener());
-        // 替换旧的context
+        if (oldContext != null) {
+            newContext.setChatMode(oldContext.getChatMode());
+        }
         contexts.put(playerId, newContext);
     }
 
@@ -120,7 +121,6 @@ public class ChatContextManager {
     public void createNewSessionWithHistory(UUID playerId, String newTemplate) {
         ChatContext oldContext = contexts.get(playerId);
         if (oldContext == null) {
-            // 如果没有旧的context，直接创建新的
             ChatContext newContext = new ChatContext(playerId);
             newContext.setCurrentPromptTemplate(newTemplate);
             newContext.setEventListener(new CompressionNotificationListener());
@@ -128,23 +128,19 @@ public class ChatContextManager {
             return;
         }
 
-        // 创建新的ChatContext实例
         ChatContext newContext = new ChatContext(playerId);
         newContext.setEventListener(new CompressionNotificationListener());
+        newContext.setChatMode(oldContext.getChatMode());
 
-        // 复制历史消息，但跳过旧的系统消息
         List<LLMMessage> oldMessages = oldContext.getMessages();
         for (LLMMessage message : oldMessages) {
-            // 跳过系统消息，因为我们要使用新模板的系统提示词
             if (message.getRole() != LLMMessage.MessageRole.SYSTEM) {
                 newContext.addMessage(message);
             }
         }
 
-        // 设置新的提示词模板
         newContext.setCurrentPromptTemplate(newTemplate);
 
-        // 替换旧的context
         contexts.put(playerId, newContext);
     }
 
