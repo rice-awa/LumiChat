@@ -218,7 +218,7 @@ public final class ChatRequestHandler {
                 chatContext.addAssistantMessage(content);
             }
             ToolCallHandler.getInstance().handleToolCall(
-                    message.getMetadata().getToolCall(), player, chatContext, config);
+                    message, player, chatContext, config);
         } else if (hasContent) {
             chatContext.addAssistantMessage(content);
             if (config.isEnableHistory()) {

@@ -397,6 +397,11 @@ public class OpenAIService implements LLMService {
             JsonObject messageObj = new JsonObject();
             messageObj.addProperty("role", message.getRole().getValue());
 
+            // 包含 DeepSeek thinking mode 的 reasoning_content
+            if (message.getReasoningContent() != null && !message.getReasoningContent().isEmpty()) {
+                messageObj.addProperty("reasoning_content", message.getReasoningContent());
+            }
+
             // 处理不同类型的消息
             if (message.getRole() == LLMMessage.MessageRole.TOOL) {
                 // Tool消息格式
@@ -530,6 +535,11 @@ public class OpenAIService implements LLMService {
                         }
 
                         LLMMessage message = new LLMMessage(messageRole, content);
+
+                        // 解析 DeepSeek thinking mode 的 reasoning_content
+                        if (messageObj.has("reasoning_content") && !messageObj.get("reasoning_content").isJsonNull()) {
+                            message.setReasoningContent(messageObj.get("reasoning_content").getAsString());
+                        }
 
                         // 处理新的tool_calls格式
                         if (messageObj.has("tool_calls")) {

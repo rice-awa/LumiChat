@@ -92,10 +92,11 @@ class ToolCallHandlerTest {
                                            String toolCallId, ChatContext context) throws Exception {
         Method method = ToolCallHandler.class.getDeclaredMethod("appendToolExchange",
                 LLMMessage.ToolCall.class, String.class, String.class,
-                LLMFunction.FunctionResult.class, ChatContext.class, LLMChatConfig.class);
+                LLMFunction.FunctionResult.class, ChatContext.class, LLMChatConfig.class,
+                String.class);
         method.setAccessible(true);
         method.invoke(ToolCallHandler.getInstance(), toolCall, functionName, toolCallId,
-                LLMFunction.FunctionResult.success("safe result"), context, commandOutputConfig(false));
+                LLMFunction.FunctionResult.success("safe result"), context, commandOutputConfig(false), null);
     }
 
     private static ChatContext newContext() throws Exception {

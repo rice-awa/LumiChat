@@ -37,9 +37,10 @@ public final class ToolCallHandler {
         return INSTANCE;
     }
 
-    void handleToolCall(LLMMessage.ToolCall toolCall, ServerPlayer player,
+    void handleToolCall(LLMMessage message, ServerPlayer player,
                         ChatContext chatContext, LLMChatConfig config) {
         try {
+            LLMMessage.ToolCall toolCall = message.getMetadata().getToolCall();
             String functionName = toolCall.getName();
             String toolCallId = toolCall.getToolCallId();
             MessageCompat.displayClientMessage(player,
@@ -56,7 +57,8 @@ public final class ToolCallHandler {
             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
                         if (toolCallId != null) {
-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config);
+                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config,
+                                    message.getReasoningContent());
                             callLLMWithFunctionResult(player, chatContext, config, 1);
                         } else {
                             handleLegacyToolCall(result, functionName, player, chatContext, config);
@@ -182,7 +184,7 @@ public final class ToolCallHandler {
             if (hasContent) {
                 chatContext.addAssistantMessage(content);
             }
-            handleToolCallWithRecursion(message.getMetadata().getToolCall(), player,
+            handleToolCallWithRecursion(message, player,
                     chatContext, config, recursionDepth);
         } else if (hasContent) {
             chatContext.addAssistantMessage(content);
@@ -196,10 +198,11 @@ public final class ToolCallHandler {
         }
     }
 
-    private void handleToolCallWithRecursion(LLMMessage.ToolCall toolCall, ServerPlayer player,
+    private void handleToolCallWithRecursion(LLMMessage message, ServerPlayer player,
                                              ChatContext chatContext, LLMChatConfig config,
                                              int recursionDepth) {
         try {
+            LLMMessage.ToolCall toolCall = message.getMetadata().getToolCall();
             String functionName = toolCall.getName();
             String toolCallId = toolCall.getToolCallId();
             MessageCompat.displayClientMessage(player,
@@ -217,7 +220,8 @@ public final class ToolCallHandler {
             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
                         if (toolCallId != null) {
-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config);
+                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config,
+                                    message.getReasoningContent());
                             callLLMWithFunctionResult(
                                     player, chatContext, config, recursionDepth + 1);
                         } else {
@@ -342,11 +346,15 @@ public final class ToolCallHandler {
 
     private void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
                                     String toolCallId, LLMFunction.FunctionResult result,
-                                    ChatContext chatContext, LLMChatConfig config) {
+                                    ChatContext chatContext, LLMChatConfig config,
+                                    String reasoningContent) {
         LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
         metadata.setToolCall(safeFollowUpToolCall(toolCall));
         toolCallMessage.setMetadata(metadata);
+        if (reasoningContent != null && !reasoningContent.isEmpty()) {
+            toolCallMessage.setReasoningContent(reasoningContent);
+        }
         chatContext.addMessage(toolCallMessage);
 
         String resultContent = toolResultContent(functionName, result, config);

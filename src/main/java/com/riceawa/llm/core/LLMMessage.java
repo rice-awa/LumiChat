@@ -16,6 +16,9 @@ public class LLMMessage {
     
     @SerializedName("content")
     private final String content;
+
+    @SerializedName("reasoning_content")
+    private String reasoningContent;
     
     @SerializedName("timestamp")
     private final LocalDateTime timestamp;
@@ -51,6 +54,14 @@ public class LLMMessage {
 
     public String getContent() {
         return content;
+    }
+
+    public String getReasoningContent() {
+        return reasoningContent;
+    }
+
+    public void setReasoningContent(String reasoningContent) {
+        this.reasoningContent = reasoningContent;
     }
 
     public LocalDateTime getTimestamp() {
