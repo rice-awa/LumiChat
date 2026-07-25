@@ -69,6 +69,43 @@ class FunctionSchemaValidatorTest {
     }
 
     @Test
+    void rejectsIntegerWithFractionalValue() {
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "object");
+        JsonObject properties = new JsonObject();
+        JsonObject countProp = new JsonObject();
+        countProp.addProperty("type", "integer");
+        countProp.addProperty("minimum", 0);
+        properties.add("count", countProp);
+        schema.add("properties", properties);
+
+        JsonObject args = new JsonObject();
+        args.addProperty("count", 3.14);
+
+        FunctionSchemaValidator.ValidationResult result = FunctionSchemaValidator.validate(args, schema);
+        assertFalse(result.isValid());
+        assertTrue(result.error().contains("count"));
+        assertTrue(result.error().contains("整数"));
+    }
+
+    @Test
+    void passesIntegerWithWholeNumberValue() {
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "object");
+        JsonObject properties = new JsonObject();
+        JsonObject countProp = new JsonObject();
+        countProp.addProperty("type", "integer");
+        properties.add("count", countProp);
+        schema.add("properties", properties);
+
+        JsonObject args = new JsonObject();
+        args.addProperty("count", 42);
+
+        FunctionSchemaValidator.ValidationResult result = FunctionSchemaValidator.validate(args, schema);
+        assertTrue(result.isValid());
+    }
+
+    @Test
     void rejectsWrongType() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
@@ -307,6 +344,51 @@ class FunctionSchemaValidatorTest {
 
         FunctionSchemaValidator.ValidationResult result = FunctionSchemaValidator.validate(args, schema);
         assertTrue(result.isValid());
+    }
+
+    @Test
+    void rejectsTeleportOneOfWhenBothAlternativesMatch() {
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "object");
+        JsonObject properties = new JsonObject();
+        JsonObject targetPlayer = new JsonObject();
+        targetPlayer.addProperty("type", "string");
+        properties.add("target_player", targetPlayer);
+        JsonObject xProp = new JsonObject();
+        xProp.addProperty("type", "number");
+        properties.add("x", xProp);
+        JsonObject yProp = new JsonObject();
+        yProp.addProperty("type", "number");
+        properties.add("y", yProp);
+        JsonObject zProp = new JsonObject();
+        zProp.addProperty("type", "number");
+        properties.add("z", zProp);
+        schema.add("properties", properties);
+
+        JsonArray oneOf = new JsonArray();
+        JsonObject opt1 = new JsonObject();
+        JsonArray req1 = new JsonArray();
+        req1.add("target_player");
+        opt1.add("required", req1);
+        oneOf.add(opt1);
+        JsonObject opt2 = new JsonObject();
+        JsonArray req2 = new JsonArray();
+        req2.add("x");
+        req2.add("y");
+        req2.add("z");
+        opt2.add("required", req2);
+        oneOf.add(opt2);
+        schema.add("oneOf", oneOf);
+
+        JsonObject args = new JsonObject();
+        args.addProperty("target_player", "Alex");
+        args.addProperty("x", 100);
+        args.addProperty("y", 64);
+        args.addProperty("z", 200);
+
+        FunctionSchemaValidator.ValidationResult result = FunctionSchemaValidator.validate(args, schema);
+        assertFalse(result.isValid());
+        assertTrue(result.error().contains("恰好一组"));
     }
 
     @Test

@@ -146,6 +146,9 @@ public final class FunctionSchemaValidator {
                 if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
                     return "参数 '" + name + "' 的类型必须为integer";
                 }
+                if (value.getAsDouble() % 1 != 0) {
+                    return "参数 '" + name + "' 的值必须是整数";
+                }
                 break;
             case "boolean":
                 if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
@@ -202,25 +205,9 @@ public final class FunctionSchemaValidator {
     }
 
     private static String checkOneOf(JsonObject arguments, JsonArray oneOf) {
-        for (JsonElement element : oneOf) {
-            JsonObject option = element.getAsJsonObject();
-            JsonArray optionRequired = option.getAsJsonArray("required");
-            if (optionRequired == null) {
-                continue;
-            }
-            boolean allPresent = true;
-            for (JsonElement req : optionRequired) {
-                if (!arguments.has(req.getAsString())) {
-                    allPresent = false;
-                    break;
-                }
-            }
-            if (allPresent) {
-                return null;
-            }
-        }
+        List<String> matchedAlternatives = new ArrayList<>();
+        List<String> allAlternatives = new ArrayList<>();
 
-        List<String> alternatives = new ArrayList<>();
         for (JsonElement element : oneOf) {
             JsonObject option = element.getAsJsonObject();
             JsonArray optionRequired = option.getAsJsonArray("required");
@@ -231,9 +218,28 @@ public final class FunctionSchemaValidator {
             for (JsonElement req : optionRequired) {
                 fields.add(req.getAsString());
             }
-            alternatives.add("{" + String.join(", ", fields) + "}");
+            String desc = "{" + String.join(", ", fields) + "}";
+            allAlternatives.add(desc);
+
+            boolean allPresent = true;
+            for (JsonElement req : optionRequired) {
+                if (!arguments.has(req.getAsString())) {
+                    allPresent = false;
+                    break;
+                }
+            }
+            if (allPresent) {
+                matchedAlternatives.add(desc);
+            }
         }
-        return "参数不符合oneOf约束，需满足以下之一: " + String.join(" 或 ", alternatives);
+
+        if (matchedAlternatives.isEmpty()) {
+            return "参数不符合oneOf约束，需满足以下之一: " + String.join(" 或 ", allAlternatives);
+        }
+        if (matchedAlternatives.size() > 1) {
+            return "需提供恰好一组参数: " + String.join(" 或 ", matchedAlternatives);
+        }
+        return null;
     }
 
     private static String formatNum(double value) {
