@@ -1,4 +1,5 @@
 {
-  "mod.lumichat.name": "LumiChat",
-  "mod.lumichat.description": "一个想让你眼前一亮的MC Fabric模组，集成了LLM（大语言模型）聊天功能，支持多种AI服务和自定义功能"
+  "modmenu.nameTranslation.lumichat": "LumiChat",
+  "modmenu.descriptionTranslation.lumichat": "一个想让你眼前一亮的MC Fabric模组，集成了LLM（大语言模型）聊天功能，支持多种AI服务和自定义功能",
+  "modmenu.summaryTranslation.lumichat": "集成LLM聊天功能的MC Fabric模组"
 }

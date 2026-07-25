@@ -33,6 +33,7 @@ bin/
 
 run/
 remappedSrc/
+logs/
 
 # java
 

@@ -3,7 +3,7 @@
 	"id": "${id}",
   "version": "${version}",
   "name": "${name}",
-	"description": "mod.lumichat.description",
+	"description": "A MC Fabric mod integrating LLM chat functionality, supporting multiple AI services and custom features",
 	"authors": [
 		"rice-awa"
 	],
