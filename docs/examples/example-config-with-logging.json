@@ -24,9 +24,10 @@
     "enablePerformanceLog": true,
     "enableAuditLog": true
   },
-  "providers": [
+    "providers": [
     {
       "name": "OpenAI",
+      "protocol": "openai",
       "baseUrl": "https://api.openai.com/v1",
       "apiKey": "your-openai-api-key-here",
       "models": [
@@ -38,6 +39,7 @@
     },
     {
       "name": "DeepSeek",
+      "protocol": "openai",
       "baseUrl": "https://api.deepseek.com/v1",
       "apiKey": "your-deepseek-api-key-here",
       "models": [
@@ -48,6 +50,7 @@
     },
     {
       "name": "OpenRouter",
+      "protocol": "openai",
       "baseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "your-openrouter-api-key-here",
       "models": [

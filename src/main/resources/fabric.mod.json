@@ -35,9 +35,6 @@
 	"depends": {
 		"fabricloader": ">=${fabric_loader}",
 		"minecraft": "${minecraft}",
-		"fabric-api": "*"
-	},
-	"suggests": {
-		"another-mod": "*"
+		"fabric-api": ">=${fabric_api}"
 	}
 }

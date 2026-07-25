@@ -7,23 +7,23 @@
 ## 新增功能列表
 
 ### 1. 执行指令功能 (execute_command)
-**权限**: 仅OP可用  
-**功能**: 安全地执行Minecraft服务器指令  
-**安全机制**: 指令黑名单保护
+**权限**: 仅OP可用 (需双开关: `enableExecuteCommand` 配置 + `executeCommandAllowlist` 允许列表)  
+**功能**: 安全地执行Minecraft服务器指令，以发起玩家身份执行  
+**安全机制**: 显式允许列表 (allowlist)
 
 ```json
 {
-  "command": "say Hello World",
-  "silent": false
+  "command": "say Hello World"
 }
 ```
 
-**黑名单保护的指令**:
-- 服务器控制: stop, restart, shutdown
-- 权限管理: op, deop
-- 封禁管理: ban, ban-ip
-- 存档管理: save-all, save-off
-- 等等...
+**安全控制层级**:
+1. 全局开关 `enableExecuteCommand`（默认 `false`）
+2. `executeCommandAllowlist` 显式允许列表，只执行列表中的命令根（如 `["say", "tell", "me"]`）
+3. 发起玩家必须是 OP
+4. 命令长度限制（默认 256 字符）
+5. 以发起玩家原有权限执行，不提升
+6. 拦截含 `\0`/`;`/换行的恶意输入
 
 ### 2. 设置方块功能 (set_block)
 **权限**: 仅OP可用  
@@ -56,7 +56,7 @@
 ```
 
 ### 4. 传送玩家功能 (teleport_player)
-**权限**: 所有玩家可传送自己，OP可传送他人  
+**权限**: 仅OP可用  
 **功能**: 传送到坐标或其他玩家身边
 
 ```json
@@ -127,7 +127,10 @@
 2. **OP玩家**: 所有功能，包括世界修改和管理员指令
 
 ### 安全机制
-- **指令黑名单**: 禁止执行危险指令
+- **Schema 校验**: fail-closed 策略，`additionalProperties: false`，未知参数拒绝
+- **运行时验证**: schema 校验后再进行坐标/长度/枚举等业务验证
+- **显式允许列表 (execute_command)**: 不在列表中的命令根一律拒绝（非黑名单）
+- **Wiki 端点**: host 允许列表、仅 HTTPS 域名、拒 IP 字面量、禁用重定向
 - **距离限制**: 限制操作范围
 - **数量限制**: 限制生成实体数量
 - **参数验证**: 严格的输入验证

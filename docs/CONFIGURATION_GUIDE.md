@@ -44,6 +44,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
   "providers": [
     {
       "name": "openai",
+      "protocol": "openai",
       "apiBaseUrl": "https://api.openai.com/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -56,6 +57,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "openrouter",
+      "protocol": "openai",
       "apiBaseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -68,6 +70,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "deepseek",
+      "protocol": "openai",
       "apiBaseUrl": "https://api.deepseek.com/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -77,6 +80,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "anthropic",
+      "protocol": "openai",
       "apiBaseUrl": "https://api.anthropic.com/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -87,6 +91,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "google",
+      "protocol": "openai",
       "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
       "apiKey": "your-api-key-here",
       "models": [
@@ -143,6 +148,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "provider-name",           // Provider唯一标识
+  "protocol": "openai",              // 协议类型（目前仅支持 "openai"）
   "apiBaseUrl": "https://api.example.com/v1",  // API基础URL
   "apiKey": "your-api-key-here",     // API密钥
   "models": [                        // 支持的模型列表
@@ -151,6 +157,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
   ]
 }
 ```
+> **注意**: `protocol` 字段为必填，不支持的协议类型会导致 Provider 加载失败。
 
 ### 🤖 支持的Provider
 
@@ -158,6 +165,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "openai",
+  "protocol": "openai",
   "apiBaseUrl": "https://api.openai.com/v1",
   "apiKey": "sk-...",
   "models": [
@@ -174,6 +182,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "openrouter",
+  "protocol": "openai",
   "apiBaseUrl": "https://openrouter.ai/api/v1",
   "apiKey": "sk-or-v1-...",
   "models": [
@@ -190,6 +199,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "deepseek",
+  "protocol": "openai",
   "apiBaseUrl": "https://api.deepseek.com/v1",
   "apiKey": "sk-...",
   "models": [
@@ -203,6 +213,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "anthropic",
+  "protocol": "openai",
   "apiBaseUrl": "https://api.anthropic.com/v1",
   "apiKey": "sk-ant-...",
   "models": [
@@ -217,6 +228,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "google",
+  "protocol": "openai",
   "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
   "apiKey": "AIza...",
   "models": [
@@ -332,12 +344,16 @@ Provider配置状态: 2/5 有效
 ### 🔒 安全配置策略
 ```json
 {
-  "enableToolCall": true,        // 谨慎启用Tool Call
-  "enableBroadcast": false,              // 默认关闭广播保护隐私
+  "enableExecuteCommand": false,         // 默认关闭命令执行
+  "executeCommandAllowlist": ["say"],    // 显式允许列表（非黑名单），不在列表中的命令根一律拒绝
+  "wikiAllowedHosts": ["mcwiki.rice-awa.top"],  // Wiki 主机允许列表
+  "enableToolCall": true,                // 启用 Tool Call
+  "enableBroadcast": false,              // 默认关闭广播
   "broadcastPlayers": [],                // 空列表=全局广播，有内容=特定玩家
   "enableGlobalContext": true            // 启用上下文信息
 }
 ```
+> **注意**: execute_command 采用双开关机制 — `enableExecuteCommand` 全局开关 + `executeCommandAllowlist` 显式允许列表。默认关闭，需管理员审核后手动启用。
 
 ### 🎯 多Provider配置策略
 ```json

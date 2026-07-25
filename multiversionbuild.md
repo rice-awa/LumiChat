@@ -10,7 +10,7 @@
 | `26.1` | `26.1.2` | `26.1`-`26.1.2` |
 | `26.2` | `26.2` | `26.2` |
 
-仅当运行 Gradle 的 JVM 为 Java 25 或更高版本时，`settings.gradle.kts` 才会把 26.1/26.2 加入当前项目矩阵。这两个条件节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。旧版 1.16.5-1.18 不受支持。
+仅当运行 Gradle 的 JVM 为 Java 25 或更高版本时，`settings.gradle.kts` 才会把 26.1/26.2 加入当前项目矩阵。这两个条件节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。
 
 ## 常用 Gradle 命令
 

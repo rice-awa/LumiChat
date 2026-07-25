@@ -8,26 +8,26 @@
 
 ```java
 // 在LogConfig中的配置
-private boolean enableLLMRequestLog = true;  // 启用LLM请求日志
+private boolean enableLLMRequestLog = true;  // 启用LLM请求日志（默认开启）
 ```
 
 ### 2. 控制日志内容详细程度
 
 ```java
-// 是否记录完整的请求体（包含所有消息和配置）
-private boolean logFullRequestBody = true;
+// 是否记录完整的请求体（默认 false，仅记录摘要）
+private boolean logFullRequestBody = false;
 
-// 是否记录完整的响应体（包含原始API响应）
-private boolean logFullResponseBody = true;
+// 是否记录完整的响应体（默认 false，仅记录摘要）
+private boolean logFullResponseBody = false;
 
-// 最大日志内容长度（字符数）
-private int maxLogContentLength = 10000;
+// 最大日志内容长度（字符数，默认 2048）
+private int maxLogContentLength = 2048;
 ```
 
 ### 3. 安全配置
 
 ```java
-// 是否脱敏敏感数据（如API密钥）
+// 是否脱敏敏感数据（默认 true，如API密钥）
 private boolean sanitizeSensitiveData = true;
 ```
 
@@ -37,39 +37,28 @@ private boolean sanitizeSensitiveData = true;
 ```java
 // 完整日志记录，便于调试
 enableLLMRequestLog = true;
-logFullRequestBody = true;
-logFullResponseBody = true;
-maxLogContentLength = 50000;  // 较大的内容限制
+logFullRequestBody = true;   // 注意：开启后会记录完整对话内容
+logFullResponseBody = true;  // 注意：开启后会记录完整 API 响应
+maxLogContentLength = 50000;
 sanitizeSensitiveData = true;
 ```
 
-### 场景2：生产环境
+### 场景2：生产环境（推荐）
 ```java
-// 平衡性能和可观测性
+// 默认配置：仅记录摘要元数据
 enableLLMRequestLog = true;
-logFullRequestBody = true;
-logFullResponseBody = false;  // 不记录完整响应体以节省空间
-maxLogContentLength = 5000;   // 较小的内容限制
+logFullRequestBody = false;   // 不记录完整请求体
+logFullResponseBody = false;  // 不记录完整响应体
+maxLogContentLength = 2048;
 sanitizeSensitiveData = true;
 ```
 
-### 场景3：高性能环境
+### 场景3：最低日志
 ```java
 // 最小化日志记录
-enableLLMRequestLog = true;
-logFullRequestBody = false;   // 只记录元数据
+enableLLMRequestLog = false;  // 关闭 LLM 请求日志
+logFullRequestBody = false;
 logFullResponseBody = false;
-maxLogContentLength = 1000;
-sanitizeSensitiveData = true;
-```
-
-### 场景4：合规审计环境
-```java
-// 完整记录所有信息
-enableLLMRequestLog = true;
-logFullRequestBody = true;
-logFullResponseBody = true;
-maxLogContentLength = 100000; // 不限制内容长度
 sanitizeSensitiveData = true;
 ```
 
