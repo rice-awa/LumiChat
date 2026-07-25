@@ -221,7 +221,14 @@
 
 ## 📝 更新日志
 
-### v2.1.0 (2026-06-19) - 最新版本
+### v2.2.0 (2026-07-25) - 最新版本
+- 🎮 **Minecraft 26.x 版本扩展** - 新增 26.1.1、26.1.2、26.2 支持，拆分 26.1 版本组（26.1 独立，26.1.1 与 26.1.2 合并）
+- 🛠️ **CI/CD 优化** - 单 job buildAndCollect 多版本构建对齐 Stonecutter 官方模板，恢复 dev-build 多版本并行构建，新增 opencode 工作流
+- 🔧 **构建修复** - 移除不存在的 foojay-resolver-convention 插件（Gradle 9.4 已内置 toolchain 供应），补充缺失的 kotlin-stdlib 依赖
+- 🏷️ **术语统一** - 统一工具调用配置中的模组ID术语，补充英文模组描述
+- 📝 **文档清理** - 删除临时开发文档，优化 agent 配置文档
+
+### v2.1.0 (2026-06-19)
 - 🔥 **迁移至 Mojang mappings** - 从 Yarn mappings 迁移到 Mojang/official mappings，覆盖命令、上下文、Tool Call、模板、Mixin 与兼容层等核心代码。
 - 📦 **多版本构建恢复** - 验证 1.19 版本组、1.20-1.20.6、1.21-1.21.11，以及可选的 26.1/26.2 构建节点。
 - 🛠️ **构建工具升级** - Fabric Loom/remap 插件升级到 1.15-SNAPSHOT，Gradle Wrapper 升级到 9.4.0，并完善 Mojang mappings 与 26.1 unobfuscated 构建分流。
