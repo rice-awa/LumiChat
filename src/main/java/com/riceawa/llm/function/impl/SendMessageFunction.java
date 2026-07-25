@@ -3,6 +3,7 @@ package com.riceawa.llm.function.impl;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.compat.MessageCompat;
+import com.riceawa.llm.compat.PlayerCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import net.minecraft.network.chat.Component;
@@ -110,11 +111,7 @@ public class SendMessageFunction implements LLMFunction {
 
             } else {
                 // 发送给指定玩家
-                //? >=1.21.11 {
-                ServerPlayer targetPlayer = server.getPlayerList().getPlayer(target);
-                //?} else {
-                /*ServerPlayer targetPlayer = server.getPlayerList().getPlayerByName(target);
-                *//*?}*/
+                ServerPlayer targetPlayer = PlayerCompat.getPlayerByName(server, target);
                 if (targetPlayer == null) {
                     return FunctionResult.error("目标玩家不可用");
                 }

@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.DimensionCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.core.BlockPos;
@@ -132,21 +133,7 @@ public class WorldInfoFunction implements LLMFunction {
     }
     
     private String getDimensionName(Level world) {
-        //? >=1.21.11 {
-        String dimensionId = world.dimension().identifier().toString();
-        //?} else {
-        /*String dimensionId = world.dimension().location().toString();
-        *//*?}*/
-        switch (dimensionId) {
-            case "minecraft:overworld":
-                return "主世界";
-            case "minecraft:the_nether":
-                return "下界";
-            case "minecraft:the_end":
-                return "末地";
-            default:
-                return dimensionId;
-        }
+        return DimensionCompat.getDisplayName(world);
     }
     
     @Override

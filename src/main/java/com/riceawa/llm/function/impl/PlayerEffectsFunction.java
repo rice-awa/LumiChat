@@ -1,6 +1,7 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.PlayerCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import net.minecraft.server.MinecraftServer;
@@ -49,11 +50,7 @@ public class PlayerEffectsFunction implements LLMFunction {
             // 如果指定了玩家名称，尝试查找该玩家
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
-                //? >=1.21.11 {
-                ServerPlayer foundPlayer = server.getPlayerList().getPlayer(playerName);
-                //?} else {
-                /*ServerPlayer foundPlayer = server.getPlayerList().getPlayerByName(playerName);
-                *//*?}*/
+                ServerPlayer foundPlayer = PlayerCompat.getPlayerByName(server, playerName);
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
                 }

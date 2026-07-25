@@ -1,7 +1,9 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.DimensionCompat;
 import com.riceawa.llm.compat.MessageCompat;
+import com.riceawa.llm.compat.PlayerCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
@@ -111,12 +113,8 @@ public class TeleportPlayerFunction implements LLMFunction {
             
             if (arguments.has("player_name")) {
                 String playerName = arguments.get("player_name").getAsString();
-                //? >=1.21.11 {
-                ServerPlayer foundPlayer = server.getPlayerList().getPlayer(playerName);
-                //?} else {
-                /*ServerPlayer foundPlayer = server.getPlayerList().getPlayerByName(playerName);
-                *//*?}*/
-                
+                ServerPlayer foundPlayer = PlayerCompat.getPlayerByName(server, playerName);
+
                 if (foundPlayer == null) {
                     return FunctionResult.error("找不到玩家: " + playerName);
                 }
@@ -133,12 +131,8 @@ public class TeleportPlayerFunction implements LLMFunction {
             if (arguments.has("target_player")) {
                 // 传送到其他玩家身边
                 String targetPlayerName = arguments.get("target_player").getAsString();
-                //? >=1.21.11 {
-                ServerPlayer destinationPlayer = server.getPlayerList().getPlayer(targetPlayerName);
-                //?} else {
-                /*ServerPlayer destinationPlayer = server.getPlayerList().getPlayerByName(targetPlayerName);
-                *//*?}*/
-                
+                ServerPlayer destinationPlayer = PlayerCompat.getPlayerByName(server, targetPlayerName);
+
                 if (destinationPlayer == null) {
                     return FunctionResult.error("找不到目标玩家: " + targetPlayerName);
                 }
@@ -238,21 +232,7 @@ public class TeleportPlayerFunction implements LLMFunction {
     }
     
     private String getDimensionName(ServerLevel world) {
-        //? >=1.21.11 {
-        String dimensionId = world.dimension().identifier().toString();
-        //?} else {
-        /*String dimensionId = world.dimension().location().toString();
-        *//*?}*/
-        switch (dimensionId) {
-            case "minecraft:overworld":
-                return "主世界";
-            case "minecraft:the_nether":
-                return "下界";
-            case "minecraft:the_end":
-                return "末地";
-            default:
-                return dimensionId;
-        }
+        return DimensionCompat.getDisplayName(world);
     }
     
     public static boolean isOperatorOnly(boolean operator) {

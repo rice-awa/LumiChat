@@ -1,6 +1,7 @@
 package com.riceawa.llm.template;
 
 import com.google.gson.annotations.SerializedName;
+import com.riceawa.llm.compat.DimensionCompat;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.server.level.ServerPlayer;
@@ -187,26 +188,14 @@ public class PromptTemplate {
 
             case "world": {
                 var world = player != null ? EntityHelper.getWorld(player) : null;
-                //? >=1.21.11 {
-                return world != null ? world.dimension().identifier().toString() : "Unknown";
-                //?} else {
-                /*return world != null ? world.dimension().location().toString() : "Unknown";
-                *//*?}*/
+                return world != null ? DimensionCompat.getDimensionId(world) : "Unknown";
             }
 
             case "dimension": {
                 if (player != null) {
                     var world = EntityHelper.getWorld(player);
                     if (world == null) return "Unknown";
-                    //? >=1.21.11 {
-                    String worldKey = world.dimension().identifier().toString();
-                    //?} else {
-                    /*String worldKey = world.dimension().location().toString();
-                    *//*?}*/
-                    if (worldKey.contains("overworld")) return "主世界";
-                    if (worldKey.contains("nether")) return "下界";
-                    if (worldKey.contains("end")) return "末地";
-                    return worldKey;
+                    return DimensionCompat.getDisplayName(world);
                 }
                 return "Unknown";
             }
