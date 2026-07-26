@@ -184,6 +184,7 @@ public class OpenAIService implements LLMService {
         boolean includeRequestContent = debugMode || logConfig.isLogFullRequestBody();
         boolean includeResponseContent = debugMode || logConfig.isLogFullResponseBody();
         LLMRequestLogEntry.Builder requestLogBuilder = LLMLogUtils.createRequestLogBuilder(requestId)
+                .debugMode(debugMode)
                 .serviceName(getServiceName())
                 .playerName(playerName)
                 .playerUuid(playerUuid)
@@ -195,8 +196,7 @@ public class OpenAIService implements LLMService {
                 .config(config)
                 .requestUrl(requestUrl)
                 .requestHeaders(requestHeaders)
-                .estimatedTokens(LLMLogUtils.estimateTokens(messages))
-                .debugMode(debugMode);
+                .estimatedTokens(LLMLogUtils.estimateTokens(messages));
         if (includeRequestContent) {
             requestLogBuilder.rawRequestJson(
                     requestBody.toString(), true, logConfig.getMaxLogContentLength());
@@ -228,12 +228,12 @@ public class OpenAIService implements LLMService {
                         parseRetryAfterMillis(response.header("Retry-After")));
                 String sanitizedErrorBody = statusException.responseSummary();
                 LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+                        .debugMode(debugMode)
                         .httpStatusCode(response.code())
                         .success(false)
                         .errorMessage("HTTP " + response.code() + ": " + sanitizedErrorBody)
                         .responseHeaders(responseHeaders)
                         .responseTimeMs(responseTime)
-                        .debugMode(debugMode)
                         .content(sanitizedErrorBody, includeResponseContent, logConfig.getMaxLogContentLength());
                 if (includeResponseContent) {
                     responseLogBuilder.rawResponseJson(
@@ -254,11 +254,11 @@ public class OpenAIService implements LLMService {
 
             // 默认只记录状态、usage、finish reason及响应摘要
             LLMResponseLogEntry.Builder responseLogBuilder = LLMLogUtils.createResponseLogBuilder(responseId, requestId)
+                    .debugMode(debugMode)
                     .httpStatusCode(response.code())
                     .success(llmResponse.isSuccess())
                     .responseHeaders(responseHeaders)
                     .responseTimeMs(responseTime)
-                    .debugMode(debugMode)
                     .model(llmResponse.getModel())
                     .content(llmResponse.getContent(), includeResponseContent, logConfig.getMaxLogContentLength());
             if (llmResponse.getUsage() != null) {
