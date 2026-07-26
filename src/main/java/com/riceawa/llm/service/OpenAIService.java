@@ -180,7 +180,9 @@ public class OpenAIService implements LLMService {
 
         // 记录请求日志：默认仅记录消息摘要和请求元数据
         LogConfig logConfig = LLMChatConfig.getInstance().getLogConfig();
-        boolean includeRequestContent = logConfig.isLogFullRequestBody();
+        boolean debugMode = logConfig.isDebugMode();
+        boolean includeRequestContent = debugMode || logConfig.isLogFullRequestBody();
+        boolean includeResponseContent = debugMode || logConfig.isLogFullResponseBody();
         LLMRequestLogEntry.Builder requestLogBuilder = LLMLogUtils.createRequestLogBuilder(requestId)
                 .serviceName(getServiceName())
                 .playerName(playerName)
@@ -193,7 +195,8 @@ public class OpenAIService implements LLMService {
                 .config(config)
                 .requestUrl(requestUrl)
                 .requestHeaders(requestHeaders)
-                .estimatedTokens(LLMLogUtils.estimateTokens(messages));
+                .estimatedTokens(LLMLogUtils.estimateTokens(messages))
+                .debugMode(debugMode);
         if (includeRequestContent) {
             requestLogBuilder.rawRequestJson(
                     requestBody.toString(), true, logConfig.getMaxLogContentLength());
@@ -230,8 +233,9 @@ public class OpenAIService implements LLMService {
                         .errorMessage("HTTP " + response.code() + ": " + sanitizedErrorBody)
                         .responseHeaders(responseHeaders)
                         .responseTimeMs(responseTime)
-                        .content(sanitizedErrorBody, logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength());
-                if (logConfig.isLogFullResponseBody()) {
+                        .debugMode(debugMode)
+                        .content(sanitizedErrorBody, includeResponseContent, logConfig.getMaxLogContentLength());
+                if (includeResponseContent) {
                     responseLogBuilder.rawResponseJson(
                             responseBody, true, logConfig.getMaxLogContentLength());
                 }
@@ -254,8 +258,9 @@ public class OpenAIService implements LLMService {
                     .success(llmResponse.isSuccess())
                     .responseHeaders(responseHeaders)
                     .responseTimeMs(responseTime)
+                    .debugMode(debugMode)
                     .model(llmResponse.getModel())
-                    .content(llmResponse.getContent(), logConfig.isLogFullResponseBody(), logConfig.getMaxLogContentLength());
+                    .content(llmResponse.getContent(), includeResponseContent, logConfig.getMaxLogContentLength());
             if (llmResponse.getUsage() != null) {
                 LLMResponse.Usage usage = llmResponse.getUsage();
                 responseLogBuilder.usage(usage.getPromptTokens(), usage.getCompletionTokens(), usage.getTotalTokens());
@@ -263,7 +268,7 @@ public class OpenAIService implements LLMService {
             if (llmResponse.getChoices() != null && !llmResponse.getChoices().isEmpty()) {
                 responseLogBuilder.finishReason(llmResponse.getChoices().get(0).getFinishReason());
             }
-            if (logConfig.isLogFullResponseBody()) {
+            if (includeResponseContent) {
                 responseLogBuilder.rawResponseJson(
                         responseBody, true, logConfig.getMaxLogContentLength());
             }

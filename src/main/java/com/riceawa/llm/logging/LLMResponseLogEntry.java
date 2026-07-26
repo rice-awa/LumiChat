@@ -72,20 +72,27 @@ public class LLMResponseLogEntry {
         this.success = builder.success;
         this.errorMessage = builder.errorMessage;
         this.llmResponse = builder.llmResponse;
-        this.rawResponseJson = builder.includeRawResponseContent
-                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawResponseJson), builder.rawResponseContentMaxLength)
-                : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
-        this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
-        this.content = builder.includeContent
-                ? LLMLogSanitizer.truncateContent(
-                        LLMLogSanitizer.sanitizeLlmLogContent(builder.originalContent), builder.contentMaxLength)
-                : null;
+        if (builder.debugMode) {
+            this.rawResponseJson = builder.rawResponseJson;
+            this.responseHeaders = new HashMap<>(builder.responseHeaders);
+            this.content = builder.originalContent;
+            this.metadata = new HashMap<>(builder.metadata);
+        } else {
+            this.rawResponseJson = builder.includeRawResponseContent
+                    ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawResponseJson), builder.rawResponseContentMaxLength)
+                    : LLMLogSanitizer.summarizeContent(builder.rawResponseJson);
+            this.responseHeaders = new HashMap<>(LLMLogSanitizer.summarizeResponseHeaders(builder.responseHeaders));
+            this.content = builder.includeContent
+                    ? LLMLogSanitizer.truncateContent(
+                            LLMLogSanitizer.sanitizeLlmLogContent(builder.originalContent), builder.contentMaxLength)
+                    : null;
+            this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
+        }
         this.contentLength = builder.originalContent == null ? 0 : builder.originalContent.length();
         this.contentSha256 = LLMLogSanitizer.sha256(builder.originalContent);
         this.model = builder.model;
         this.usage = builder.usage;
         this.finishReason = builder.finishReason;
-        this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
     }
 
     public String getResponseId() { return responseId; }
@@ -168,8 +175,10 @@ public class LLMResponseLogEntry {
         private String model;
         private TokenUsage usage;
         private String finishReason;
+        private boolean debugMode;
         private Map<String, Object> metadata = new HashMap<>();
 
+        public Builder debugMode(boolean debugMode) { this.debugMode = debugMode; return this; }
         public Builder responseId(String responseId) { this.responseId = responseId; return this; }
         public Builder requestId(String requestId) { this.requestId = requestId; return this; }
         public Builder timestamp(LocalDateTime timestamp) { this.timestamp = timestamp; return this; }
@@ -178,7 +187,7 @@ public class LLMResponseLogEntry {
         public Builder success(boolean success) { this.success = success; return this; }
 
         public Builder errorMessage(String errorMessage) {
-            this.errorMessage = LLMLogSanitizer.summarizeContent(errorMessage);
+            this.errorMessage = debugMode ? errorMessage : LLMLogSanitizer.summarizeContent(errorMessage);
             return this;
         }
 
@@ -188,7 +197,7 @@ public class LLMResponseLogEntry {
                 this.success = llmResponse.isSuccess();
                 setContent(llmResponse.getContent());
                 this.model = llmResponse.getModel();
-                this.errorMessage = LLMLogSanitizer.summarizeContent(llmResponse.getError());
+                this.errorMessage = debugMode ? llmResponse.getError() : LLMLogSanitizer.summarizeContent(llmResponse.getError());
                 if (llmResponse.getUsage() != null) {
                     LLMResponse.Usage responseUsage = llmResponse.getUsage();
                     this.usage = new TokenUsage(responseUsage.getPromptTokens(), responseUsage.getCompletionTokens(), responseUsage.getTotalTokens());
@@ -227,12 +236,20 @@ public class LLMResponseLogEntry {
         }
 
         public Builder responseHeaders(Map<String, String> headers) {
-            this.responseHeaders.putAll(LLMLogSanitizer.summarizeResponseHeaders(headers));
+            if (debugMode) {
+                this.responseHeaders.putAll(headers);
+            } else {
+                this.responseHeaders.putAll(LLMLogSanitizer.summarizeResponseHeaders(headers));
+            }
             return this;
         }
 
         public Builder responseHeader(String key, String value) {
-            this.responseHeaders.putAll(LLMLogSanitizer.summarizeResponseHeaders(Map.of(key, value)));
+            if (debugMode) {
+                this.responseHeaders.put(key, value);
+            } else {
+                this.responseHeaders.putAll(LLMLogSanitizer.summarizeResponseHeaders(Map.of(key, value)));
+            }
             return this;
         }
 

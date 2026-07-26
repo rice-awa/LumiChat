@@ -28,6 +28,15 @@ public class LogConfig {
     private boolean logFullResponseBody = false;
     private int maxLogContentLength = 2048; // 最大日志内容长度
     private boolean sanitizeSensitiveData = true; // 是否脱敏敏感数据
+    private boolean debugMode = false;
+
+    public boolean isDebugMode() {
+        return debugMode;
+    }
+
+    public void setDebugMode(boolean debugMode) {
+        this.debugMode = debugMode;
+    }
 
     public LogLevel getLogLevel() {
         return logLevel;

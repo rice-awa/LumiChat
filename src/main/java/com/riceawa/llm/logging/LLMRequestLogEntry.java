@@ -64,18 +64,26 @@ public class LLMRequestLogEntry {
         this.playerUuid = builder.playerUuid;
         this.serviceName = builder.serviceName;
         this.model = builder.model;
-        this.messages = builder.messages == null ? new ArrayList<>()
-                : LLMLogSanitizer.sanitizeMessageSummaries(
-                        builder.messages, builder.includeMessageContent, builder.messageContentMaxLength);
+        if (builder.debugMode) {
+            this.messages = builder.messages == null ? new ArrayList<>() : builder.messages;
+            this.rawRequestJson = builder.rawRequestJson;
+            this.requestUrl = builder.requestUrl;
+            this.requestHeaders = new HashMap<>(builder.requestHeaders);
+            this.metadata = new HashMap<>(builder.metadata);
+        } else {
+            this.messages = builder.messages == null ? new ArrayList<>()
+                    : LLMLogSanitizer.sanitizeMessageSummaries(
+                            builder.messages, builder.includeMessageContent, builder.messageContentMaxLength);
+            this.rawRequestJson = builder.includeRawRequestContent
+                    ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawRequestJson), builder.rawRequestContentMaxLength)
+                    : LLMLogSanitizer.summarizeContent(builder.rawRequestJson);
+            this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(builder.requestUrl);
+            this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));
+            this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
+        }
         this.config = builder.config;
-        this.rawRequestJson = builder.includeRawRequestContent
-                ? LLMLogSanitizer.truncateContent(LLMLogSanitizer.sanitizeLlmLogContent(builder.rawRequestJson), builder.rawRequestContentMaxLength)
-                : LLMLogSanitizer.summarizeContent(builder.rawRequestJson);
-        this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(builder.requestUrl);
-        this.requestHeaders = new HashMap<>(LLMLogSanitizer.sanitizeHeaders(builder.requestHeaders));
         this.contextMessageCount = builder.contextMessageCount;
         this.estimatedTokens = builder.estimatedTokens;
-        this.metadata = new HashMap<>(LLMLogSanitizer.summarizeMetadata(builder.metadata));
     }
 
     public String getRequestId() { return requestId; }
@@ -129,8 +137,10 @@ public class LLMRequestLogEntry {
         private Map<String, String> requestHeaders = new HashMap<>();
         private int contextMessageCount;
         private Integer estimatedTokens;
+        private boolean debugMode;
         private Map<String, Object> metadata = new HashMap<>();
 
+        public Builder debugMode(boolean debugMode) { this.debugMode = debugMode; return this; }
         public Builder requestId(String requestId) { this.requestId = requestId; return this; }
         public Builder timestamp(LocalDateTime timestamp) { this.timestamp = timestamp; return this; }
         public Builder playerName(String playerName) { this.playerName = playerName; return this; }
@@ -139,17 +149,17 @@ public class LLMRequestLogEntry {
         public Builder model(String model) { this.model = model; return this; }
 
         public Builder messages(List<LLMMessage> messages) {
-            this.includeMessageContent = false;
+            this.includeMessageContent = debugMode;
             this.messageContentMaxLength = 0;
-            this.messages = LLMLogSanitizer.summarizeMessages(messages, false, 0);
+            this.messages = LLMLogSanitizer.summarizeMessages(messages, debugMode, 0);
             this.contextMessageCount = messages != null ? messages.size() : 0;
             return this;
         }
 
         public Builder messageSummaries(List<Map<String, Object>> messages) {
-            this.includeMessageContent = false;
+            this.includeMessageContent = debugMode;
             this.messageContentMaxLength = 0;
-            this.messages = LLMLogSanitizer.sanitizeMessageSummaries(messages, false, 0);
+            this.messages = LLMLogSanitizer.sanitizeMessageSummaries(messages, debugMode, 0);
             this.contextMessageCount = messages != null ? messages.size() : 0;
             return this;
         }
@@ -185,19 +195,27 @@ public class LLMRequestLogEntry {
         }
 
         public Builder requestUrl(String requestUrl) {
-            this.requestUrl = LLMLogSanitizer.sanitizeRequestUrl(requestUrl);
+            this.requestUrl = debugMode ? requestUrl : LLMLogSanitizer.sanitizeRequestUrl(requestUrl);
             return this;
         }
 
         public Builder requestHeaders(Map<String, String> headers) {
             if (headers != null) {
-                this.requestHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(headers));
+                if (debugMode) {
+                    this.requestHeaders.putAll(headers);
+                } else {
+                    this.requestHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(headers));
+                }
             }
             return this;
         }
 
         public Builder requestHeader(String key, String value) {
-            this.requestHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(Map.of(key, value)));
+            if (debugMode) {
+                this.requestHeaders.put(key, value);
+            } else {
+                this.requestHeaders.putAll(LLMLogSanitizer.sanitizeHeaders(Map.of(key, value)));
+            }
             return this;
         }
 
