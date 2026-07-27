@@ -1,44 +1,23 @@
-# LLMChat 配置指南
+# LumiChat 配置指南
 
-## 🎯 概述
+## 概述
 
-LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证和故障恢复。本指南将帮助您完成配置和优化。
-
-## 📁 配置文件位置
+LumiChat v3 采用分层嵌套配置结构，将配置项按使用频率分为三个层级，降低用户认知负担。
 
 配置文件位于：`config/lumichat/config.json`
 
-## 🚀 快速开始
+## 快速开始
 
-### 首次使用
-1. 启动服务器，系统会自动生成默认配置
-2. 使用 `/llmchat setup` 检查配置状态
-3. 编辑配置文件，设置您的API密钥
-4. 使用 `/llmchat reload` 重新加载配置
+1. 启动服务器，系统自动生成默认配置
+2. 编辑 `config.json`，设置你的 API 密钥
+3. 使用 `/lumichat setup` 检查配置状态
+4. 使用 `/lumichat reload` 重新加载配置
 
-### 智能配置检测
-系统会自动：
-- 检测API密钥有效性
-- 在配置失效时自动切换到可用Provider
-- 验证配置完整性并自动修复
-
-## 📋 完整配置示例
+## 完整配置示例 (v3)
 
 ```json
 {
-  "configVersion": "2.0.0",
-  "defaultPromptTemplate": "default",
-  "defaultTemperature": 0.7,
-  "defaultMaxTokens": 8192,
-  "maxContextCharacters": 60000,
-  "enableHistory": true,
-  "enableToolCall": true,
-  "enableBroadcast": false,
-  "historyRetentionDays": 30,
-  "compressionModel": "",
-  "enableCompressionNotification": true,
-  "enableGlobalContext": true,
-  "globalContextPrompt": "=== 当前游戏环境信息 ===\n发起者：{{player_name}}\n当前时间：{{current_time}}\n在线玩家（{{player_count}}人）：{{online_players}}\n游戏版本：{{game_version}}",
+  "configVersion": "3.0.0",
   "currentProvider": "openai",
   "currentModel": "gpt-4o",
   "providers": [
@@ -47,428 +26,355 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
       "protocol": "openai-compatible",
       "apiBaseUrl": "https://api.openai.com/v1",
       "apiKey": "your-api-key-here",
-      "models": [
-        "gpt-3.5-turbo",
-        "gpt-4",
-        "gpt-4-turbo",
-        "gpt-4o",
-        "gpt-4o-mini"
-      ]
-    },
-    {
-      "name": "openrouter",
-      "protocol": "openai-compatible",
-      "apiBaseUrl": "https://openrouter.ai/api/v1",
-      "apiKey": "your-api-key-here",
-      "models": [
-        "anthropic/claude-3.5-sonnet",
-        "google/gemini-2.5-pro-preview",
-        "anthropic/claude-sonnet-4",
-        "openai/gpt-4o",
-        "meta-llama/llama-3.1-405b-instruct"
-      ]
-    },
-    {
-      "name": "deepseek",
-      "protocol": "openai-compatible",
-      "apiBaseUrl": "https://api.deepseek.com/v1",
-      "apiKey": "your-api-key-here",
-      "models": [
-        "deepseek-chat",
-        "deepseek-reasoner"
-      ]
-    },
-    {
-      "name": "anthropic",
-      "protocol": "openai-compatible",
-      "apiBaseUrl": "https://api.anthropic.com/v1",
-      "apiKey": "your-api-key-here",
-      "models": [
-        "claude-3.5-sonnet",
-        "claude-3-opus",
-        "claude-3-haiku"
-      ]
-    },
-    {
-      "name": "google",
-      "protocol": "openai-compatible",
-      "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
-      "apiKey": "your-api-key-here",
-      "models": [
-        "gemini-2.5-pro-preview",
-        "gemini-1.5-pro",
-        "gemini-1.5-flash"
-      ]
+      "models": ["gpt-4o", "gpt-4o-mini"]
     }
-  ]
+  ],
+  "chat": {
+    "defaultPromptTemplate": "default",
+    "temperature": 0.7,
+    "maxTokens": 8192,
+    "maxContextCharacters": 60000,
+    "enableHistory": true,
+    "enableToolCall": true,
+    "enableBroadcast": false,
+    "broadcastPlayers": [],
+    "enableChatIntegration": true,
+    "defaultChatMode": "OFF",
+    "enableGlobalContext": true,
+    "globalContextPrompt": "=== 当前游戏环境信息 ===\n发起者：{{player_name}}\n当前时间：{{current_time}}\n在线玩家（{{player_count}}人）：{{online_players}}\n游戏版本：{{game_version}}"
+  },
+  "security": {
+    "enableExecuteCommand": true,
+    "executeCommandReturnFullOutput": true,
+    "executeCommandBlocklist": ["ban", "ban-ip", "deop", "kick", "op", "pardon", "reload", "stop", "whitelist"],
+    "executeCommandMaxLength": 256,
+    "wikiApiUrl": "https://mcwiki.rice-awa.top",
+    "wikiAllowedHosts": ["mcwiki.rice-awa.top"]
+  },
+  "models": {
+    "compressionModel": "",
+    "titleGenerationModel": "",
+    "enableTitleGeneration": true,
+    "enableCompressionNotification": true
+  },
+  "advanced": {
+    "toolCall": {
+      "enableRecursive": true,
+      "maxDepth": 25
+    },
+    "http": {
+      "connectTimeoutMs": 30000,
+      "readTimeoutMs": 60000,
+      "writeTimeoutMs": 60000,
+      "maxIdleConnections": 20,
+      "keepAliveDurationMs": 300000
+    },
+    "concurrency": {
+      "maxConcurrentRequests": 10,
+      "queueCapacity": 50,
+      "requestTimeoutMs": 30000,
+      "corePoolSize": 5,
+      "maximumPoolSize": 20,
+      "keepAliveTimeMs": 60000
+    },
+    "retry": {
+      "enabled": true,
+      "maxAttempts": 3,
+      "delayMs": 1000,
+      "backoffMultiplier": 2.0
+    },
+    "logSettings": {
+      "level": "INFO",
+      "file": true,
+      "console": true,
+      "json": true,
+      "async": true,
+      "maxFileSize": 10485760,
+      "maxBackupFiles": 5,
+      "retentionDays": 30,
+      "llmRequestLog": true,
+      "logFullBodies": false,
+      "maxContentLength": 2048
+    }
+  }
 }
 ```
 
-## ⚙️ 核心配置项
+---
 
-### 🔧 基础设置
-| 配置项 | 类型 | 默认值 | 说明 | 验证范围 |
-|--------|------|--------|------|----------|
-| `defaultPromptTemplate` | String | `"default"` | 默认提示词模板 | - |
-| `defaultTemperature` | Double | `0.7` | 默认温度参数 | 0.0 - 2.0 |
-| `defaultMaxTokens` | Integer | `8192` | 默认最大token数 | 1 - 1,000,000 |
-| `maxContextCharacters` | Integer | `100000` | 最大上下文字符数 | 1 - 1,000,000 |
+## L0 必备配置 (Required)
 
-### 🎛️ 功能开关
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `enableHistory` | Boolean | `true` | 启用历史记录保存 |
-| `enableToolCall` | Boolean | `true` | 启用Tool Call |
-| `enableBroadcast` | Boolean | `false` | 启用AI聊天广播 |
-| `enableGlobalContext` | Boolean | `true` | 启用全局上下文信息 |
+这是让模组正常工作的最小配置。首次使用只需关注这三个字段。
 
-### 🗜️ 上下文压缩配置
-| 配置项 | 类型 | 默认值 | 说明 |
-|--------|------|--------|------|
-| `compressionModel` | String | `""` | 压缩专用模型（空=使用当前模型） |
-| `enableCompressionNotification` | Boolean | `true` | 启用压缩通知 |
+### `providers` (Array\<Provider\>)
 
-### 📚 历史记录配置
-| 配置项 | 类型 | 默认值 | 说明 | 验证范围 |
-|--------|------|--------|------|----------|
-| `historyRetentionDays` | Integer | `30` | 历史记录保留天数 | 1 - 365 |
+API 提供商列表。每个 Provider 结构：
 
-### 🔌 Provider配置
-| 配置项 | 类型 | 说明 |
-|--------|------|------|
-| `currentProvider` | String | 当前使用的Provider（自动选择） |
-| `currentModel` | String | 当前使用的模型（自动选择） |
-| `providers` | Array | Provider配置列表 |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `name` | String | 唯一标识名 |
+| `protocol` | String | 协议类型，默认 `"openai-compatible"` |
+| `apiBaseUrl` | String | API 基础 URL |
+| `apiKey` | String | API 密钥 |
+| `models` | Array\<String\> | 支持的模型列表 |
 
-> **💡 智能提示**: 系统会自动验证配置值的有效性，无效值会自动重置为默认值。
-
-## 🔌 Provider配置详解
-
-### 🏗️ Provider结构
-```json
-{
-  "name": "provider-name",           // Provider唯一标识
-  "protocol": "openai-compatible",              // 协议类型（目前支持 "openai-compatible"）
-  "apiBaseUrl": "https://api.example.com/v1",  // API基础URL
-  "apiKey": "your-api-key-here",     // API密钥
-  "models": [                        // 支持的模型列表
-    "model-1",
-    "model-2"
-  ]
-}
-```
-> **注意**: `protocol` 字段为必填，不支持的协议类型会导致 Provider 加载失败。
-
-### 🤖 支持的Provider
-
-#### OpenAI
 ```json
 {
   "name": "openai",
   "protocol": "openai-compatible",
   "apiBaseUrl": "https://api.openai.com/v1",
-  "apiKey": "sk-...",
-  "models": [
-    "gpt-3.5-turbo",
-    "gpt-4",
-    "gpt-4-turbo",
-    "gpt-4o",
-    "gpt-4o-mini"
-  ]
+  "apiKey": "your-api-key-here",
+  "models": ["gpt-4o", "gpt-4o-mini"]
 }
 ```
 
-#### OpenRouter (多模型聚合)
+系统会自动检测无效密钥（占位符 `your-api-key-here`、包含 `placeholder`/`example`、过短的 `sk-` 前缀密钥等）。
+
+### `currentProvider` (String)
+
+当前使用的 Provider 名称，对应 `providers` 中某个 Provider 的 `name`。留空时系统自动选择第一个可用 Provider。
+
+默认值：`""`（自动选择）
+
+### `currentModel` (String)
+
+当前使用的模型名称。留空时系统自动选择对应 Provider 的第一个模型。
+
+默认值：`""`（自动选择）
+
+---
+
+## L1 常用配置 (Common)
+
+日常调整频率较高的配置，集中在 `chat` 和 `security` 两个分组。
+
+### `chat` — 聊天行为
+
+| 字段 | 类型 | 默认值 | 说明 | 验证范围 |
+|------|------|--------|------|----------|
+| `defaultPromptTemplate` | String | `"default"` | 默认提示词模板名称 | - |
+| `temperature` | Double | `0.7` | 生成温度 | 0.0 ~ 2.0 |
+| `maxTokens` | Integer | `8192` | 单次请求最大 Token 数 | 1 ~ 1,000,000 |
+| `maxContextCharacters` | Integer | `60000` | 上下文最大字符数 | 1 ~ 1,000,000 |
+| `enableHistory` | Boolean | `true` | 启用聊天记录持久化 | - |
+| `enableToolCall` | Boolean | `true` | 启用 Function Calling | - |
+| `enableBroadcast` | Boolean | `false` | 启用聊天广播 | - |
+| `broadcastPlayers` | Array\<String\> | `[]` | 广播目标玩家（空数组=全局） | - |
+| `enableChatIntegration` | Boolean | `true` | 启用聊天集成 | - |
+| `defaultChatMode` | String | `"OFF"` | 默认聊天模式 | `OFF`, `WHISPER`, `PARTY`, `PUBLIC` |
+| `enableGlobalContext` | Boolean | `true` | 启用全局上下文信息注入 | - |
+| `globalContextPrompt` | String | 见默认值 | 全局上下文提示词模板 | - |
+
+### `security` — 安全控制
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enableExecuteCommand` | Boolean | `true` | 启用命令执行 Function |
+| `executeCommandReturnFullOutput` | Boolean | `true` | 命令执行返回完整输出 |
+| `executeCommandBlocklist` | Array\<String\> | `["ban","ban-ip","deop","kick","op","pardon","reload","stop","whitelist"]` | 命令阻止列表 |
+| `executeCommandMaxLength` | Integer | `256` | 命令最大长度（字符） |
+| `wikiApiUrl` | String | `"https://mcwiki.rice-awa.top"` | Wiki API 地址 |
+| `wikiAllowedHosts` | Array\<String\> | `["mcwiki.rice-awa.top"]` | Wiki 主机允许列表 |
+
+> execute_command 采用双开关机制：`enableExecuteCommand` 全局开关 + `executeCommandBlocklist` 命令阻止列表。默认开启，可通过 blocklist 控制允许的命令。
+
+---
+
+## L2 高级配置 (Advanced)
+
+面向有特定需求或追求性能调优的用户，集中在 `models` 和 `advanced` 两个分组。
+
+### `models` — 模型额外设置
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `compressionModel` | String | `""` | 压缩专用模型（空=使用当前模型） |
+| `titleGenerationModel` | String | `""` | 标题生成模型（空=使用当前模型） |
+| `enableTitleGeneration` | Boolean | `true` | 启用自动标题生成 |
+| `enableCompressionNotification` | Boolean | `true` | 启用上下文压缩通知 |
+
+### `advanced.toolCall` — 多轮工具调用
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enableRecursive` | Boolean | `true` | 启用递归工具调用 |
+| `maxDepth` | Integer | `25` | 最大递归深度 |
+
+### `advanced.http` — HTTP 连接
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `connectTimeoutMs` | Integer | `30000` | 连接超时（毫秒） |
+| `readTimeoutMs` | Integer | `60000` | 读取超时（毫秒） |
+| `writeTimeoutMs` | Integer | `60000` | 写入超时（毫秒） |
+| `maxIdleConnections` | Integer | `20` | 最大空闲连接数 |
+| `keepAliveDurationMs` | Integer | `300000` | 连接保活时间（毫秒） |
+
+### `advanced.concurrency` — 调度与并发
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `maxConcurrentRequests` | Integer | `10` | 最大并发请求数 |
+| `queueCapacity` | Integer | `50` | 队列容量 |
+| `requestTimeoutMs` | Integer | `30000` | 请求超时（毫秒） |
+| `corePoolSize` | Integer | `5` | 核心线程池大小 |
+| `maximumPoolSize` | Integer | `20` | 最大线程池大小 |
+| `keepAliveTimeMs` | Integer | `60000` | 线程保活时间（毫秒） |
+
+### `advanced.retry` — 重试策略
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `enabled` | Boolean | `true` | 启用自动重试 |
+| `maxAttempts` | Integer | `3` | 最大重试次数 |
+| `delayMs` | Integer | `1000` | 初始延迟（毫秒） |
+| `backoffMultiplier` | Double | `2.0` | 退避乘数 |
+
+### `advanced.logSettings` — 日志
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `level` | String | `"INFO"` | 日志级别 (TRACE/DEBUG/INFO/WARN/ERROR) |
+| `file` | Boolean | `true` | 启用文件日志 |
+| `console` | Boolean | `true` | 启用控制台日志 |
+| `json` | Boolean | `true` | 启用 JSON 格式 |
+| `async` | Boolean | `true` | 启用异步写入 |
+| `maxFileSize` | Integer | `10485760` | 最大文件大小（字节，默认 10MB） |
+| `maxBackupFiles` | Integer | `5` | 最大备份文件数 |
+| `retentionDays` | Integer | `30` | 日志保留天数 |
+| `llmRequestLog` | Boolean | `true` | 启用 LLM 请求审计日志 |
+| `logFullBodies` | Boolean | `false` | 记录完整请求/响应体 |
+| `maxContentLength` | Integer | `2048` | 日志内容截断长度 |
+
+---
+
+## Provider 详解
+
+### 结构
+
 ```json
 {
-  "name": "openrouter",
+  "name": "provider-name",
   "protocol": "openai-compatible",
-  "apiBaseUrl": "https://openrouter.ai/api/v1",
-  "apiKey": "sk-or-v1-...",
-  "models": [
-    "anthropic/claude-3.5-sonnet",
-    "google/gemini-2.5-pro-preview",
-    "anthropic/claude-sonnet-4",
-    "openai/gpt-4o",
-    "meta-llama/llama-3.1-405b-instruct"
-  ]
+  "apiBaseUrl": "https://api.example.com/v1",
+  "apiKey": "your-api-key-here",
+  "models": ["model-1", "model-2"]
 }
 ```
 
-#### DeepSeek
-```json
-{
-  "name": "deepseek",
-  "protocol": "openai-compatible",
-  "apiBaseUrl": "https://api.deepseek.com/v1",
-  "apiKey": "sk-...",
-  "models": [
-    "deepseek-chat",
-    "deepseek-reasoner"
-  ]
-}
-```
+`protocol` 目前支持 `"openai-compatible"`。不支持的协议会导致 Provider 加载失败。
 
-#### Anthropic
-```json
-{
-  "name": "anthropic",
-  "protocol": "openai-compatible",
-  "apiBaseUrl": "https://api.anthropic.com/v1",
-  "apiKey": "sk-ant-...",
-  "models": [
-    "claude-3.5-sonnet",
-    "claude-3-opus",
-    "claude-3-haiku"
-  ]
-}
-```
+### 智能配置特性
 
-#### Google AI
-```json
-{
-  "name": "google",
-  "protocol": "openai-compatible",
-  "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
-  "apiKey": "AIza...",
-  "models": [
-    "gemini-2.5-pro-preview",
-    "gemini-1.5-pro",
-    "gemini-1.5-flash"
-  ]
-}
-```
+- **自动故障切换**：当前 Provider 失效时自动切换到可用 Provider
+- **配置验证**：启动时自动验证所有配置项，无效值恢复默认值
+- **配置修复**：缺失字段自动补充，无效 Provider 自动排除
+- **状态检查**：`/lumichat setup` 查看详细配置报告
 
-### 🔍 API密钥检测
-系统会自动检测以下无效密钥：
-- `your-api-key-here` 等占位符
-- 包含 `placeholder`、`example` 的密钥
-- 太短的 `sk-` 开头密钥（< 20字符）
-- 空值或null值
+### 命令
 
-## 🚀 智能配置特性
-
-### 🔄 自动故障切换
-系统具备智能故障切换能力：
-- **自动检测**: 检测当前Provider和Model的有效性
-- **智能切换**: 配置失效时自动切换到可用的Provider
-- **无缝体验**: 用户无感知的配置修复
-
-### 📊 配置状态监控
-使用命令检查配置状态：
 ```bash
-/llmchat setup    # 显示详细配置报告
-/llmchat reload   # 重新加载并验证配置
+/lumichat setup     # 显示配置状态报告
+/lumichat reload    # 重新加载并验证配置
+/lumichat provider  # 管理 Provider 配置
+/lumichat model     # 管理模型配置
 ```
 
-配置报告示例：
-```
-Provider配置状态: 2/5 有效
-✅ 有效的Provider列表:
-  - openai: 5个模型可用
-  - deepseek: 2个模型可用
-⚠️ 无效的Provider列表:
-  - openrouter: API密钥为占位符，需要设置真实密钥
-  - anthropic: API密钥为占位符，需要设置真实密钥
-  - google: API密钥为占位符，需要设置真实密钥
-```
+---
 
-## ⚙️ 高级配置
+## 故障排除
 
-### 🔀 并发设置
-```json
-{
-  "concurrencySettings": {
-    "maxConcurrentRequests": 10,    // 最大并发请求数
-    "queueCapacity": 100,           // 队列容量
-    "requestTimeoutMs": 30000,      // 请求超时时间(毫秒)
-    "corePoolSize": 5,              // 核心线程池大小
-    "maximumPoolSize": 20,          // 最大线程池大小
-    "keepAliveTimeMs": 60000        // 线程保活时间(毫秒)
-  }
-}
-```
+### API 密钥问题
 
-### 📝 日志配置
-```json
-{
-  "logConfig": {
-    "enableSystemLog": true,        // 启用系统日志
-    "enableChatLog": true,          // 启用聊天日志
-    "enableErrorLog": true,         // 启用错误日志
-    "enablePerformanceLog": true,   // 启用性能日志
-    "enableAuditLog": true,         // 启用审计日志
-    "logLevel": "INFO",             // 日志级别
-    "maxFileSize": 10485760,        // 最大文件大小(字节)
-    "maxFiles": 10,                 // 最大文件数量
-    "retentionDays": 30,            // 保留天数
-    "compressionEnabled": true      // 启用压缩
-  }
-}
-```
-
-### 📢 广播配置
-```json
-{
-  "enableBroadcast": false,         // 启用广播功能
-  "broadcastPlayers": [             // 广播目标玩家
-    "player1",
-    "player2"
-  ]
-}
-```
-> **注意**: 空数组表示全局广播，有内容表示仅向指定玩家广播
-
-## 💡 配置最佳实践
-
-### 💰 成本优化策略
-```json
-{
-  "currentModel": "gpt-4o",              // 主聊天用高质量模型
-  "compressionModel": "gpt-4o-mini",     // 压缩用经济模型
-  "defaultMaxTokens": 4096,              // 控制单次请求token数
-  "maxContextCharacters": 50000          // 适中的上下文长度
-}
-```
-
-### ⚡ 性能优化策略
-```json
-{
-  "maxContextCharacters": 80000,         // 根据需要调整上下文长度
-  "enableCompressionNotification": false, // 高级用户可关闭通知
-  "historyRetentionDays": 7,             // 减少历史记录保留时间
-  "defaultTemperature": 0.5              // 降低温度提高响应速度
-}
-```
-
-### 🔒 安全配置策略
-```json
-{
-  "enableExecuteCommand": true,         // 默认开启命令执行（通过blocklist控制）
-  "executeCommandBlocklist": ["say"],    // 命令阻止列表，列表中的命令根一律拒绝
-  "wikiAllowedHosts": ["mcwiki.rice-awa.top"],  // Wiki 主机允许列表
-  "enableToolCall": true,                // 启用 Tool Call
-  "enableBroadcast": false,              // 默认关闭广播
-  "broadcastPlayers": [],                // 空列表=全局广播，有内容=特定玩家
-  "enableGlobalContext": true            // 启用上下文信息
-}
-```
-> **注意**: execute_command 采用双开关机制 — `enableExecuteCommand` 全局开关 + `executeCommandBlocklist` 命令阻止列表。默认开启，可通过blocklist控制允许的命令。
-
-### 🎯 多Provider配置策略
-```json
-{
-  "providers": [
-    {
-      "name": "primary",
-      "apiKey": "your-primary-key",      // 主要Provider
-      "models": ["gpt-4o", "gpt-4"]
-    },
-    {
-      "name": "backup",
-      "apiKey": "your-backup-key",       // 备用Provider
-      "models": ["gpt-3.5-turbo"]
-    },
-    {
-      "name": "economic",
-      "apiKey": "your-economic-key",     // 经济型Provider
-      "models": ["deepseek-chat"]
-    }
-  ]
-}
-```
-> **💡 提示**: 系统会自动在Provider间切换，确保服务可用性
-
-## 🔄 智能配置管理
-
-### 🤖 自动配置修复
-系统具备强大的自动修复能力：
-- **配置验证**: 启动时自动验证所有配置项
-- **默认值恢复**: 无效配置自动重置为默认值
-- **Provider切换**: 失效Provider自动切换到可用选项
-- **配置完整性**: 缺失配置项自动补充
-
-### 📋 配置检查命令
-```bash
-/llmchat setup     # 显示详细配置状态报告
-/llmchat reload    # 重新加载并验证配置
-```
-
-### 🔧 配置修复流程
-1. **自动检测**: 系统启动时自动检测配置问题
-2. **智能修复**: 自动修复可修复的问题
-3. **用户提示**: 显示需要用户手动处理的问题
-4. **配置保存**: 修复后自动保存配置
-
-## 🛠️ 故障排除
-
-### ❓ 常见问题及解决方案
-
-#### 🔑 API密钥问题
 | 问题 | 原因 | 解决方案 |
 |------|------|----------|
-| "API密钥为占位符" | 使用默认占位符密钥 | 设置真实的API密钥 |
+| "API密钥为占位符" | 使用默认占位符密钥 | 设置真实的 API 密钥 |
 | "API密钥太短" | 密钥格式不正确 | 检查密钥完整性 |
-| "认证失败" | 密钥无效或过期 | 重新生成API密钥 |
+| "认证失败" | 密钥无效或过期 | 重新生成 API 密钥 |
 
-#### 🤖 模型问题
-| 问题 | 原因 | 解决方案 |
-|------|------|----------|
-| "模型不支持" | Provider不支持指定模型 | 检查模型列表或切换Provider |
-| "模型访问被拒绝" | 账户权限不足 | 升级账户或使用其他模型 |
-| "模型已废弃" | 使用了已停用的模型 | 更新到最新模型 |
+### 配置重置
 
-#### 🌐 网络问题
-| 问题 | 原因 | 解决方案 |
-|------|------|----------|
-| "连接超时" | 网络连接问题 | 检查网络连接和防火墙 |
-| "API地址无法访问" | URL错误或服务不可用 | 验证API基础URL |
-| "请求频率限制" | 超出API调用限制 | 降低请求频率或升级账户 |
-
-### 🔄 配置重置方案
-
-#### 方案1: 软重置（推荐）
+**软重置（推荐）**：
 ```bash
-/llmchat reload    # 重新加载配置，保留自定义设置
+/lumichat reload
 ```
 
-#### 方案2: 配置修复
+**完全重置**：
 ```bash
-/llmchat setup     # 查看问题
-# 手动编辑配置文件修复问题
-/llmchat reload    # 重新加载
-```
-
-#### 方案3: 完全重置
-```bash
-# 1. 备份配置（可选）
-cp config/lumichat/config.json config/lumichat/config.json.backup
-
-# 2. 删除配置文件
 rm config/lumichat/config.json
-
-# 3. 重新加载（会生成默认配置）
-/llmchat reload
+# 重启服务器，系统自动生成默认配置
 ```
 
-### 🆘 紧急恢复
-如果系统完全无法工作：
-1. **停止服务器**
-2. **删除整个配置目录**: `rm -rf config/lumichat/`
-3. **重启服务器**
-4. **系统会自动生成全新的默认配置**
-5. **重新设置API密钥**
+---
 
-## 📞 获取帮助
+## 附录：v2 → v3 迁移表
 
-### 🔍 诊断信息收集
-遇到问题时，请收集以下信息：
-- 配置文件内容（隐藏API密钥）
-- `/llmchat setup` 命令输出
-- 服务器日志中的错误信息
-- 使用的Minecraft和模组版本
+| v2 字段 (flat) | v3 路径 (nested) | 备注 |
+|---|---|---|
+| `defaultPromptTemplate` | `chat.defaultPromptTemplate` | |
+| `defaultTemperature` | `chat.temperature` | |
+| `defaultMaxTokens` | `chat.maxTokens` | |
+| `maxContextCharacters` | `chat.maxContextCharacters` | |
+| `enableHistory` | `chat.enableHistory` | |
+| `enableToolCall` | `chat.enableToolCall` | |
+| `enableBroadcast` | `chat.enableBroadcast` | |
+| `broadcastPlayers` | `chat.broadcastPlayers` | |
+| `enableChatIntegration` | `chat.enableChatIntegration` | |
+| `defaultChatMode` | `chat.defaultChatMode` | |
+| `enableGlobalContext` | `chat.enableGlobalContext` | |
+| `globalContextPrompt` | `chat.globalContextPrompt` | |
+| `enableExecuteCommand` | `security.enableExecuteCommand` | |
+| `executeCommandReturnFullOutput` | `security.executeCommandReturnFullOutput` | |
+| `executeCommandBlocklist` | `security.executeCommandBlocklist` | |
+| `executeCommandMaxLength` | `security.executeCommandMaxLength` | |
+| `wikiApiUrl` | `security.wikiApiUrl` | |
+| `wikiAllowedHosts` | `security.wikiAllowedHosts` | |
+| `compressionModel` | `models.compressionModel` | |
+| `titleGenerationModel` | `models.titleGenerationModel` | |
+| `enableTitleGeneration` | `models.enableTitleGeneration` | |
+| `enableCompressionNotification` | `models.enableCompressionNotification` | |
+| `enableRecursiveToolCalls` | `advanced.toolCall.enableRecursive` | |
+| `maxToolCallDepth` | `advanced.toolCall.maxDepth` | |
+| `concurrencySettings.connectTimeoutMs` | `advanced.http.connectTimeoutMs` | |
+| `concurrencySettings.readTimeoutMs` | `advanced.http.readTimeoutMs` | |
+| `concurrencySettings.writeTimeoutMs` | `advanced.http.writeTimeoutMs` | |
+| `concurrencySettings.maxIdleConnections` | `advanced.http.maxIdleConnections` | |
+| `concurrencySettings.keepAliveDurationMs` | `advanced.http.keepAliveDurationMs` | |
+| `concurrencySettings.maxConcurrentRequests` | `advanced.concurrency.maxConcurrentRequests` | |
+| `concurrencySettings.queueCapacity` | `advanced.concurrency.queueCapacity` | |
+| `concurrencySettings.requestTimeoutMs` | `advanced.concurrency.requestTimeoutMs` | |
+| `concurrencySettings.corePoolSize` | `advanced.concurrency.corePoolSize` | |
+| `concurrencySettings.maximumPoolSize` | `advanced.concurrency.maximumPoolSize` | |
+| `concurrencySettings.keepAliveTimeMs` | `advanced.concurrency.keepAliveTimeMs` | |
+| `concurrencySettings.enableRetry` | `advanced.retry.enabled` | |
+| `concurrencySettings.maxRetryAttempts` | `advanced.retry.maxAttempts` | |
+| `concurrencySettings.retryDelayMs` | `advanced.retry.delayMs` | |
+| `concurrencySettings.retryBackoffMultiplier` | `advanced.retry.backoffMultiplier` | |
+| `logConfig.logLevel` | `advanced.logSettings.level` | |
+| `logConfig.enableFileLogging` | `advanced.logSettings.file` | |
+| `logConfig.enableConsoleLogging` | `advanced.logSettings.console` | |
+| `logConfig.enableJsonFormat` | `advanced.logSettings.json` | |
+| `logConfig.enableAsyncLogging` | `advanced.logSettings.async` | |
+| `logConfig.maxFileSize` | `advanced.logSettings.maxFileSize` | |
+| `logConfig.maxBackupFiles` | `advanced.logSettings.maxBackupFiles` | |
+| `logConfig.retentionDays` | `advanced.logSettings.retentionDays` | |
+| `logConfig.enableLLMRequestLog` | `advanced.logSettings.llmRequestLog` | |
+| `logConfig.logFullRequestBody` | `advanced.logSettings.logFullBodies` | 合并两个字段 |
+| `logConfig.logFullResponseBody` | `advanced.logSettings.logFullBodies` | 合并两个字段 |
+| `logConfig.maxLogContentLength` | `advanced.logSettings.maxContentLength` | |
 
-### 📚 更多资源
-- **GitHub Issues**: 报告Bug和功能请求
-- **Wiki文档**: 详细的使用说明
-- **社区论坛**: 用户交流和经验分享
+### v3 中移除的 v2 字段
+
+以下 v2 字段在 v3 中不再存在：
+
+| v2 字段 | 说明 |
+|---|---|
+| `historyRetentionDays` | 不再使用 |
+| `messagePreviewCount` | 不再使用 |
+| `messagePreviewMaxLength` | 不再使用 |
+| `toolCallTimeoutMs` | 不再使用 |
+| `sanitizeSensitiveData` | 不再使用 |
+| `asyncQueueSize` | 不再使用 |
+| `enableRateLimit` | 不再使用 |
+| `requestsPerMinute` | 不再使用 |
+| `requestsPerHour` | 不再使用 |
