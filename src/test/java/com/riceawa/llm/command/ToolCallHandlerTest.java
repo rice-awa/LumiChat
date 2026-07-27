@@ -7,6 +7,7 @@ import com.riceawa.llm.context.ChatContext;
 import com.riceawa.llm.context.ContextCompressor;
 import com.riceawa.llm.core.LLMMessage;
 import com.riceawa.llm.function.LLMFunction;
+import com.riceawa.llm.config.SecuritySettings;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -113,9 +114,16 @@ class ToolCallHandlerTest {
         unsafeField.setAccessible(true);
         Unsafe unsafe = (Unsafe) unsafeField.get(null);
         LLMChatConfig config = (LLMChatConfig) unsafe.allocateInstance(LLMChatConfig.class);
-        Field outputFlag = LLMChatConfig.class.getDeclaredField("executeCommandReturnFullOutput");
-        outputFlag.setAccessible(true);
-        outputFlag.setBoolean(config, returnFullOutput);
+
+        SecuritySettings sec = (SecuritySettings) unsafe.allocateInstance(SecuritySettings.class);
+        Field secOutputFlag = SecuritySettings.class.getDeclaredField("executeCommandReturnFullOutput");
+        secOutputFlag.setAccessible(true);
+        secOutputFlag.setBoolean(sec, returnFullOutput);
+
+        Field secField = LLMChatConfig.class.getDeclaredField("security");
+        secField.setAccessible(true);
+        secField.set(config, sec);
+
         return config;
     }
 
