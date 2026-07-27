@@ -223,7 +223,7 @@ LumiChat 的命令分为以下独立注册入口：
 - **基础信息查询**: 所有玩家可用（世界信息、天气、自身状态、背包、附近实体）
 - **send_message**: 所有玩家可用发送给自己或指定玩家；`all` 广播需 OP
 - **teleport_player**: 仅 OP 可用
-- **execute_command**: 仅 OP 可用，且需要双开关 (`enableExecuteCommand` + `executeCommandAllowlist`)
+- **execute_command**: 仅 OP 可用，且需要双开关 (`enableExecuteCommand` + `executeCommandBlocklist`)
 - **set_block / summon_entity**: 仅 OP 可用
 - **control_weather / control_time**: 仅 OP 可用
 - **Wiki 查询**: 所有玩家可用，仅限 `wikiAllowedHosts` 中的主机

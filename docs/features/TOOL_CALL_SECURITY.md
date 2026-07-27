@@ -49,16 +49,16 @@
 **权限**：仅 OP 可用，同时需要功能开关和允许列表双重控制。
 
 **双开关机制**：
-1. `LLMChatConfig.isEnableExecuteCommand()` — 全局功能开关，配置文件中 `enableExecuteCommand` 字段。默认关闭。
-2. `CommandExecutionPolicy` — fail-closed 允许列表（非黑名单），只执行管理员显式列入 `executeCommandAllowlist` 的顶级命令。
+1. `LLMChatConfig.isEnableExecuteCommand()` — 全局功能开关，配置文件中 `enableExecuteCommand` 字段。默认开启。
+2. `CommandExecutionPolicy` — fail-closed 命令阻止列表，列表中的命令顶级根会被拒绝执行。
 
 **`CommandExecutionPolicy.evaluate()` 检查顺序**：
 1. 功能是否启用 → 未启用则拒绝（`disabled`）
 2. 是否为 OP → 非 OP 拒绝（`not_operator`）
 3. 命令长度 ≤ 可配置最大值（默认 256 字符）
 4. 命令规范化（去除前导 `/`，拦截含 `\0`/`;`/换行的恶意输入）
-5. 允许列表非空 → 空列表拒绝（`allowlist_empty`）
-6. 命令顶级根是否在允许列表中 → 不在则拒绝（`not_allowlisted`）
+5. 阻止列表非空 → 空列表拒绝（`blocklist_empty`）
+6. 命令顶级根是否在阻止列表中 → 在则拒绝（`not_blocklisted`）
 
 **以发起玩家身份执行**：命令通过 `serverPlayer.createCommandSourceStack()` 以发起玩家身份执行，不提升权限。
 
@@ -117,14 +117,14 @@
 ## 配置建议
 
 ### 生产环境
-- `enableExecuteCommand` 默认 `false`，仅在充分审计后启用
-- `executeCommandAllowlist` 仅列入安全且可审计的命令根（如 `say`、`tell`、`me`）
+- `enableExecuteCommand` 默认 `true`，通过blocklist控制可执行命令
+- `executeCommandBlocklist` 列入需要阻止的命令根（如 `op`、`stop`、`kick`）
 - `wikiAllowedHosts` 仅包含受信任的内部 Wiki 主机
 - 定期审查 OP 玩家列表
 - 监控审计日志中的工具调用记录
 
 ### 安全注意事项
-1. execute_command 使用显式允许列表（非黑名单），不在列表中的命令一律拒绝
+1. execute_command 使用命令阻止列表（blocklist），在列表中的命令一律拒绝
 2. 所有 schema 采用 fail-closed 策略：未知参数立即拒绝
 3. 业务验证在 schema 校验之后再次执行，双重保护
 4. Wiki 端点仅限 HTTPS 域名，自动拦截 IP 字面量和重定向

@@ -1,13 +1,13 @@
 {
+  "configVersion": "2.0.0",
   "defaultPromptTemplate": "default",
   "defaultTemperature": 0.7,
   "defaultMaxTokens": 8192,
-  "maxContextLength": 8192,
+  "maxContextCharacters": 8192,
   "enableHistory": true,
   "enableToolCall": true,
   "enableBroadcast": false,
   "broadcastPlayers": [],
-  "historyRetentionDays": 30,
   "logConfig": {
     "logLevel": "INFO",
     "enableFileLogging": true,
@@ -17,49 +17,45 @@
     "maxBackupFiles": 5,
     "retentionDays": 30,
     "enableAsyncLogging": true,
-    "asyncQueueSize": 1000,
     "enableSystemLog": true,
     "enableChatLog": true,
     "enableErrorLog": true,
     "enablePerformanceLog": true,
     "enableAuditLog": true
   },
-    "providers": [
+  "providers": [
     {
       "name": "OpenAI",
-      "protocol": "openai",
-      "baseUrl": "https://api.openai.com/v1",
+      "protocol": "openai-compatible",
+      "apiBaseUrl": "https://api.openai.com/v1",
       "apiKey": "your-openai-api-key-here",
       "models": [
         "gpt-4",
         "gpt-4-turbo",
         "gpt-3.5-turbo"
-      ],
-      "defaultModel": "gpt-4"
+      ]
     },
     {
       "name": "DeepSeek",
-      "protocol": "openai",
-      "baseUrl": "https://api.deepseek.com/v1",
+      "protocol": "openai-compatible",
+      "apiBaseUrl": "https://api.deepseek.com/v1",
       "apiKey": "your-deepseek-api-key-here",
       "models": [
         "deepseek-chat",
         "deepseek-coder"
-      ],
-      "defaultModel": "deepseek-chat"
+      ]
     },
     {
       "name": "OpenRouter",
-      "protocol": "openai",
-      "baseUrl": "https://openrouter.ai/api/v1",
+      "protocol": "openai-compatible",
+      "apiBaseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "your-openrouter-api-key-here",
       "models": [
         "anthropic/claude-3-opus",
         "anthropic/claude-3-sonnet",
         "openai/gpt-4",
         "google/gemini-pro"
-      ],
-      "defaultModel": "anthropic/claude-3-sonnet"
+      ]
     }
   ],
   "currentProvider": "OpenAI",

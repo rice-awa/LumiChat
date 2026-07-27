@@ -44,7 +44,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
   "providers": [
     {
       "name": "openai",
-      "protocol": "openai",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://api.openai.com/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -57,7 +57,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "openrouter",
-      "protocol": "openai",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -70,7 +70,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "deepseek",
-      "protocol": "openai",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://api.deepseek.com/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -80,7 +80,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "anthropic",
-      "protocol": "openai",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://api.anthropic.com/v1",
       "apiKey": "your-api-key-here",
       "models": [
@@ -91,7 +91,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
     },
     {
       "name": "google",
-      "protocol": "openai",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
       "apiKey": "your-api-key-here",
       "models": [
@@ -148,7 +148,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "provider-name",           // Provider唯一标识
-  "protocol": "openai",              // 协议类型（目前仅支持 "openai"）
+  "protocol": "openai-compatible",              // 协议类型（目前支持 "openai-compatible"）
   "apiBaseUrl": "https://api.example.com/v1",  // API基础URL
   "apiKey": "your-api-key-here",     // API密钥
   "models": [                        // 支持的模型列表
@@ -165,7 +165,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "openai",
-  "protocol": "openai",
+  "protocol": "openai-compatible",
   "apiBaseUrl": "https://api.openai.com/v1",
   "apiKey": "sk-...",
   "models": [
@@ -182,7 +182,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "openrouter",
-  "protocol": "openai",
+  "protocol": "openai-compatible",
   "apiBaseUrl": "https://openrouter.ai/api/v1",
   "apiKey": "sk-or-v1-...",
   "models": [
@@ -199,7 +199,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "deepseek",
-  "protocol": "openai",
+  "protocol": "openai-compatible",
   "apiBaseUrl": "https://api.deepseek.com/v1",
   "apiKey": "sk-...",
   "models": [
@@ -213,7 +213,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "anthropic",
-  "protocol": "openai",
+  "protocol": "openai-compatible",
   "apiBaseUrl": "https://api.anthropic.com/v1",
   "apiKey": "sk-ant-...",
   "models": [
@@ -228,7 +228,7 @@ LLMChat 采用智能配置系统，支持多Provider自动切换、配置验证�
 ```json
 {
   "name": "google",
-  "protocol": "openai",
+  "protocol": "openai-compatible",
   "apiBaseUrl": "https://generativelanguage.googleapis.com/v1beta",
   "apiKey": "AIza...",
   "models": [
@@ -344,8 +344,8 @@ Provider配置状态: 2/5 有效
 ### 🔒 安全配置策略
 ```json
 {
-  "enableExecuteCommand": false,         // 默认关闭命令执行
-  "executeCommandAllowlist": ["say"],    // 显式允许列表（非黑名单），不在列表中的命令根一律拒绝
+  "enableExecuteCommand": true,         // 默认开启命令执行（通过blocklist控制）
+  "executeCommandBlocklist": ["say"],    // 命令阻止列表，列表中的命令根一律拒绝
   "wikiAllowedHosts": ["mcwiki.rice-awa.top"],  // Wiki 主机允许列表
   "enableToolCall": true,                // 启用 Tool Call
   "enableBroadcast": false,              // 默认关闭广播
@@ -353,7 +353,7 @@ Provider配置状态: 2/5 有效
   "enableGlobalContext": true            // 启用上下文信息
 }
 ```
-> **注意**: execute_command 采用双开关机制 — `enableExecuteCommand` 全局开关 + `executeCommandAllowlist` 显式允许列表。默认关闭，需管理员审核后手动启用。
+> **注意**: execute_command 采用双开关机制 — `enableExecuteCommand` 全局开关 + `executeCommandBlocklist` 命令阻止列表。默认开启，可通过blocklist控制允许的命令。
 
 ### 🎯 多Provider配置策略
 ```json
@@ -392,7 +392,6 @@ Provider配置状态: 2/5 有效
 ```bash
 /llmchat setup     # 显示详细配置状态报告
 /llmchat reload    # 重新加载并验证配置
-/llmchat config    # 显示当前配置摘要
 ```
 
 ### 🔧 配置修复流程

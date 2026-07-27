@@ -128,8 +128,6 @@ public class LLMChatConfig {
             LogManager.getInstance().system("Config file does not exist, creating default configuration...");
             createDefaultConfig();
             LogManager.getInstance().system("Default configuration created with maxContextCharacters: " + this.maxContextCharacters);
-            saveConfig();
-            LogManager.getInstance().system("Default configuration saved to file");
             return;
         }
 
@@ -240,6 +238,19 @@ public class LLMChatConfig {
         selectInitialProviderAndModel();
 
         LogManager.getInstance().system("Created default configuration with " + this.providers.size() + " providers");
+
+        // 写入精简的默认配置文件，省略 concurrencySettings / logConfig
+        // 避免新用户看到大量系统配置噪音
+        try (OutputStreamWriter writer = new OutputStreamWriter(
+                Files.newOutputStream(configFile), StandardCharsets.UTF_8)) {
+            ConfigData data = createConfigData();
+            data.concurrencySettings = null;
+            data.logConfig = null;
+            gson.toJson(data, writer);
+            LogManager.getInstance().system("Default configuration saved to file (system sections omitted)");
+        } catch (IOException e) {
+            LogManager.getInstance().error("Failed to save default config: " + e.getMessage());
+        }
     }
 
     /**
