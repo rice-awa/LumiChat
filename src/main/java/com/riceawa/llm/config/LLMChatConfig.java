@@ -53,9 +53,6 @@ public class LLMChatConfig {
     private String compressionModel = ConfigDefaults.DEFAULT_COMPRESSION_MODEL;
     private boolean enableCompressionNotification = ConfigDefaults.DEFAULT_ENABLE_COMPRESSION_NOTIFICATION;
 
-    // 消息预览配置
-    private int messagePreviewCount = ConfigDefaults.DEFAULT_MESSAGE_PREVIEW_COUNT;
-    private int messagePreviewMaxLength = ConfigDefaults.DEFAULT_MESSAGE_PREVIEW_MAX_LENGTH;
 
     // 全局上下文配置
     private boolean enableGlobalContext = ConfigDefaults.DEFAULT_ENABLE_GLOBAL_CONTEXT;
@@ -72,7 +69,6 @@ public class LLMChatConfig {
     // 多轮工具调用配置
     private boolean enableRecursiveToolCalls = ConfigDefaults.DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
     private int maxToolCallDepth = ConfigDefaults.DEFAULT_MAX_TOOL_CALL_DEPTH;
-    private int toolCallTimeoutMs = ConfigDefaults.DEFAULT_TOOL_CALL_TIMEOUT_MS;
 
     // 并发配置
     private ConcurrencySettings concurrencySettings = ConcurrencySettings.createDefault();
@@ -325,7 +321,6 @@ public class LLMChatConfig {
         // 处理多轮工具调用配置
         this.enableRecursiveToolCalls = data.enableRecursiveToolCalls != null ? data.enableRecursiveToolCalls : (Boolean) ConfigDefaults.getDefaultValue("enableRecursiveToolCalls");
         this.maxToolCallDepth = data.maxToolCallDepth != null ? data.maxToolCallDepth : (Integer) ConfigDefaults.getDefaultValue("maxToolCallDepth");
-        this.toolCallTimeoutMs = data.toolCallTimeoutMs != null ? data.toolCallTimeoutMs : (Integer) ConfigDefaults.getDefaultValue("toolCallTimeoutMs");
 
         // 处理并发配置
         this.concurrencySettings = data.concurrencySettings != null ? data.concurrencySettings : ConcurrencySettings.createDefault();
@@ -453,7 +448,6 @@ public class LLMChatConfig {
         // 多轮工具调用配置
         data.enableRecursiveToolCalls = this.enableRecursiveToolCalls;
         data.maxToolCallDepth = this.maxToolCallDepth;
-        data.toolCallTimeoutMs = this.toolCallTimeoutMs;
 
         // 系统配置
         data.concurrencySettings = this.concurrencySettings;
@@ -721,25 +715,6 @@ public class LLMChatConfig {
 
     public void setEnableCompressionNotification(boolean enableCompressionNotification) {
         this.enableCompressionNotification = enableCompressionNotification;
-        saveConfig();
-    }
-
-    // 消息预览配置的getter和setter方法
-    public int getMessagePreviewCount() {
-        return messagePreviewCount;
-    }
-
-    public void setMessagePreviewCount(int messagePreviewCount) {
-        this.messagePreviewCount = Math.max(1, Math.min(10, messagePreviewCount)); // 限制在1-10之间
-        saveConfig();
-    }
-
-    public int getMessagePreviewMaxLength() {
-        return messagePreviewMaxLength;
-    }
-
-    public void setMessagePreviewMaxLength(int messagePreviewMaxLength) {
-        this.messagePreviewMaxLength = Math.max(50, Math.min(500, messagePreviewMaxLength)); // 限制在50-500之间
         saveConfig();
     }
 
@@ -1132,21 +1107,6 @@ public class LLMChatConfig {
     }
 
     /**
-     * 获取工具调用超时时间（毫秒）
-     */
-    public int getToolCallTimeoutMs() {
-        return toolCallTimeoutMs;
-    }
-
-    /**
-     * 设置工具调用超时时间（毫秒）
-     */
-    public void setToolCallTimeoutMs(int toolCallTimeoutMs) {
-        this.toolCallTimeoutMs = Math.max(5000, Math.min(60000, toolCallTimeoutMs)); // 限制在5-60秒之间
-        saveConfig();
-    }
-
-    /**
      * 配置数据类
      */
     private static class ConfigData {
@@ -1186,7 +1146,6 @@ public class LLMChatConfig {
         // 多轮工具调用配置
         Boolean enableRecursiveToolCalls;
         Integer maxToolCallDepth;
-        Integer toolCallTimeoutMs;
 
         // 系统配置
         ConcurrencySettings concurrencySettings;
