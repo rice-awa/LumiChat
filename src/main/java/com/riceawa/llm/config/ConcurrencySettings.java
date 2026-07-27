@@ -27,11 +27,6 @@ public class ConcurrencySettings {
     private long retryDelayMs = 1000; // 1秒
     private double retryBackoffMultiplier = 2.0;
     
-    // 速率限制配置
-    private boolean enableRateLimit = false;
-    private int requestsPerMinute = 60;
-    private int requestsPerHour = 1000;
-    
     public ConcurrencySettings() {
     }
     
@@ -163,31 +158,6 @@ public class ConcurrencySettings {
         this.retryBackoffMultiplier = retryBackoffMultiplier;
     }
     
-    // 速率限制配置的getter和setter
-    public boolean isEnableRateLimit() {
-        return enableRateLimit;
-    }
-    
-    public void setEnableRateLimit(boolean enableRateLimit) {
-        this.enableRateLimit = enableRateLimit;
-    }
-    
-    public int getRequestsPerMinute() {
-        return requestsPerMinute;
-    }
-    
-    public void setRequestsPerMinute(int requestsPerMinute) {
-        this.requestsPerMinute = requestsPerMinute;
-    }
-    
-    public int getRequestsPerHour() {
-        return requestsPerHour;
-    }
-    
-    public void setRequestsPerHour(int requestsPerHour) {
-        this.requestsPerHour = requestsPerHour;
-    }
-    
     /**
      * 验证配置的有效性
      */
@@ -205,9 +175,7 @@ public class ConcurrencySettings {
                keepAliveTimeMs > 0 &&
                maxRetryAttempts >= 0 &&
                retryDelayMs >= 0 &&
-               retryBackoffMultiplier > 0 &&
-               requestsPerMinute > 0 &&
-               requestsPerHour > 0;
+               retryBackoffMultiplier > 0;
     }
     
     @Override
@@ -227,10 +195,7 @@ public class ConcurrencySettings {
                 ", enableRetry=" + enableRetry +
                 ", maxRetryAttempts=" + maxRetryAttempts +
                 ", retryDelayMs=" + retryDelayMs +
-                ", retryBackoffMultiplier=" + retryBackoffMultiplier +
-                ", enableRateLimit=" + enableRateLimit +
-                ", requestsPerMinute=" + requestsPerMinute +
-                ", requestsPerHour=" + requestsPerHour +
-                '}';
+               ", retryBackoffMultiplier=" + retryBackoffMultiplier +
+               '}';
     }
 }

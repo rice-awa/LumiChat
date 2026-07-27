@@ -39,7 +39,7 @@ public class LogManager {
         this.rotationManager = new FileRotationManager(logDirectory, config);
         
         // 初始化异步日志队列和执行器
-        this.logQueue = new ArrayBlockingQueue<>(config.getAsyncQueueSize());
+        this.logQueue = new ArrayBlockingQueue<>(1000);
         this.asyncExecutor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "LLMChat-Logger");
             t.setDaemon(true);

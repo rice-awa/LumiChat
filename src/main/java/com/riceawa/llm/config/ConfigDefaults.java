@@ -24,16 +24,11 @@ public class ConfigDefaults {
     public static final boolean DEFAULT_ENABLE_EXECUTE_COMMAND = true;
     public static final boolean DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT = true;
     public static final int DEFAULT_EXECUTE_COMMAND_MAX_LENGTH = 256;
-    public static final int DEFAULT_HISTORY_RETENTION_DAYS = 30;
     
     // 上下文压缩配置默认值
     public static final String DEFAULT_COMPRESSION_MODEL = ""; // 空字符串表示使用当前模型
     public static final boolean DEFAULT_ENABLE_COMPRESSION_NOTIFICATION = true;
 
-    // 消息预览配置默认值
-    public static final int DEFAULT_MESSAGE_PREVIEW_COUNT = 5; // 恢复对话时显示的消息数量
-    public static final int DEFAULT_MESSAGE_PREVIEW_MAX_LENGTH = 150; // 每条消息的最大显示长度
-    
     // 全局上下文配置默认值
     public static final boolean DEFAULT_ENABLE_GLOBAL_CONTEXT = true;
     public static final String DEFAULT_GLOBAL_CONTEXT_PROMPT =
@@ -54,7 +49,6 @@ public class ConfigDefaults {
     // 多轮工具调用配置默认值
     public static final boolean DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS = true;
     public static final int DEFAULT_MAX_TOOL_CALL_DEPTH = 25;
-    public static final int DEFAULT_TOOL_CALL_TIMEOUT_MS = 30000; // 30秒
 
     // API密钥占位符（用于检测无效密钥）
     public static final String API_KEY_PLACEHOLDER = "your-api-key-here";
@@ -209,13 +203,6 @@ public class ConfigDefaults {
                 }
                 return false;
 
-            case "historyRetentionDays":
-                if (value instanceof Number) {
-                    int days = ((Number) value).intValue();
-                    return days >= 1 && days <= 365; // 1天到1年
-                }
-                return false;
-
             default:
                 return true; // 其他配置项不做特殊验证
         }
@@ -234,14 +221,12 @@ public class ConfigDefaults {
             case "enableToolCall": return DEFAULT_ENABLE_TOOL_CALL;
             case "enableRecursiveToolCalls": return DEFAULT_ENABLE_RECURSIVE_TOOL_CALLS;
             case "maxToolCallDepth": return DEFAULT_MAX_TOOL_CALL_DEPTH;
-            case "toolCallTimeoutMs": return DEFAULT_TOOL_CALL_TIMEOUT_MS;
             case "enableBroadcast": return DEFAULT_ENABLE_BROADCAST;
             case "enableChatIntegration": return DEFAULT_ENABLE_CHAT_INTEGRATION;
             case "defaultChatMode": return DEFAULT_DEFAULT_CHAT_MODE;
             case "enableExecuteCommand": return DEFAULT_ENABLE_EXECUTE_COMMAND;
             case "executeCommandReturnFullOutput": return DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
             case "executeCommandMaxLength": return DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
-            case "historyRetentionDays": return DEFAULT_HISTORY_RETENTION_DAYS;
             case "compressionModel": return DEFAULT_COMPRESSION_MODEL;
             case "enableCompressionNotification": return DEFAULT_ENABLE_COMPRESSION_NOTIFICATION;
             case "enableGlobalContext": return DEFAULT_ENABLE_GLOBAL_CONTEXT;

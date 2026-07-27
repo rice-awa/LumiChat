@@ -47,7 +47,6 @@ public class LLMChatConfig {
     private boolean executeCommandReturnFullOutput = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_RETURN_FULL_OUTPUT;
     private Set<String> executeCommandBlocklist = ConfigDefaults.createDefaultExecuteCommandBlocklist();
     private int executeCommandMaxLength = ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
-    private int historyRetentionDays = ConfigDefaults.DEFAULT_HISTORY_RETENTION_DAYS;
 
     // 上下文压缩配置
     private String compressionModel = ConfigDefaults.DEFAULT_COMPRESSION_MODEL;
@@ -301,7 +300,6 @@ public class LLMChatConfig {
                 : ConfigDefaults.createDefaultExecuteCommandBlocklist();
         this.executeCommandMaxLength = data.executeCommandMaxLength != null
                 ? data.executeCommandMaxLength : ConfigDefaults.DEFAULT_EXECUTE_COMMAND_MAX_LENGTH;
-        this.historyRetentionDays = data.historyRetentionDays != null ? data.historyRetentionDays : (Integer) ConfigDefaults.getDefaultValue("historyRetentionDays");
         this.enableGlobalContext = data.enableGlobalContext != null ? data.enableGlobalContext : (Boolean) ConfigDefaults.getDefaultValue("enableGlobalContext");
         this.globalContextPrompt = data.globalContextPrompt != null ? data.globalContextPrompt : (String) ConfigDefaults.getDefaultValue("globalContextPrompt");
 
@@ -431,8 +429,6 @@ public class LLMChatConfig {
         data.executeCommandReturnFullOutput = this.executeCommandReturnFullOutput;
         data.executeCommandBlocklist = new HashSet<>(this.executeCommandBlocklist);
         data.executeCommandMaxLength = this.executeCommandMaxLength;
-        data.historyRetentionDays = this.historyRetentionDays;
-
         // 全局上下文配置
         data.enableGlobalContext = this.enableGlobalContext;
         data.globalContextPrompt = this.globalContextPrompt;
@@ -638,15 +634,6 @@ public class LLMChatConfig {
 
     public void clearBroadcastPlayers() {
         this.broadcastPlayers.clear();
-        saveConfig();
-    }
-
-    public int getHistoryRetentionDays() {
-        return historyRetentionDays;
-    }
-
-    public void setHistoryRetentionDays(int historyRetentionDays) {
-        this.historyRetentionDays = historyRetentionDays;
         saveConfig();
     }
 
@@ -1129,8 +1116,6 @@ public class LLMChatConfig {
         Boolean executeCommandReturnFullOutput;
         Set<String> executeCommandBlocklist;
         Integer executeCommandMaxLength;
-        Integer historyRetentionDays;
-
         // 全局上下文配置
         Boolean enableGlobalContext;
         String globalContextPrompt;
