@@ -172,6 +172,7 @@ public final class AdvancedSettings {
         boolean llmRequestLog;
         boolean logFullBodies;
         int maxContentLength;
+        boolean debugMode;
 
         private LogSettings() {}
 
@@ -188,6 +189,7 @@ public final class AdvancedSettings {
             l.llmRequestLog = true;
             l.logFullBodies = false;
             l.maxContentLength = 2048;
+            l.debugMode = false;
             return l;
         }
 
@@ -202,5 +204,6 @@ public final class AdvancedSettings {
         public boolean isLlmRequestLog() { return llmRequestLog; }
         public boolean isLogFullBodies() { return logFullBodies; }
         public int getMaxContentLength() { return maxContentLength; }
+        public boolean isDebugMode() { return debugMode; }
     }
 }

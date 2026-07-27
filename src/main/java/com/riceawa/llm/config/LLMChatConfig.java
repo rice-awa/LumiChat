@@ -358,6 +358,7 @@ public class LLMChatConfig {
         lc.setLogFullRequestBody(ls.isLogFullBodies());
         lc.setLogFullResponseBody(ls.isLogFullBodies());
         lc.setMaxLogContentLength(ls.getMaxContentLength());
+        lc.setDebugMode(ls.isDebugMode());
         this.logConfig = lc;
     }
 
