@@ -64,55 +64,13 @@ public class ConfigDefaults {
      */
     public static List<Provider> createDefaultProviders() {
         List<Provider> providers = new ArrayList<>();
-        
-        // OpenAI Provider
-        providers.add(new Provider(
-            "openai",
-            "https://api.openai.com/v1",
-            API_KEY_PLACEHOLDER,
-            List.of("gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini")
-        ));
-        
-        // OpenRouter Provider
-        providers.add(new Provider(
-            "openrouter", 
-            "https://openrouter.ai/api/v1",
-            API_KEY_PLACEHOLDER,
-            List.of(
-                "anthropic/claude-3.5-sonnet",
-                "google/gemini-2.5-pro-preview", 
-                "anthropic/claude-sonnet-4",
-                "openai/gpt-4o",
-                "meta-llama/llama-3.1-405b-instruct"
-            )
-        ));
-        
-        // DeepSeek Provider
-        providers.add(new Provider(
-            "deepseek",
-            "https://api.deepseek.com/v1", 
-            API_KEY_PLACEHOLDER,
-            List.of("deepseek-chat", "deepseek-reasoner")
-        ));
-        
-        // Anthropic Provider
-        providers.add(new Provider(
-            "anthropic",
-            ANTHROPIC_PROVIDER_PROTOCOL,
-            "https://api.anthropic.com/v1",
-            API_KEY_PLACEHOLDER,
-            List.of("claude-3.5-sonnet", "claude-3-opus", "claude-3-haiku")
-        ));
-        
-        // Google AI Provider
-        providers.add(new Provider(
-            "google",
-            GOOGLE_PROVIDER_PROTOCOL,
-            "https://generativelanguage.googleapis.com/v1beta",
-            API_KEY_PLACEHOLDER,
-            List.of("gemini-2.5-pro-preview", "gemini-1.5-pro", "gemini-1.5-flash")
-        ));
-        
+        Provider openai = new Provider();
+        openai.setName("openai");
+        openai.setProtocol(DEFAULT_PROVIDER_PROTOCOL);
+        openai.setApiBaseUrl("https://api.openai.com/v1");
+        openai.setApiKey(API_KEY_PLACEHOLDER);
+        openai.setModels(java.util.Arrays.asList("gpt-4o", "gpt-4o-mini"));
+        providers.add(openai);
         return providers;
     }
     
