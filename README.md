@@ -233,7 +233,7 @@
 - 🏷️ **Mod Menu 修复** - 修复 Mod Menu 描述显示原始翻译键的问题
 - 📝 **文档更新** - 新增聊天集成设计文档、UX 审查文档，更新 AGENTS.md
 
-### v2.2.0 (2026-07-25)
+### v2.2.0
 - 🎮 **Minecraft 26.x 版本扩展** - 新增 26.1.1、26.1.2、26.2 支持，拆分 26.1 版本组（26.1 独立，26.1.1 与 26.1.2 合并）
 - 🛠️ **CI/CD 优化** - 单 job buildAndCollect 多版本构建对齐 Stonecutter 官方模板，恢复 dev-build 多版本并行构建，新增 opencode 工作流
 - 🔧 **构建修复** - 移除不存在的 foojay-resolver-convention 插件（Gradle 9.4 已内置 toolchain 供应），补充缺失的 kotlin-stdlib 依赖
