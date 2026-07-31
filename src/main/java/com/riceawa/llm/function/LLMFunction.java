@@ -33,6 +33,13 @@ public interface LLMFunction {
      * @return 函数执行结果
      */
     FunctionResult execute(Player player, MinecraftServer server, JsonObject arguments);
+
+    /**
+     * Declares which executor boundary owns this function.
+     */
+    default ExecutionMode executionMode() {
+        return ExecutionMode.SERVER_THREAD;
+    }
     
     /**
      * 检查玩家是否有权限调用此函数
@@ -51,6 +58,11 @@ public interface LLMFunction {
      * 获取函数类别
      */
     String getCategory();
+
+    enum ExecutionMode {
+        SERVER_THREAD,
+        ASYNC
+    }
     
     /**
      * 函数执行结果

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecraft 版本构建。模组提供 `/llmchat` 聊天命令、OpenAI 兼容 Provider、提示词模板、Tool Call、历史记录、日志、上下文压缩和游戏内广播等功能。
 
-当前构建矩阵在 `settings.gradle.kts` 中定义：历史版本组覆盖 1.16.5/1.17/1.18/1.19，独立节点覆盖 1.20-1.20.6、1.21-1.21.11；如果本机 Java 支持 25，也会启用 26.1 节点。`vcsVersion` 和默认 active 版本都是 `1.21.11`。
+当前构建矩阵在 `settings.gradle.kts` 中定义：历史版本组覆盖 1.19，独立节点覆盖 1.20-1.20.6、1.21-1.21.11；如果本机 Java 支持 25，也会启用 26.1/26.2 节点。`vcsVersion` 和默认 active 版本都是 `1.21.11`。
 
 ## 常用命令
 
@@ -164,6 +164,25 @@ method(/*? if >=1.20 {*/ param /*?}*/);
 - `docs/TESTING_GUIDE.md` 记录测试策略和游戏内回归检查。
 - `docs/features/TOOL_CALL_SECURITY.md`、`docs/features/TOOL_CALL_DEVELOPMENT.md`、`docs/features/CONTEXT_MANAGEMENT.md`、`docs/features/LOGGING_AND_HISTORY.md` 等记录关键子系统设计。
 - `AGENTS.md` 是通用代理规范；本文件吸收其中与 Claude Code 相关的约定。
+
+## 分支工作流
+
+- **基线分支**：`dev` — 所有功能开发和 bug 修复都从此分支拉出
+- **功能/修复分支**：任何功能或修复都**必须新建分支**（基线为 `dev`），命名如 `feat/xxx`、`fix/xxx`
+- **例外**：仅当改动极小（仅需一个提交即可完成）时，可直接在 `dev` 上提交
+- **完成后**：review 代码，然后合并回 `dev` 分支
+- **发布分支**：`main` 仅用于版本发布，不直接提交，从 `dev` 合并
+
+```bash
+# 标准流程
+git checkout dev
+git checkout -b feat/new-feature
+# 开发、提交...
+git checkout dev
+git merge feat/new-feature
+git branch -d feat/new-feature
+git push origin dev
+```
 
 ## 提交与 PR 约定
 

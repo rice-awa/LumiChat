@@ -1,6 +1,9 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.DimensionCompat;
+import com.riceawa.llm.compat.WorldInfoCompat;
+import com.riceawa.llm.compat.WorldTimeCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.core.BlockPos;
@@ -41,6 +44,7 @@ public class WorldInfoFunction implements LLMFunction {
         properties.add("include_details", includeDetails);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         return schema;
     }
     
@@ -64,7 +68,7 @@ public class WorldInfoFunction implements LLMFunction {
             info.append("是否硬核: ").append(server.isHardcore() ? "是" : "否").append("\n");
             
             // 时间信息
-            long time = EntityHelper.getDayTime(world);
+            long time = WorldTimeCompat.getDayTime(world);
             int hours = (int) ((time / 1000 + 6) % 24);
             int minutes = (int) ((time % 1000) * 60 / 1000);
             info.append("游戏时间: ").append(String.format("%02d:%02d", hours, minutes)).append("\n");
@@ -88,11 +92,7 @@ public class WorldInfoFunction implements LLMFunction {
             
             // 生物群系信息
             Holder<Biome> biome = world.getBiome(pos);
-            //? >=1.21.11 {
-            String biomeName = biome.unwrapKey().map(key -> key.identifier().toString()).orElse("未知");
-            //?} else {
-            /*String biomeName = biome.unwrapKey().map(key -> key.location().toString()).orElse("未知");
-            *//*?}*/
+            String biomeName = WorldInfoCompat.getBiomeId(biome);
             info.append("当前生物群系: ").append(biomeName).append("\n");
             
             if (includeDetails) {
@@ -100,27 +100,13 @@ public class WorldInfoFunction implements LLMFunction {
                 info.append("\n=== 详细信息 ===\n");
                 info.append("世界种子: ").append(world.getSeed()).append("\n");
                 info.append("世界边界大小: ").append((int)world.getWorldBorder().getSize()).append("\n");
-                //? >=1.21.11 {
-                BlockPos spawnPos = world.getRespawnData().pos();
-                //?} else if >=1.21.9 {
-                /*BlockPos spawnPos = world.getLevelData().getRespawnData().pos();
-                *///?} else {
-                /*BlockPos spawnPos = world.getSharedSpawnPos();
-                *//*?}*/
+                BlockPos spawnPos = WorldInfoCompat.getSpawnPosition(world);
                 info.append("出生点: ").append(spawnPos.getX()).append(", ")
                     .append(spawnPos.getY()).append(", ")
                     .append(spawnPos.getZ()).append("\n");
                 info.append("海平面高度: ").append(world.getSeaLevel()).append("\n");
-                //? >=1.21.2 {
-                info.append("最低建筑高度: ").append(world.getMinY()).append("\n");
-                //?} else {
-                /*info.append("最低建筑高度: ").append(world.getMinBuildHeight()).append("\n");
-                *//*?}*/
-                //? >=1.21.9 {
+                info.append("最低建筑高度: ").append(WorldInfoCompat.getMinBuildHeight(world)).append("\n");
                 info.append("最高建筑高度: ").append(world.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
-                //?} else {
-                /*info.append("最高建筑高度: ").append(world.getHeight(Heightmap.Types.WORLD_SURFACE, pos.getX(), pos.getZ())).append("\n");
-                *//*?}*/
             }
             
             return FunctionResult.success(info.toString());
@@ -131,21 +117,7 @@ public class WorldInfoFunction implements LLMFunction {
     }
     
     private String getDimensionName(Level world) {
-        //? >=1.21.11 {
-        String dimensionId = world.dimension().identifier().toString();
-        //?} else {
-        /*String dimensionId = world.dimension().location().toString();
-        *//*?}*/
-        switch (dimensionId) {
-            case "minecraft:overworld":
-                return "主世界";
-            case "minecraft:the_nether":
-                return "下界";
-            case "minecraft:the_end":
-                return "末地";
-            default:
-                return dimensionId;
-        }
+        return DimensionCompat.getDisplayName(world);
     }
     
     @Override

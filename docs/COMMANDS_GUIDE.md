@@ -1,5 +1,15 @@
 # 命令使用指南
 
+## 命令架构
+
+LumiChat 的命令分为以下独立注册入口：
+
+| 命令根 | 职责 | 权限 |
+|--------|------|------|
+| `/llmchat` | 聊天、模板管理、Provider 管理、广播控制 | 聊天对所有玩家开放，管理功能需 OP |
+| `/llmlog` | 日志级别管理、日志类别开关 | 仅 OP |
+| `/llmhistory` | 历史记录查询、导出、搜索、清除 | 仅 OP |
+
 ## 基础命令（所有玩家可用）
 
 ### 聊天命令
@@ -31,10 +41,23 @@
 
 ## 管理员命令（仅OP可用）
 
+### 模板编辑命令
+```bash
+/llmchat template create <名称>     # 创建新模板
+/llmchat template edit <名称>       # 热编辑模板
+/llmchat template preview           # 预览当前编辑的模板
+/llmchat template save              # 保存模板
+/llmchat template var set <键> <值>  # 设置模板变量
+/llmchat template var remove <键>   # 移除模板变量
+/llmchat template delete <名称>     # 删除模板
+/llmchat template copy <源> <目标>   # 复制模板
+```
+
 ### Provider和模型管理
 ```bash
 /llmchat provider switch <provider> # 切换到指定的provider
 /llmchat model set <模型名>          # 设置当前使用的模型
+/llmchat provider check [provider]  # 强制检测Provider健康状态
 /llmchat reload                     # 热重载配置文件
 ```
 
@@ -47,7 +70,7 @@
 /llmchat broadcast player clear     # 清空广播玩家列表
 ```
 
-### 日志管理命令
+### 日志管理命令 (`/llmlog`)
 ```bash
 /llmlog level <级别>                # 设置日志级别 (DEBUG/INFO/WARN/ERROR)
 /llmlog status                      # 显示日志系统状态
@@ -56,7 +79,7 @@
 /llmlog test                        # 生成测试日志
 ```
 
-### 历史记录管理命令
+### 历史记录管理命令 (`/llmhistory`)
 ```bash
 /llmhistory stats [player]          # 显示玩家统计信息
 /llmhistory export <player> <格式>   # 导出玩家历史记录
@@ -185,22 +208,25 @@
 ### 基础权限
 - 所有玩家都可以使用基本聊天功能
 - 所有玩家都可以查看信息和状态
-- 所有玩家都可以管理自己的模板和对话
+- 所有玩家都可以切换到已有的预设模板
 
 ### OP权限
-- Provider和模型管理
+- 模板创建/编辑/保存/删除/复制
+- Provider 切换和模型设置
 - 广播功能控制
 - 配置文件重载
-- 日志系统管理
-- 历史记录管理
-- Tool Call中的管理员功能
+- 日志系统管理 (`/llmlog`)
+- 历史记录管理 (`/llmhistory`)
+- Tool Call 中的管理员功能
 
-### Tool Call权限
-- **基础信息查询**: 所有玩家可用
-- **查询其他玩家信息**: 需要OP权限或查询自己
-- **服务器性能信息**: 需要OP权限
-- **发送广播消息**: 需要OP权限
-- **管理员功能**: 仅OP可用（执行指令、设置方块、生成实体、控制天气时间等）
+### Tool Call 权限
+- **基础信息查询**: 所有玩家可用（世界信息、天气、自身状态、背包、附近实体）
+- **send_message**: 所有玩家可用发送给自己或指定玩家；`all` 广播需 OP
+- **teleport_player**: 仅 OP 可用
+- **execute_command**: 仅 OP 可用，且需要双开关 (`enableExecuteCommand` + `executeCommandBlocklist`)
+- **set_block / summon_entity**: 仅 OP 可用
+- **control_weather / control_time**: 仅 OP 可用
+- **Wiki 查询**: 所有玩家可用，仅限 `wikiAllowedHosts` 中的主机
 
 ## 注意事项
 

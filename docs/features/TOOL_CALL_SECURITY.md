@@ -1,223 +1,139 @@
-# LLM Chat Mod - Tool Call 安全指南
+# LumiChat Tool Call 安全指南
 
 ## 概述
 
-本文档详细说明了LLM Chat Mod中Tool Call功能的安全机制和权限控制系统。
+本文档详细说明了 LumiChat 模组中 Tool Call 功能的安全机制和权限控制系统。
 
-## 新增功能
+## 安全架构
 
-### 1. 统一权限管理系统
+### Schema 校验（Fail-Closed）
 
-#### PermissionHelper 工具类
-- **位置**: `src/main/java/com/riceawa/llm/function/PermissionHelper.java`
-- **功能**: 统一处理所有LLM函数的权限检查
-- **特性**:
-  - 统一的OP权限检查
-  - 指令黑名单保护
-  - 细粒度权限控制
-  - 安全错误消息生成
+所有工具调用参数在进入执行路径前均经过 `FunctionSchemaValidator` 校验：
 
-#### 权限级别
-1. **所有玩家**: 基础信息查询（时间、天气、自己的状态等）
-2. **OP玩家**: 所有功能，包括世界修改和管理员指令
-3. **特殊权限**: 某些功能允许玩家操作自己但需要OP权限操作他人
+- `additionalProperties: false`：每个函数的 JSON Schema 声明不允许未知参数。LLM 传入的任何未知字段会被拒绝，返回 `未知参数: <name>`。
+- 必需参数检查：`required` 数组中的字段缺失时拒绝。
+- 类型校验：`string`、`number`、`integer`、`boolean`、`array` 类型与声明不符时拒绝。
+- 字符串约束：`minLength`、`maxLength` 运行时强制执行。
+- 数值约束：`minimum`、`maximum` 运行时强制执行。
+- 枚举约束：`enum` 列表外的值拒绝。
+- `oneOf` 条件：传入参数需恰好匹配一组条件。
 
-### 2. 新增管理员功能
+校验失败时函数返回错误消息给 LLM，不会执行任何副作用操作。
 
-#### ExecuteCommandFunction - 执行服务器指令
-- **权限**: 仅OP可用
-- **安全机制**:
-  - 指令黑名单保护
-  - 禁止执行危险指令（stop、op、ban等）
-  - 限制特殊指令前缀（execute、forceload等）
-- **参数**:
-  - `command`: 要执行的指令
-  - `silent`: 是否静默执行
+### 二次业务验证
 
-#### SetBlockFunction - 设置方块
-- **权限**: 仅OP可用
-- **安全限制**:
-  - 最大操作距离：100方块
-  - Y坐标范围：-64到320
-  - 可选择是否替换现有方块
-- **参数**:
-  - `x`, `y`, `z`: 坐标
-  - `block_type`: 方块类型
-  - `replace`: 是否替换现有方块
+在 schema 校验通过后，各函数在 `execute()` 中再次进行参数合法性检查（如坐标范围、命令长度、消息内容长度等），确保即使 schema 被绕过也无法产生非预期行为。
 
-#### SummonEntityFunction - 生成实体
-- **权限**: 仅OP可用
-- **安全限制**:
-  - 最大生成距离：50方块
-  - 最大生成数量：10个
-  - 自动添加随机偏移避免重叠
-- **参数**:
-  - `entity_type`: 实体类型
-  - `x`, `y`, `z`: 坐标
-  - `count`: 生成数量
+## 权限控制系统
 
-#### TeleportPlayerFunction - 传送玩家
-- **权限**: 
-  - 所有玩家可传送自己
-  - OP可传送任何玩家
-- **功能**:
-  - 传送到指定坐标
-  - 传送到其他玩家身边
-  - 跨维度传送
-- **参数**:
-  - `player_name`: 要传送的玩家（可选）
-  - `target_player`: 传送目标玩家
-  - `x`, `y`, `z`: 目标坐标
-  - `dimension`: 目标维度
+### PermissionHelper
 
-#### WeatherControlFunction - 天气控制
-- **权限**: 仅OP可用
-- **功能**: 控制指定世界的天气
-- **参数**:
-  - `weather_type`: 天气类型（clear/rain/thunder）
-  - `duration`: 持续时间（秒）
-  - `world`: 目标世界
+统一权限检查工具类（位置：`src/main/java/com/riceawa/llm/function/PermissionHelper.java`）：
 
-#### TimeControlFunction - 时间控制
-- **权限**: 仅OP可用
-- **功能**: 控制指定世界的时间
-- **参数**:
-  - `time_type`: 时间类型（day/night/noon/midnight/sunrise/sunset/specific）
-  - `time_value`: 具体时间值（仅specific类型）
-  - `world`: 目标世界
+- `isOperator(player)`：检查玩家是否拥有 OP 权限（permission level >= 2）
+- `canTeleportOthers(player)`：仅 OP 可传送其他玩家
+- `canSendBroadcast(player)`：仅 OP 可向全体广播
+- `canModifyWorld(player)`：世界修改需 OP
+- `canControlEnvironment(player)`：环境控制需 OP
+- `canSummonEntity(player)`：实体生成需 OP
 
-## 安全机制
+### 权限级别
 
-### 1. 指令黑名单
-以下指令被禁止通过LLM执行：
-- 服务器控制: `stop`, `restart`, `shutdown`
-- 权限管理: `op`, `deop`
-- 白名单管理: `whitelist`
-- 封禁管理: `ban`, `ban-ip`, `pardon`, `pardon-ip`
-- 存档管理: `save-all`, `save-off`, `save-on`
-- 配置管理: `reload`
-- 调试命令: `debug`, `perf`, `jfr`
-- 数据包管理: `datapack`
-- 函数执行: `function`（避免递归）
+1. **所有玩家**：基础信息查询（世界信息、天气、自身状态、背包、附近实体）、发送消息给指定玩家
+2. **OP 玩家**：所有功能，包括世界修改、管理员指令、实体生成、天气时间控制、传送其他玩家、广播
 
-### 2. 受限制的指令前缀
-- `execute`: 执行命令
-- `forceload`: 强制加载区块
-- `worldborder`: 世界边界
-- `difficulty`: 难度设置
-- `gamerule`: 游戏规则
+## 各函数安全说明
 
-### 3. 距离和数量限制
-- **方块设置**: 最大距离100方块
-- **实体生成**: 最大距离50方块，最大数量10个
-- **坐标验证**: Y坐标限制在-64到320之间
+### execute_command — 执行服务器指令
 
-### 4. 权限检查层级
-1. **函数级权限**: `hasPermission()` 方法的基础检查
-2. **操作级权限**: 在 `execute()` 方法中的具体权限验证
-3. **参数验证**: 对所有输入参数进行安全验证
-4. **黑名单检查**: 对危险操作进行额外保护
+**权限**：仅 OP 可用，同时需要功能开关和允许列表双重控制。
 
-## 使用示例
+**双开关机制**：
+1. `LLMChatConfig.isEnableExecuteCommand()` — 全局功能开关，配置文件中 `enableExecuteCommand` 字段。默认开启。
+2. `CommandExecutionPolicy` — fail-closed 命令阻止列表，列表中的命令顶级根会被拒绝执行。
 
-### 执行安全指令
-```json
-{
-  "command": "say Hello World",
-  "silent": false
-}
-```
+**`CommandExecutionPolicy.evaluate()` 检查顺序**：
+1. 功能是否启用 → 未启用则拒绝（`disabled`）
+2. 是否为 OP → 非 OP 拒绝（`not_operator`）
+3. 命令长度 ≤ 可配置最大值（默认 256 字符）
+4. 命令规范化（去除前导 `/`，拦截含 `\0`/`;`/换行的恶意输入）
+5. 阻止列表非空 → 空列表拒绝（`blocklist_empty`）
+6. 命令顶级根是否在阻止列表中 → 在则拒绝（`not_blocklisted`）
 
-### 设置方块
-```json
-{
-  "x": 100,
-  "y": 64,
-  "z": 200,
-  "block_type": "diamond_block",
-  "replace": true
-}
-```
+**以发起玩家身份执行**：命令通过 `serverPlayer.createCommandSourceStack()` 以发起玩家身份执行，不提升权限。
 
-### 生成实体
-```json
-{
-  "entity_type": "cow",
-  "x": 0,
-  "y": 100,
-  "z": 0,
-  "count": 5
-}
-```
+**审计日志**：每次执行尝试均记录到审计日志（actor UUID、command root、SHA-256 哈希、结果码、耗时）。
 
-### 传送玩家
-```json
-{
-  "player_name": "Steve",
-  "x": 0,
-  "y": 100,
-  "z": 0,
-  "dimension": "overworld"
-}
-```
+### send_message — 发送消息
 
-### 控制天气
-```json
-{
-  "weather_type": "rain",
-  "duration": 600,
-  "world": "overworld"
-}
-```
+**权限**：所有玩家可用。
 
-### 控制时间
-```json
-{
-  "time_type": "noon",
-  "world": "overworld"
-}
-```
+- 目标为 `"all"` 时检查 `PermissionHelper.canSendBroadcast()`（需 OP）
+- 指定目标玩家时：OP 或目标为自己方可发送
+- 消息内容长度：1-512 字符
+- 支持三种消息类型：`chat`（聊天）、`system`（系统消息）、`actionbar`（动作栏）
 
-## 测试覆盖
+### teleport_player — 传送玩家
 
-### 单元测试
-- `PermissionHelperTest`: 权限管理系统测试
-- `AdminFunctionsTest`: 管理员功能测试
-- 现有测试已更新以使用统一权限系统
+**权限**：OP 仅限（`hasPermission` 返回 `isOperatorOnly`），与分维度传送均需 OP。
 
-### 测试覆盖范围
-- 权限检查逻辑
-- 参数验证
-- 错误处理
-- 安全限制
-- 黑名单保护
+- Y 坐标范围：-64 到 320
+- 指定维度时，仅允许 `overworld`/`nether`/`end`
+- `oneOf` 约束：需提供 `target_player`（传送到玩家身边）或 `x,y,z` 坐标，不能同时满足两类条件
+
+### Wiki 系列函数（wiki_page / wiki_search / wiki_batch_pages）
+
+**Host 允许列表**：
+- 配置文件 `wikiAllowedHosts` 字段控制允许的 Wiki API 主机
+- 默认值：`["mcwiki.rice-awa.top"]`，由 `ConfigDefaults.DEFAULT_WIKI_ALLOWED_HOSTS` 管理
+- 空/未配置的允许列表会导致所有 Wiki 请求被拒绝
+
+**端点验证（`WikiEndpointPolicy`）**：
+- 仅 HTTPS（`endpoint.isHttps()`）
+- 仅端口 443（不允许非标准端口）
+- URL 中不得含 credentials（`encodedUsername`/`encodedPassword` 必须为空）
+- IP 字面量（IPv4/IPv6）被拒绝，只允许域名
+- 国际化域名通过 `IDN.toASCII` 标准化后匹配
+- HTTP 客户端禁用重定向（`followRedirects(false)` / `followSslRedirects(false)`），防止 SSRF
+
+### 世界操作函数（set_block / summon_entity）
+
+- 仅 OP 可用
+- 距离和数量硬限制：方块设置最大 100 方块范围，实体生成最大 50 方块范围、最多 10 个实体
+- Y 坐标范围：-64 到 320
+
+### 环境控制函数（control_weather / control_time）
+
+- 仅 OP 可用
+- 天气类型枚举：`clear` / `rain` / `thunder`
+- 时间类型枚举：`day` / `night` / `noon` / `midnight` / `sunrise` / `sunset` / `specific`
+
+## 模板编辑权限
+
+- `llmchat template create/edit/save/var/delete/copy` 均需要 OP 权限
+- 通过 `CommandPermissionPolicy.canEditGlobalTemplates(source)` 检查，要求 permission level >= 2
+- 仅 `template list` 和 `template set` 对所有玩家开放
 
 ## 配置建议
 
 ### 生产环境
-- 确保只有可信任的玩家拥有OP权限
-- 定期审查OP玩家列表
-- 监控LLM工具调用日志
-- 考虑添加额外的审计日志
+- `enableExecuteCommand` 默认 `true`，通过blocklist控制可执行命令
+- `executeCommandBlocklist` 列入需要阻止的命令根（如 `op`、`stop`、`kick`）
+- `wikiAllowedHosts` 仅包含受信任的内部 Wiki 主机
+- 定期审查 OP 玩家列表
+- 监控审计日志中的工具调用记录
 
-### 开发环境
-- 可以临时调整距离和数量限制进行测试
-- 使用测试账号验证权限控制
-- 测试各种边界条件和错误情况
+### 安全注意事项
+1. execute_command 使用命令阻止列表（blocklist），在列表中的命令一律拒绝
+2. 所有 schema 采用 fail-closed 策略：未知参数立即拒绝
+3. 业务验证在 schema 校验之后再次执行，双重保护
+4. Wiki 端点仅限 HTTPS 域名，自动拦截 IP 字面量和重定向
+5. 审计日志记录所有 execute_command 尝试（含失败尝试），不记录原始命令明文（仅 SHA-256）
+6. 日志脱敏默认开启，完整请求/响应体记录默认关闭
 
-## 更新日志
+## 参考资料
 
-### v1.1.0 - 新增管理员功能
-- 添加了6个新的管理员功能函数
-- 实现了统一的权限管理系统
-- 增强了安全保护机制
-- 更新了所有现有函数的权限检查
-- 添加了全面的单元测试覆盖
-
-## 注意事项
-
-1. **权限控制**: 所有新功能都严格限制为OP权限
-2. **安全第一**: 多层安全检查确保系统安全
-3. **向后兼容**: 现有功能保持完全兼容
-4. **测试覆盖**: 新功能都有对应的单元测试
-5. **文档完整**: 提供详细的使用说明和安全指南
+- Fabric Commands API: [Fabric Wiki - Commands](https://fabricmc.net/wiki/tutorial:commands)
+- Gradle Toolchains: [Gradle Docs - Toolchains for JVM Projects](https://docs.gradle.org/current/userguide/toolchains.html)
+- Stonecutter: [Stonecutter Docs](https://stonecutter.kikugie.dev/)
+- `docs/api/Notable_Minecraft_changes.md`：跨版本 API 差异参考

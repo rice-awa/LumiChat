@@ -1,13 +1,13 @@
 {
+  "configVersion": "2.0.0",
   "defaultPromptTemplate": "default",
   "defaultTemperature": 0.7,
   "defaultMaxTokens": 8192,
-  "maxContextLength": 8192,
+  "maxContextCharacters": 8192,
   "enableHistory": true,
   "enableToolCall": true,
   "enableBroadcast": false,
   "broadcastPlayers": [],
-  "historyRetentionDays": 30,
   "concurrencySettings": {
     "maxIdleConnections": 20,
     "keepAliveDurationMs": 300000,
@@ -23,10 +23,7 @@
     "enableRetry": true,
     "maxRetryAttempts": 3,
     "retryDelayMs": 1000,
-    "retryBackoffMultiplier": 2.0,
-    "enableRateLimit": false,
-    "requestsPerMinute": 60,
-    "requestsPerHour": 1000
+    "retryBackoffMultiplier": 2.0
   },
   "logConfig": {
     "enableLogging": true,
@@ -43,6 +40,7 @@
   "providers": [
     {
       "name": "openai",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://api.openai.com/v1",
       "apiKey": "your-openai-api-key-here",
       "models": [
@@ -54,6 +52,7 @@
     },
     {
       "name": "openrouter",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://openrouter.ai/api/v1",
       "apiKey": "your-openrouter-api-key-here",
       "models": [
@@ -64,6 +63,7 @@
     },
     {
       "name": "deepseek",
+      "protocol": "openai-compatible",
       "apiBaseUrl": "https://api.deepseek.com/v1",
       "apiKey": "your-deepseek-api-key-here",
       "models": [

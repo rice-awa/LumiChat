@@ -76,7 +76,7 @@
 ## 📚 文档导航
 
 ### 构建和开发文档
-- 🔧 [多版本构建指南](mulitversionbuild.md) - Stonecutter 多版本构建完整指南
+- 🔧 [多版本构建指南](multiversionbuild.md) - Stonecutter 多版本构建完整指南
 
 ### 功能详细文档
 - 📖 [配置指南](docs/CONFIGURATION_GUIDE.md) - 完整的配置选项和多Provider设置
@@ -208,12 +208,41 @@
 6. **重要**: 请将 `maxContextCharacters` 设置为比模型默认上下文长度低的值，为压缩和处理预留空间
 7. 使用 `/llmchat provider check` 定期检查Provider连接状态
 8. 热编辑模板时使用 `{{变量名}}` 格式引用内置和自定义变量
+9. execute_command 采用显式允许列表（非黑名单），默认关闭，需管理员审核后启用
+
+## 📖 开发参考资料
+
+- [Fabric Commands API](https://fabricmc.net/wiki/tutorial:commands) — 命令注册与权限
+- [Gradle Toolchains](https://docs.gradle.org/current/userguide/toolchains.html) — 跨 Java 版本编译
+- [Stonecutter Docs](https://stonecutter.kikugie.dev/) — 多版本构建框架
+- [OkHttp](https://square.github.io/okhttp/) — HTTP 客户端与 MockWebServer
+- [Mojang Mappings](https://fabricmc.net/wiki/tutorial:migrating_to_mojang_mappings) — Mojang 官方映射迁移指南
+- `docs/api/Notable_Minecraft_changes.md` — 跨版本 Minecraft API 破坏性变更参考
 
 ## 📝 更新日志
 
-### v2.1.0 (2026-06-19) - 最新版本
+### v2.3.0 (2026-07-25) - 最新版本
+
+- 🔥 **聊天集成** - 新增聊天集成事件拦截，支持 `@AI` 触发和连续模式
+- 🔥 **ChatMode 命令** - 新增 `/llmchat chatmode` 命令，支持 `trigger`/`continuous`/`off`/`status` 四种模式
+- ⚙️ **全局开关配置** - 添加 `enableChatIntegration` 全局开关，灵活控制聊天集成行为
+- 🛡️ **命令执行安全** - 命令执行由白名单模式改为黑名单模式，默认开启（PR #22）
+- 🔧 **execute_command 修复** - 修复 LLM 忘记传 `command` 参数导致执行失败及命令输出丢失的问题
+- 🔧 **思考模型兼容修复** - 修复思考模型下 `reasoning_content` 丢失导致工具调用报 400 错误
+- 📊 **日志完整性修复** - 移除 `containsExecuteCommand` 对日志内容完整性的覆盖
+- 🏷️ **Mod Menu 修复** - 修复 Mod Menu 描述显示原始翻译键的问题
+- 📝 **文档更新** - 新增聊天集成设计文档、UX 审查文档，更新 AGENTS.md
+
+### v2.2.0
+- 🎮 **Minecraft 26.x 版本扩展** - 新增 26.1.1、26.1.2、26.2 支持，拆分 26.1 版本组（26.1 独立，26.1.1 与 26.1.2 合并）
+- 🛠️ **CI/CD 优化** - 单 job buildAndCollect 多版本构建对齐 Stonecutter 官方模板，恢复 dev-build 多版本并行构建，新增 opencode 工作流
+- 🔧 **构建修复** - 移除不存在的 foojay-resolver-convention 插件（Gradle 9.4 已内置 toolchain 供应），补充缺失的 kotlin-stdlib 依赖
+- 🏷️ **术语统一** - 统一工具调用配置中的模组ID术语，补充英文模组描述
+- 📝 **文档清理** - 删除临时开发文档，优化 agent 配置文档
+
+### v2.1.0 (2026-06-19)
 - 🔥 **迁移至 Mojang mappings** - 从 Yarn mappings 迁移到 Mojang/official mappings，覆盖命令、上下文、Tool Call、模板、Mixin 与兼容层等核心代码。
-- 📦 **多版本构建恢复** - 恢复并验证 1.16.5/1.17/1.18/1.19 版本组、1.20-1.20.6、1.21-1.21.11，以及可选的 26.1 构建节点。
+- 📦 **多版本构建恢复** - 验证 1.19 版本组、1.20-1.20.6、1.21-1.21.11，以及可选的 26.1/26.2 构建节点。
 - 🛠️ **构建工具升级** - Fabric Loom/remap 插件升级到 1.15-SNAPSHOT，Gradle Wrapper 升级到 9.4.0，并完善 Mojang mappings 与 26.1 unobfuscated 构建分流。
 - ☕ **Java 版本矩阵明确化** - 26.1 使用 Java 25，1.20.5+ 使用 Java 21，1.18+ 使用 Java 17，1.17 使用 Java 16，旧版本使用 Java 8。
 - ✅ **迁移验证完成** - 已验证代表性节点 `:1.19:build`、`:1.20.6:build`、`:1.21.11:build`、`buildAndCollect`，并完成 1.21.11 与 26.1 服务端启动 smoke test。

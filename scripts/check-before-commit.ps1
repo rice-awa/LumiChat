@@ -25,28 +25,55 @@ if ($gitStatus) {
     Write-Host ""
 }
 
-# 2. 全版本构建
+# 2. 代表性版本构建
 if (-not $SkipBuild) {
-    Write-Host "[2/4] 执行全版本构建..." -ForegroundColor Yellow
-    
-    Write-Host "  构建 1.21.10..." -NoNewline
-    & ./gradlew :1.21.10:build --quiet 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host " OK" -ForegroundColor Green
-    } else {
-        Write-Host " FAILED" -ForegroundColor Red
-        Write-Host "错误: 1.21.10 构建失败" -ForegroundColor Red
+    Write-Host "[2/4] 执行代表性版本构建..." -ForegroundColor Yellow
+
+    $representativeVersions = @("1.19", "1.20.6", "1.21.11")
+    $javaExecutable = "java"
+    if (-not [string]::IsNullOrEmpty($env:JAVA_HOME)) {
+        $javaExecutableName = if ($IsWindows) { "java.exe" } else { "java" }
+        $javaExecutable = Join-Path (Join-Path $env:JAVA_HOME "bin") $javaExecutableName
+        if (-not (Test-Path -LiteralPath $javaExecutable -PathType Leaf)) {
+            Write-Host "错误: JAVA_HOME 指定的 Java 可执行文件不存在: $javaExecutable" -ForegroundColor Red
+            exit 1
+        }
+    } elseif ($null -eq (Get-Command "java" -CommandType Application -ErrorAction SilentlyContinue)) {
+        Write-Host "错误: JAVA_HOME 未设置，PATH 中找不到 java" -ForegroundColor Red
         exit 1
     }
-    
-    Write-Host "  构建 1.21.11..." -NoNewline
-    & ./gradlew :1.21.11:build --quiet 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host " OK" -ForegroundColor Green
-    } else {
-        Write-Host " FAILED" -ForegroundColor Red
-        Write-Host "错误: 1.21.11 构建失败" -ForegroundColor Red
+
+    try {
+        $javaVersionOutput = (& $javaExecutable -version 2>&1 | Out-String)
+        $javaVersionExitCode = $LASTEXITCODE
+    } catch {
+        Write-Host "错误: 无法执行所选 Java: $javaExecutable" -ForegroundColor Red
         exit 1
+    }
+    if ($javaVersionExitCode -ne 0) {
+        Write-Host "错误: 所选 Java 的版本命令失败（退出码 $javaVersionExitCode）: $javaExecutable" -ForegroundColor Red
+        exit 1
+    }
+
+    $javaMajorMatch = [regex]::Match($javaVersionOutput, 'version "(?:1\.)?(\d+)')
+    if (-not $javaMajorMatch.Success) {
+        Write-Host "错误: 无法解析所选 Java 的主版本: $javaExecutable" -ForegroundColor Red
+        exit 1
+    }
+    $javaMajor = [int]$javaMajorMatch.Groups[1].Value
+    if ($javaMajor -ge 25) {
+        $representativeVersions += @("26.1", "26.2")
+    }
+
+    foreach ($version in $representativeVersions) {
+        Write-Host "  构建 $version..." -NoNewline
+        & ./gradlew ":${version}:build" --quiet 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host " FAILED" -ForegroundColor Red
+            Write-Host "错误: $version 构建失败" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host " OK" -ForegroundColor Green
     }
 } else {
     Write-Host "[2/4] 跳过构建检查 (-SkipBuild)" -ForegroundColor Yellow
@@ -64,15 +91,12 @@ Write-Host "  Stonecutter Reset 完成" -ForegroundColor Green
 # 4. 检查是否有 Stonecutter 生成的变更
 Write-Host "[4/4] 检查 Stonecutter 状态..." -ForegroundColor Yellow
 $diffStatus = git diff --exit-code 2>&1
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  工作区干净，无多余变更" -ForegroundColor Green
-} else {
-    Write-Host "  警告: stonecutterReset 后仍有变更" -ForegroundColor Yellow
-    Write-Host "  请检查以下文件:" -ForegroundColor Yellow
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "错误: Stonecutter reset 后仍有源码差异" -ForegroundColor Red
     git diff --name-only
-    Write-Host ""
-    Write-Host "  这些变更可能是 Stonecutter 生成的临时文件，请确认是否需要提交" -ForegroundColor Yellow
+    exit 1
 }
+Write-Host "  工作区干净，无多余变更" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "=== 检查完成 ===" -ForegroundColor Green

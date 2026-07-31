@@ -1,4 +1,5 @@
 {
-  "mod.lumichat.name": "LumiChat",
-  "mod.lumichat.description": "A MC Fabric mod that will make your eyes light up, integrating LLM (Large Language Model) chat functionality, supporting multiple AI services and custom features"
+  "modmenu.nameTranslation.lumichat": "LumiChat",
+  "modmenu.descriptionTranslation.lumichat": "A MC Fabric mod that will make your eyes light up, integrating LLM (Large Language Model) chat functionality, supporting multiple AI services and custom features",
+  "modmenu.summaryTranslation.lumichat": "A MC Fabric mod integrating LLM chat functionality"
 }

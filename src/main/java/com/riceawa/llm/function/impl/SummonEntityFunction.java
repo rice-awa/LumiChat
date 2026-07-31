@@ -1,17 +1,12 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
-import com.riceawa.llm.compat.IdentifierCompat;
+import com.riceawa.llm.compat.EntityCompat;
+import com.riceawa.llm.compat.RegistryCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-//? >=1.21.11 {
-import net.minecraft.resources.Identifier;
-//?} else {
-/*import net.minecraft.resources.ResourceLocation;
-*//*?}*/
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
@@ -42,6 +37,7 @@ public class SummonEntityFunction implements LLMFunction {
     public JsonObject getParametersSchema() {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "object");
+        schema.addProperty("additionalProperties", false);
         
         JsonObject properties = new JsonObject();
         
@@ -49,6 +45,7 @@ public class SummonEntityFunction implements LLMFunction {
         JsonObject entityParam = new JsonObject();
         entityParam.addProperty("type", "string");
         entityParam.addProperty("description", "实体类型（如：cow, pig, zombie等）");
+        entityParam.addProperty("maxLength", 100);
         properties.add("entity_type", entityParam);
         
         // X坐标
@@ -122,17 +119,7 @@ public class SummonEntityFunction implements LLMFunction {
             }
             
             // 获取实体类型 - 使用兼容层
-            //? >=1.21.11 {
-            Identifier entityId = IdentifierCompat.forEntityType(entityType);
-            //?} else {
-            /*ResourceLocation entityId = IdentifierCompat.forEntityType(entityType);
-            *//*?}*/
-            
-            //? >=1.21.2 {
-            EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.getValue(entityId);
-            //?} else {
-            /*EntityType<?> type = BuiltInRegistries.ENTITY_TYPE.get(entityId);
-            *//*?}*/
+            EntityType<?> type = RegistryCompat.getEntityType(entityType);
             if (type == null) {
                 return FunctionResult.error("未知的实体类型: " + entityType);
             }
@@ -150,11 +137,7 @@ public class SummonEntityFunction implements LLMFunction {
                     double offsetX = x + (Math.random() - 0.5) * 2;
                     double offsetZ = z + (Math.random() - 0.5) * 2;
                     
-                    //? >=1.21.2 {
-                    Entity entity = type.create(level, net.minecraft.world.entity.EntitySpawnReason.COMMAND);
-                    //?} else {
-                    /*Entity entity = type.create(level);
-                    *//*?}*/
+                    Entity entity = EntityCompat.create(type, level);
                     if (entity != null) {
                         entity.setPos(offsetX, y, offsetZ);
                         entity.setYRot(0.0F);

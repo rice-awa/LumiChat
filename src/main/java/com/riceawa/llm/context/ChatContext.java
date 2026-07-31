@@ -9,10 +9,14 @@ import com.riceawa.llm.core.LLMContext;
 import com.riceawa.llm.service.LLMServiceManager;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.logging.LogManager;
+import com.riceawa.llm.util.EntityHelper;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Player;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 聊天上下文管理器，管理每个玩家的对话状态
@@ -46,33 +50,59 @@ public class ChatContext {
         default void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount, int compressedCount, Player player) {
             onContextCompressionCompleted(playerId, success, originalCount, compressedCount);
         }
+
+        default void onContextCompressionStarted(UUID playerId, int messagesToCompress,
+                                                 MinecraftServer server) {
+            onContextCompressionStarted(playerId, messagesToCompress);
+        }
+
+        default void onContextCompressionCompleted(UUID playerId, boolean success, int originalCount,
+                                                   int compressedCount, MinecraftServer server) {
+            onContextCompressionCompleted(playerId, success, originalCount, compressedCount);
+        }
     }
     private final String sessionId;
     private final UUID playerId;
     private final List<LLMMessage> messages;
+    private final Object messageLock = new Object();
     private final Map<String, Object> metadata;
     private String currentPromptTemplate;
     private int maxContextCharacters;
-    private long lastActivity;
-    private ContextEventListener eventListener;
+    private volatile long lastActivity;
+    private volatile ContextEventListener eventListener;
+    private volatile ChatMode chatMode = ChatMode.OFF;
+    private final Executor compressionExecutor;
+    private final ContextCompressor compressor;
 
     // 缓存字符长度以提高性能
     private int cachedTotalCharacters = -1;
     private boolean characterCacheValid = false;
 
     // 压缩状态标记
-    private volatile boolean compressionInProgress = false;
+    private final AtomicBoolean compressionInProgress = new AtomicBoolean();
 
-    // 当前玩家实体（用于发送通知）
-    private transient Player currentPlayer;
+    // 仅保存 server 用于把通知调度回 server thread，不长期保存 Player 实体。
+    private volatile MinecraftServer notificationServer;
 
     public ChatContext(UUID playerId) {
+        this(playerId,
+                LLMChatConfig.getInstance().getDefaultPromptTemplate(),
+                LLMChatConfig.getInstance().getMaxContextCharacters(),
+                command -> ChatContextManager.getInstance().getScheduler().execute(command),
+                null);
+        this.chatMode = LLMChatConfig.getInstance().getDefaultChatMode();
+    }
+
+    ChatContext(UUID playerId, String promptTemplate, int maxContextCharacters,
+                Executor compressionExecutor, ContextCompressor compressor) {
         this.sessionId = UUID.randomUUID().toString();
         this.playerId = playerId;
         this.messages = new ArrayList<>();
         this.metadata = new ConcurrentHashMap<>();
-        this.currentPromptTemplate = LLMChatConfig.getInstance().getDefaultPromptTemplate();
-        this.maxContextCharacters = LLMChatConfig.getInstance().getMaxContextCharacters();
+        this.currentPromptTemplate = promptTemplate;
+        this.maxContextCharacters = maxContextCharacters;
+        this.compressionExecutor = Objects.requireNonNull(compressionExecutor, "compressionExecutor");
+        this.compressor = compressor == null ? this::compressMessages : compressor;
         this.lastActivity = System.currentTimeMillis();
     }
 
@@ -80,7 +110,7 @@ public class ChatContext {
      * 添加消息到上下文
      */
     public void addMessage(LLMMessage message) {
-        synchronized (messages) {
+        synchronized (messageLock) {
             messages.add(message);
             invalidateCharacterCache();
             updateLastActivity();
@@ -113,7 +143,7 @@ public class ChatContext {
      * 如果已存在系统消息，则替换第一个系统消息；否则在开头添加
      */
     public void updateSystemMessage(String content) {
-        synchronized (messages) {
+        synchronized (messageLock) {
             // 查找第一个系统消息
             for (int i = 0; i < messages.size(); i++) {
                 if (messages.get(i).getRole() == MessageRole.SYSTEM) {
@@ -136,7 +166,7 @@ public class ChatContext {
      * 获取所有消息
      */
     public List<LLMMessage> getMessages() {
-        synchronized (messages) {
+        synchronized (messageLock) {
             return new ArrayList<>(messages);
         }
     }
@@ -145,7 +175,7 @@ public class ChatContext {
      * 获取最近的N条消息
      */
     public List<LLMMessage> getRecentMessages(int count) {
-        synchronized (messages) {
+        synchronized (messageLock) {
             int size = messages.size();
             if (size <= count) {
                 return new ArrayList<>(messages);
@@ -158,7 +188,7 @@ public class ChatContext {
      * 清空上下文
      */
     public void clear() {
-        synchronized (messages) {
+        synchronized (messageLock) {
             messages.clear();
             invalidateCharacterCache();
             updateLastActivity();
@@ -169,21 +199,25 @@ public class ChatContext {
      * 计算所有消息的总字符长度
      */
     public int calculateTotalCharacters() {
+        synchronized (messageLock) {
+            return calculateTotalCharactersLocked();
+        }
+    }
+
+    private int calculateTotalCharactersLocked() {
         if (characterCacheValid) {
             return cachedTotalCharacters;
         }
 
-        synchronized (messages) {
-            int total = 0;
-            for (LLMMessage message : messages) {
-                if (message.getContent() != null) {
-                    total += message.getContent().length();
-                }
+        int total = 0;
+        for (LLMMessage message : messages) {
+            if (message.getContent() != null) {
+                total += message.getContent().length();
             }
-            cachedTotalCharacters = total;
-            characterCacheValid = true;
-            return total;
         }
+        cachedTotalCharacters = total;
+        characterCacheValid = true;
+        return total;
     }
 
     /**
@@ -198,144 +232,162 @@ public class ChatContext {
      * 检查是否超过上下文字符长度限制
      */
     private boolean exceedsContextLimits() {
-        return calculateTotalCharacters() > maxContextCharacters;
+        synchronized (messageLock) {
+            return calculateTotalCharactersLocked() > maxContextCharacters;
+        }
     }
 
     /**
      * 设置当前玩家实体（用于发送通知）
      */
     public void setCurrentPlayer(Player player) {
-        this.currentPlayer = player;
+        this.notificationServer = EntityHelper.getServerSafe(player);
     }
 
     /**
      * 检查是否需要压缩，如果需要则启动异步压缩任务
      */
     public void scheduleCompressionIfNeeded() {
-        if (!exceedsContextLimits() || compressionInProgress) {
+        if (!exceedsContextLimits()
+                || !compressionInProgress.compareAndSet(false, true)) {
             return;
         }
 
-        // 启动异步压缩
-        compressContextAsync();
+        try {
+            compressionExecutor.execute(this::runCompression);
+        } catch (RuntimeException | Error exception) {
+            compressionInProgress.set(false);
+            throw exception;
+        }
     }
 
-    /**
-     * 异步压缩上下文
-     */
-    private void compressContextAsync() {
-        compressionInProgress = true;
+    private void runCompression() {
+        try {
+            CompressionSnapshot snapshot = createCompressionSnapshot();
+            if (snapshot == null) {
+                return;
+            }
 
-        // 使用ChatContextManager的调度器执行异步任务
-        ChatContextManager.getInstance().getScheduler().execute(() -> {
+            notifyCompressionStarted(snapshot.messagesToCompress());
+
+            String compressedSummary = null;
             try {
-                // 执行压缩逻辑
-                trimContext();
-            } catch (Exception e) {
-                LogManager.getInstance().error("Async context compression failed for session " + sessionId, e);
-            } finally {
-                compressionInProgress = false;
+                compressedSummary = compressor.compress(snapshot.compressionCandidates());
+            } catch (Exception exception) {
+                // Compressor failures use the same bounded fallback as empty responses.
             }
-        });
+
+            boolean compressionSucceeded = compressedSummary != null
+                    && !compressedSummary.trim().isEmpty();
+            List<LLMMessage> replacement = compressionSucceeded
+                    ? buildSummaryReplacement(snapshot, compressedSummary.trim())
+                    : snapshot.fallbackReplacement();
+            int mergedCount = mergeSnapshot(snapshot, replacement);
+            if (mergedCount >= 0) {
+                notifyCompressionCompleted(compressionSucceeded,
+                        snapshot.messagesToCompress(), mergedCount);
+            }
+        } finally {
+            compressionInProgress.set(false);
+        }
     }
 
-    /**
-     * 修剪上下文，保持在最大长度内
-     * 使用智能压缩而不是简单删除
-     */
-    private void trimContext() {
-        if (!exceedsContextLimits()) {
-            return;
-        }
-
-        // 保留系统消息和最近的消息
-        List<LLMMessage> systemMessages = new ArrayList<>();
-        List<LLMMessage> otherMessages = new ArrayList<>();
-
-        for (LLMMessage message : messages) {
-            if (message.getRole() == MessageRole.SYSTEM) {
-                systemMessages.add(message);
-            } else {
-                otherMessages.add(message);
+    private CompressionSnapshot createCompressionSnapshot() {
+        synchronized (messageLock) {
+            if (calculateTotalCharactersLocked() <= maxContextCharacters) {
+                return null;
             }
-        }
 
-        // 智能计算需要压缩的消息
-        int messagesToCompress = calculateMessagesToCompress(systemMessages, otherMessages);
-
-        if (messagesToCompress <= 0) {
-            return; // 无需压缩
-        }
-
-        if (messagesToCompress > 0 && messagesToCompress < otherMessages.size()) {
-                // 通知监听器压缩即将开始
-                if (eventListener != null) {
-                    if (currentPlayer != null) {
-                        eventListener.onContextCompressionStarted(playerId, messagesToCompress, currentPlayer);
-                    } else {
-                        eventListener.onContextCompressionStarted(playerId, messagesToCompress);
-                    }
-                }
-
-                // 尝试压缩旧消息
-                List<LLMMessage> messagesToCompressSublist = otherMessages.subList(0, messagesToCompress);
-                String compressedSummary = compressMessages(messagesToCompressSublist);
-
-                if (compressedSummary != null && !compressedSummary.trim().isEmpty()) {
-                    // 压缩成功，用摘要替换旧消息
-                    List<LLMMessage> remainingMessages = otherMessages.subList(messagesToCompress, otherMessages.size());
-
-                    // 重新构建消息列表
-                    messages.clear();
-                    messages.addAll(systemMessages);
-
-                    // 添加压缩摘要作为系统消息
-                    messages.add(new LLMMessage(MessageRole.SYSTEM,
-                        "=== 对话历史摘要 ===\n" + compressedSummary + "\n=== 以下是最近的对话 ==="));
-
-                    messages.addAll(remainingMessages);
-
-                    LogManager.getInstance().system("Context compressed for session " + sessionId +
-                        ", compressed " + messagesToCompress + " messages into summary");
-
-                    // 通知监听器压缩成功
-                    if (eventListener != null) {
-                        if (currentPlayer != null) {
-                            eventListener.onContextCompressionCompleted(playerId, true,
-                                messagesToCompress, messages.size(), currentPlayer);
-                        } else {
-                            eventListener.onContextCompressionCompleted(playerId, true,
-                                messagesToCompress, messages.size());
-                        }
-                    }
+            List<LLMMessage> originalPrefix = List.copyOf(messages);
+            List<LLMMessage> systemMessages = new ArrayList<>();
+            List<LLMMessage> otherMessages = new ArrayList<>();
+            for (LLMMessage message : originalPrefix) {
+                if (message.getRole() == MessageRole.SYSTEM) {
+                    systemMessages.add(message);
                 } else {
-                    // 压缩失败，回退到简单删除
-                    fallbackTrimContext(systemMessages, otherMessages);
-
-                    // 通知监听器压缩失败
-                    if (eventListener != null) {
-                        if (currentPlayer != null) {
-                            eventListener.onContextCompressionCompleted(playerId, false,
-                                messagesToCompress, messages.size(), currentPlayer);
-                        } else {
-                            eventListener.onContextCompressionCompleted(playerId, false,
-                                messagesToCompress, messages.size());
-                        }
-                    }
+                    otherMessages.add(message);
                 }
             }
+
+            int messagesToCompress = calculateMessagesToCompress(
+                    systemMessages, otherMessages, maxContextCharacters);
+            if (messagesToCompress <= 0 || messagesToCompress >= otherMessages.size()) {
+                return null;
+            }
+
+            List<LLMMessage> immutableSystemMessages = List.copyOf(systemMessages);
+            List<LLMMessage> immutableOtherMessages = List.copyOf(otherMessages);
+            List<LLMMessage> compressionCandidates = List.copyOf(
+                    immutableOtherMessages.subList(0, messagesToCompress));
+            List<LLMMessage> fallbackReplacement = buildFallbackReplacement(
+                    immutableSystemMessages, immutableOtherMessages, maxContextCharacters);
+            return new CompressionSnapshot(originalPrefix, immutableSystemMessages,
+                    immutableOtherMessages, compressionCandidates,
+                    fallbackReplacement, messagesToCompress);
         }
+    }
+
+    private List<LLMMessage> buildSummaryReplacement(CompressionSnapshot snapshot,
+                                                     String compressedSummary) {
+        List<LLMMessage> replacement = new ArrayList<>(snapshot.systemMessages());
+        replacement.add(new LLMMessage(MessageRole.SYSTEM,
+                "=== 对话历史摘要 ===\n" + compressedSummary + "\n=== 以下是最近的对话 ==="));
+        replacement.addAll(snapshot.otherMessages().subList(
+                snapshot.messagesToCompress(), snapshot.otherMessages().size()));
+        return List.copyOf(replacement);
+    }
+
+    private int mergeSnapshot(CompressionSnapshot snapshot, List<LLMMessage> replacement) {
+        synchronized (messageLock) {
+            if (!hasSnapshotPrefix(snapshot.originalPrefix())) {
+                return -1;
+            }
+
+            List<LLMMessage> appendedTail = new ArrayList<>(
+                    messages.subList(snapshot.originalPrefix().size(), messages.size()));
+            messages.clear();
+            messages.addAll(replacement);
+            messages.addAll(appendedTail);
+            invalidateCharacterCache();
+            updateLastActivity();
+            return messages.size();
+        }
+    }
+
+    private boolean hasSnapshotPrefix(List<LLMMessage> snapshot) {
+        if (messages.size() < snapshot.size()) {
+            return false;
+        }
+        for (int i = 0; i < snapshot.size(); i++) {
+            if (!messages.get(i).getId().equals(snapshot.get(i).getId())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void notifyCompressionStarted(int messagesToCompress) {
+        ContextEventListener listener = eventListener;
+        if (listener != null) {
+            listener.onContextCompressionStarted(playerId, messagesToCompress, notificationServer);
+        }
+    }
+
+    private void notifyCompressionCompleted(boolean success, int originalCount, int compressedCount) {
+        ContextEventListener listener = eventListener;
+        if (listener != null) {
+            listener.onContextCompressionCompleted(playerId, success,
+                    originalCount, compressedCount, notificationServer);
+        }
+    }
 
     /**
      * 智能计算需要压缩的消息数量（基于字符长度）
      * 策略：压缩完整的消息（如1/2的消息），保持消息完整性
      */
-    private int calculateMessagesToCompress(List<LLMMessage> systemMessages, List<LLMMessage> otherMessages) {
-        int totalCharacters = calculateTotalCharacters();
-        if (totalCharacters <= maxContextCharacters) {
-            return 0; // 无需压缩
-        }
-
+    private int calculateMessagesToCompress(List<LLMMessage> systemMessages,
+                                            List<LLMMessage> otherMessages,
+                                            int contextCharacterLimit) {
         // 计算系统消息的字符长度
         int systemCharacters = 0;
         for (LLMMessage msg : systemMessages) {
@@ -345,7 +397,7 @@ public class ChatContext {
         }
 
         // 预留压缩摘要的空间（估算为500字符）
-        int availableCharacters = maxContextCharacters - systemCharacters - 500;
+        int availableCharacters = contextCharacterLimit - systemCharacters - 500;
         if (availableCharacters <= 0) {
             // 如果空间不足，压缩一半消息（保持完整性）
             return Math.max(1, otherMessages.size() / 2);
@@ -378,7 +430,9 @@ public class ChatContext {
     /**
      * 回退的上下文修剪方法（简单删除）
      */
-    private void fallbackTrimContext(List<LLMMessage> systemMessages, List<LLMMessage> otherMessages) {
+    private List<LLMMessage> buildFallbackReplacement(List<LLMMessage> systemMessages,
+                                                      List<LLMMessage> otherMessages,
+                                                      int contextCharacterLimit) {
         // 按字符长度保留完整消息
         List<LLMMessage> messagesToKeep = new ArrayList<>();
 
@@ -390,7 +444,7 @@ public class ChatContext {
             }
         }
 
-        int availableCharacters = maxContextCharacters - systemCharacters;
+        int availableCharacters = contextCharacterLimit - systemCharacters;
         int currentCharacters = 0;
 
         // 从最新消息开始保留完整消息
@@ -405,14 +459,18 @@ public class ChatContext {
             }
         }
 
-        // 重新构建消息列表
-        messages.clear();
-        messages.addAll(systemMessages);
-        messages.addAll(messagesToKeep);
-        invalidateCharacterCache();
+        List<LLMMessage> replacement = new ArrayList<>(systemMessages);
+        replacement.addAll(messagesToKeep);
+        return List.copyOf(replacement);
+    }
 
-        LogManager.getInstance().system("Context trimmed using fallback method for session " + sessionId +
-            ", kept " + messagesToKeep.size() + " messages with " + currentCharacters + " characters");
+    private record CompressionSnapshot(
+            List<LLMMessage> originalPrefix,
+            List<LLMMessage> systemMessages,
+            List<LLMMessage> otherMessages,
+            List<LLMMessage> compressionCandidates,
+            List<LLMMessage> fallbackReplacement,
+            int messagesToCompress) {
     }
 
     /**
@@ -541,20 +599,24 @@ public class ChatContext {
     }
 
     public int getMaxContextCharacters() {
-        return maxContextCharacters;
+        synchronized (messageLock) {
+            return maxContextCharacters;
+        }
     }
 
     public void setMaxContextCharacters(int maxContextCharacters) {
-        System.out.println("ChatContext[" + sessionId + "] updating maxContextCharacters from " +
-            this.maxContextCharacters + " to " + maxContextCharacters);
-        this.maxContextCharacters = maxContextCharacters;
-        invalidateCharacterCache();
-        updateLastActivity();
+        synchronized (messageLock) {
+            System.out.println("ChatContext[" + sessionId + "] updating maxContextCharacters from " +
+                this.maxContextCharacters + " to " + maxContextCharacters);
+            this.maxContextCharacters = maxContextCharacters;
+            invalidateCharacterCache();
+            updateLastActivity();
+        }
     }
 
     // 保持向后兼容的方法名
     public int getMaxContextLength() {
-        return maxContextCharacters;
+        return getMaxContextCharacters();
     }
 
     public void setMaxContextLength(int maxContextLength) {
@@ -566,7 +628,17 @@ public class ChatContext {
     }
 
     public int getMessageCount() {
-        return messages.size();
+        synchronized (messageLock) {
+            return messages.size();
+        }
+    }
+
+    public ChatMode getChatMode() {
+        return chatMode;
+    }
+
+    public void setChatMode(ChatMode mode) {
+        this.chatMode = mode;
     }
 
     /**

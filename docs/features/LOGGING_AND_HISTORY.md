@@ -62,10 +62,21 @@ LLMChat模组现在包含了完善的日志系统和增强的历史记录功能�
     "enableChatLog": true,
     "enableErrorLog": true,
     "enablePerformanceLog": true,
-    "enableAuditLog": true
+    "enableAuditLog": true,
+    "enableLLMRequestLog": true,
+    "logFullRequestBody": false,
+    "logFullResponseBody": false,
+    "maxLogContentLength": 2048,
+    "sanitizeSensitiveData": true
   }
 }
 ```
+
+**重要默认值说明**：
+- `logFullRequestBody` 和 `logFullResponseBody` **默认关闭**（`false`）：不会记录完整的 LLM 请求/响应体，仅记录摘要元数据（模型、token 用量、响应时间等）。开启后日志文件将包含完整对话内容，需注意隐私风险。
+- `sanitizeSensitiveData` **默认开启**（`true`）：自动脱敏 API 密钥等敏感信息。
+- `maxLogContentLength` 默认 2048 字符：限制单条日志内容的长度上限。
+- `enableLLMRequestLog`：独立的 LLM 请求/响应日志，与聊天日志分离，便于审计。
 
 ### 日志管理命令
 
@@ -173,10 +184,13 @@ config/lumichat/
 
 ## 隐私和安全
 
-- **敏感信息**: API密钥等敏感信息不会记录在日志中
-- **访问控制**: 日志和历史记录管理需要管理员权限
+- **敏感信息脱敏**: `sanitizeSensitiveData` 默认开启，API 密钥等敏感信息不会以明文记录
+- **完整请求/响应体默认关闭**: `logFullRequestBody` 和 `logFullResponseBody` 默认 `false`，避免将完整对话内容写入日志文件
+- **摘要日志**: 默认仅记录元数据（模型名、token 用量、响应时间、成功/失败），不含消息正文
+- **访问控制**: 日志和历史记录管理命令（`/llmlog`、`/llmhistory`）需要 OP 权限
 - **数据保留**: 可配置日志和历史记录的保留时间
-- **审计跟踪**: 所有管理操作都会记录在审计日志中
+- **审计跟踪**: 所有管理操作和命令执行尝试均记录在审计日志中
+- **execute_command 审计**: 记录 actor UUID、command root、命令 SHA-256 哈希（不记录原始命令明文）
 
 ## 故障排除
 

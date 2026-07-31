@@ -1,9 +1,9 @@
 package com.riceawa.llm.function.impl;
 
 import com.google.gson.JsonObject;
+import com.riceawa.llm.compat.WeatherCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
-import com.riceawa.llm.util.EntityHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
@@ -52,9 +52,15 @@ public class WeatherControlFunction implements LLMFunction {
         worldParam.addProperty("type", "string");
         worldParam.addProperty("description", "目标世界：overworld（主世界）、nether（下界）、end（末地）");
         worldParam.addProperty("default", "overworld");
+        com.google.gson.JsonArray worldEnum = new com.google.gson.JsonArray();
+        worldEnum.add("overworld");
+        worldEnum.add("nether");
+        worldEnum.add("end");
+        worldParam.add("enum", worldEnum);
         properties.add("world", worldParam);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         
         // 必需参数
         com.google.gson.JsonArray required = new com.google.gson.JsonArray();
@@ -112,13 +118,13 @@ public class WeatherControlFunction implements LLMFunction {
             // 设置天气
             switch (weatherType) {
                 case "clear":
-                    EntityHelper.setWeatherParameters(targetWorld, durationTicks, 0, false, false);
+                    WeatherCompat.setWeatherParameters(targetWorld, durationTicks, 0, false, false);
                     break;
                 case "rain":
-                    EntityHelper.setWeatherParameters(targetWorld, 0, durationTicks, true, false);
+                    WeatherCompat.setWeatherParameters(targetWorld, 0, durationTicks, true, false);
                     break;
                 case "thunder":
-                    EntityHelper.setWeatherParameters(targetWorld, 0, durationTicks, true, true);
+                    WeatherCompat.setWeatherParameters(targetWorld, 0, durationTicks, true, true);
                     break;
             }
             

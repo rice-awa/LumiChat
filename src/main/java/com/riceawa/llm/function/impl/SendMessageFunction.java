@@ -1,7 +1,9 @@
 package com.riceawa.llm.function.impl;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.riceawa.llm.compat.MessageCompat;
+import com.riceawa.llm.compat.PlayerCompat;
 import com.riceawa.llm.function.LLMFunction;
 import com.riceawa.llm.function.PermissionHelper;
 import net.minecraft.network.chat.Component;
@@ -36,22 +38,30 @@ public class SendMessageFunction implements LLMFunction {
         JsonObject message = new JsonObject();
         message.addProperty("type", "string");
         message.addProperty("description", "要发送的消息内容");
+        message.addProperty("minLength", 1);
+        message.addProperty("maxLength", 512);
         properties.add("message", message);
         
         // 可选参数：目标玩家
         JsonObject target = new JsonObject();
         target.addProperty("type", "string");
-        target.addProperty("description", "目标玩家名称，不填则发送给所有玩家（需要OP权限）");
+        target.addProperty("description", "目标玩家名称；不填则发送给自己，all表示向所有玩家广播（需要OP权限）");
         properties.add("target", target);
         
         // 可选参数：消息类型
         JsonObject messageType = new JsonObject();
         messageType.addProperty("type", "string");
         messageType.addProperty("description", "消息类型：chat(聊天), system(系统消息), actionbar(动作栏)");
+        JsonArray messageTypes = new JsonArray();
+        messageTypes.add("chat");
+        messageTypes.add("system");
+        messageTypes.add("actionbar");
+        messageType.add("enum", messageTypes);
         messageType.addProperty("default", "chat");
         properties.add("message_type", messageType);
         
         schema.add("properties", properties);
+        schema.addProperty("additionalProperties", false);
         schema.add("required", new com.google.gson.JsonArray());
         schema.getAsJsonArray("required").add("message");
         
@@ -67,43 +77,48 @@ public class SendMessageFunction implements LLMFunction {
             }
             
             String messageContent = arguments.get("message").getAsString();
-            if (messageContent.trim().isEmpty()) {
-                return FunctionResult.error("消息内容不能为空");
+            if (!isValidMessageContent(messageContent)) {
+                return FunctionResult.error("消息长度必须在1到512个字符之间");
             }
             
             String target = arguments.has("target") ? 
                 arguments.get("target").getAsString() : null;
-            String messageType = arguments.has("message_type") ? 
+            String messageType = arguments.has("message_type") ?
                 arguments.get("message_type").getAsString() : "chat";
+            if (!isSupportedMessageType(messageType)) {
+                return FunctionResult.error("不支持的消息类型");
+            }
             
             // 构建消息
             Component messageComponent = buildMessage(player, messageContent, messageType);
             
-            if (target == null || target.trim().isEmpty()) {
-                // 发送给所有玩家 - 需要OP权限
+            if ("all".equals(target)) {
+                // 向所有在线玩家发送消息 - 需要OP权限
                 if (!PermissionHelper.canSendBroadcast(player)) {
                     return FunctionResult.error(PermissionHelper.getPermissionErrorMessage("向所有玩家发送消息"));
                 }
-                
-                // 发送给所有在线玩家
+
                 for (ServerPlayer onlinePlayer : server.getPlayerList().getPlayers()) {
                     sendMessageToPlayer(onlinePlayer, messageComponent, messageType);
                 }
-                
-                return FunctionResult.success("消息已发送给所有在线玩家 (" + 
+
+                return FunctionResult.success("消息已发送给所有在线玩家 (" +
                     server.getPlayerCount() + " 人)");
-                
+
+            } else if (target == null || target.trim().isEmpty()) {
+                sendMessageToPlayer((ServerPlayer) player, messageComponent, messageType);
+                return FunctionResult.success("消息已发送给自己");
+
             } else {
                 // 发送给指定玩家
-                //? >=1.21.11 {
-                ServerPlayer targetPlayer = server.getPlayerList().getPlayer(target);
-                //?} else {
-                /*ServerPlayer targetPlayer = server.getPlayerList().getPlayerByName(target);
-                *//*?}*/
+                ServerPlayer targetPlayer = PlayerCompat.getPlayerByName(server, target);
                 if (targetPlayer == null) {
-                    return FunctionResult.error("找不到玩家: " + target);
+                    return FunctionResult.error("目标玩家不可用");
                 }
-                
+                if (!canSendToTarget(PermissionHelper.isOperator(player), targetPlayer.equals(player))) {
+                    return FunctionResult.error(PermissionHelper.getPermissionErrorMessage("向其他玩家发送消息"));
+                }
+
                 sendMessageToPlayer(targetPlayer, messageComponent, messageType);
                 return FunctionResult.success("消息已发送给 " + target);
             }
@@ -113,6 +128,19 @@ public class SendMessageFunction implements LLMFunction {
         }
     }
     
+    public static boolean isValidMessageContent(String messageContent) {
+        return messageContent != null && messageContent.length() >= 1 && messageContent.length() <= 512;
+    }
+
+    public static boolean isSupportedMessageType(String messageType) {
+        return "chat".equals(messageType) || "system".equals(messageType)
+                || "actionbar".equals(messageType);
+    }
+
+    public static boolean canSendToTarget(boolean operator, boolean targetIsSender) {
+        return operator || targetIsSender;
+    }
+
     private Component buildMessage(Player sender, String content, String messageType) {
         String senderName = sender.getName().getString();
         

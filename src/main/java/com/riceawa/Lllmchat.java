@@ -3,10 +3,12 @@ package com.riceawa;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.riceawa.llm.command.ChatIntegrationHandler;
 import com.riceawa.llm.command.LLMChatCommand;
 import com.riceawa.llm.config.LLMChatConfig;
 import com.riceawa.llm.template.PromptTemplateManager;
@@ -107,6 +109,11 @@ public class Lllmchat implements ModInitializer {
 			LogManager.getInstance().system("Server stopping, cleaning up resources...");
 			ChatContextManager.getInstance().shutdown();
 			LogManager.getInstance().shutdown();
+		});
+
+		// 聊天集成：拦截玩家聊天消息，根据 chatMode 触发 AI
+		ServerMessageEvents.CHAT_MESSAGE.register((message, sender, params) -> {
+			ChatIntegrationHandler.getInstance().onChatMessage(message.signedContent(), sender);
 		});
 	}
 }

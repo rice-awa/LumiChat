@@ -27,7 +27,7 @@ stonecutter {
             versions("26.1.1", "26.1.2")
             version("26.2")
         }
-        vcsVersion = "1.21.11"
+        vcsVersion = if (supportsMc26) "26.2" else "1.21.11"
     }
 }
 

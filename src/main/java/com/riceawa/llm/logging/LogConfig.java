@@ -13,7 +13,6 @@ public class LogConfig {
     private int maxBackupFiles = 5;
     private int retentionDays = 30;
     private boolean enableAsyncLogging = true;
-    private int asyncQueueSize = 1000;
     
     // 日志类别配置
     private boolean enableSystemLog = true;
@@ -24,10 +23,18 @@ public class LogConfig {
     private boolean enableLLMRequestLog = true;
 
     // LLM请求日志特殊配置
-    private boolean logFullRequestBody = true;
-    private boolean logFullResponseBody = true;
-    private int maxLogContentLength = 10000; // 最大日志内容长度
-    private boolean sanitizeSensitiveData = true; // 是否脱敏敏感数据
+    private boolean logFullRequestBody = false;
+    private boolean logFullResponseBody = false;
+    private int maxLogContentLength = 2048; // 最大日志内容长度
+    private boolean debugMode = false;
+
+    public boolean isDebugMode() {
+        return debugMode;
+    }
+
+    public void setDebugMode(boolean debugMode) {
+        this.debugMode = debugMode;
+    }
 
     public LogLevel getLogLevel() {
         return logLevel;
@@ -91,14 +98,6 @@ public class LogConfig {
 
     public void setEnableAsyncLogging(boolean enableAsyncLogging) {
         this.enableAsyncLogging = enableAsyncLogging;
-    }
-
-    public int getAsyncQueueSize() {
-        return asyncQueueSize;
-    }
-
-    public void setAsyncQueueSize(int asyncQueueSize) {
-        this.asyncQueueSize = asyncQueueSize;
     }
 
     public boolean isEnableSystemLog() {
@@ -173,14 +172,6 @@ public class LogConfig {
         this.maxLogContentLength = maxLogContentLength;
     }
 
-    public boolean isSanitizeSensitiveData() {
-        return sanitizeSensitiveData;
-    }
-
-    public void setSanitizeSensitiveData(boolean sanitizeSensitiveData) {
-        this.sanitizeSensitiveData = sanitizeSensitiveData;
-    }
-
     /**
      * 检查指定类别的日志是否启用
      */
@@ -219,7 +210,6 @@ public class LogConfig {
         return logLevel != null && 
                maxFileSize > 0 && 
                maxBackupFiles >= 0 && 
-               retentionDays > 0 && 
-               asyncQueueSize > 0;
+               retentionDays > 0;
     }
 }

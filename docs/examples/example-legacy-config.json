@@ -1,3 +1,4 @@
+// configVersion: "2.0.0" (pre-Phase-B format)
 {
   "defaultPromptTemplate": "default",
   "defaultTemperature": 0.7,

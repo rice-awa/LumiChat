@@ -33,17 +33,10 @@ public final class CommandCompat {
      */
     public static int executeCommand(MinecraftServer server, CommandSourceStack source, String command) {
         //? >=1.21.11 {
-        // 优先尝试使用 performPrefixedCommand
         try {
-            server.getCommands().performPrefixedCommand(source, command);
-            return 1; // performPrefixedCommand 没有返回值，成功则返回 1
-        } catch (Exception e) {
-            // 如果 performPrefixedCommand 失败，回退到 dispatcher.execute
-            try {
-                return server.getCommands().getDispatcher().execute(command, source);
-            } catch (CommandSyntaxException ex) {
-                return 0;
-            }
+            return server.getCommands().getDispatcher().execute(command, source);
+        } catch (CommandSyntaxException e) {
+            return 0;
         }
         //?} else {
         /*try {
@@ -71,18 +64,9 @@ public final class CommandCompat {
 
         //? >=1.21.11 {
         try {
-            // 首先尝试使用 dispatcher.execute 获取返回值
             return server.getCommands().getDispatcher().execute(command, captureSource);
         } catch (CommandSyntaxException e) {
             return 0;
-        } catch (Exception e) {
-            // 如果失败，尝试使用 performPrefixedCommand
-            try {
-                server.getCommands().performPrefixedCommand(captureSource, command);
-                return 1;
-            } catch (Exception ex) {
-                return 0;
-            }
         }
         //?} else {
         /*try {
