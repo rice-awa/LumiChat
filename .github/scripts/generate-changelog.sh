@@ -33,9 +33,20 @@ if [[ -n "$SINCE_REF" ]]; then
 else
     LATEST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
     if [[ -n "$LATEST_TAG" ]]; then
-        RANGE="${LATEST_TAG}..${HEAD_REF}"
+        LATEST_TAG_SHA="$(git rev-parse "${LATEST_TAG}^{}" 2>/dev/null || true)"
+        HEAD_SHA="$(git rev-parse "${HEAD_REF}^{}")"
+        if [[ "$LATEST_TAG_SHA" == "$HEAD_SHA" ]]; then
+            # 最新 tag 恰好指向 HEAD（手动打 tag 后触发工作流的场景），找倒数第二个 tag
+            PREV_TAG="$(git describe --tags --abbrev=0 "${LATEST_TAG}^" 2>/dev/null || true)"
+            if [[ -n "$PREV_TAG" ]]; then
+                RANGE="${PREV_TAG}..${HEAD_REF}"
+            else
+                RANGE="${HEAD_REF}"
+            fi
+        else
+            RANGE="${LATEST_TAG}..${HEAD_REF}"
+        fi
     else
-        # 无 tag：取全部历史（首次发布）
         RANGE="${HEAD_REF}"
     fi
 fi
