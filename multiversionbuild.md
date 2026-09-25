@@ -9,8 +9,11 @@
 | `1.21`-`1.21.11` | 与各节点同名 | 由各节点的 `mod.mc_targets` 声明 |
 | `26.1` | `26.1.2` | `26.1`-`26.1.2` |
 | `26.2` | `26.2` | `26.2` |
+| `26.3` | `26.3` | `26.3` |
 
-仅当运行 Gradle 的 JVM 为 Java 25 或更高版本时，`settings.gradle.kts` 才会把 26.1/26.2 加入当前项目矩阵。这两个条件节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。
+仅当运行 Gradle 的 JVM 为 Java 25 或更高版本时，`settings.gradle.kts` 才会把 26.1-26.3 加入当前项目矩阵。这些条件节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。
+
+构建工具链：Loom `1.17.21` + Gradle `9.6.0`。该组合来自 [Fabric for Minecraft 26.3 公告](https://fabricmc.net/2026/09/15/263.html)（"Developers should use Loom 1.17 and Gradle 9.6.0"）；Loom 1.17.x 要求 Gradle plugin API `>=9.5.0`，故 wrapper 必须是 9.6.0 或更高。
 
 ## 常用 Gradle 命令
 
@@ -28,6 +31,7 @@
 # 仅在运行 Gradle 的 JVM 为 Java 25+ 时执行
 ./gradlew :26.1:build
 ./gradlew :26.2:build
+./gradlew :26.3:build
 ```
 
 **运行特定版本：**
@@ -77,7 +81,8 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 │   ├── ...
 │   ├── 1.21.11/
 │   ├── 26.1/            # Java 25+ 条件节点: 实际构建版本 26.1.2
-│   └── 26.2/            # Java 25+ 条件节点: 实际构建版本 26.2
+│   ├── 26.2/            # Java 25+ 条件节点: 实际构建版本 26.2
+│   └── 26.3/            # Java 25+ 条件节点: 实际构建版本 26.3
 ├── build.gradle.kts        # 构建模板（应用于所有版本）
 ├── stonecutter.gradle.kts  # Stonecutter 控制器配置
 └── settings.gradle.kts     # 项目设置和版本定义
@@ -161,7 +166,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 脚本将执行以下检查：
 1. 工作区状态检查
-2. 代表性版本构建验证（始终验证 1.19、1.20.6、1.21.11；Java 25+ 时再验证 26.1、26.2）
+2. 代表性版本构建验证（始终验证 1.19、1.20.6、1.21.11；Java 25+ 时再验证 26.1、26.2、26.3）
 3. resetActiveVersion 执行
 4. Stonecutter 状态验证
 

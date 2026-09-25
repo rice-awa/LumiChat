@@ -12,7 +12,10 @@ public final class WorldTimeCompat {
     private WorldTimeCompat() {}
 
     public static long getDayTime(ServerLevel world) {
-        //? >=26.1 {
+        //? >=26.3 {
+        /*var clock = world.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD);
+        return world.clockManager().getInstance(clock).totalTicks();
+        *///?} else if >=26.1 {
         /*var clock = world.registryAccess().lookupOrThrow(Registries.WORLD_CLOCK).getOrThrow(WorldClocks.OVERWORLD);
         return world.clockManager().getTotalTicks(clock);
         *///?} else {
