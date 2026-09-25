@@ -62,7 +62,7 @@ if (-not $SkipBuild) {
     }
     $javaMajor = [int]$javaMajorMatch.Groups[1].Value
     if ($javaMajor -ge 25) {
-        $representativeVersions += @("26.1", "26.2")
+        $representativeVersions += @("26.1", "26.2", "26.3")
     }
 
     foreach ($version in $representativeVersions) {

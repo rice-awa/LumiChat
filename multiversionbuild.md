@@ -9,8 +9,11 @@
 | `1.21`-`1.21.11` | 与各节点同名 | 由各节点的 `mod.mc_targets` 声明 |
 | `26.1` | `26.1.2` | `26.1`-`26.1.2` |
 | `26.2` | `26.2` | `26.2` |
+| `26.3` | `26.3` | `26.3` |
 
-仅当运行 Gradle 的 JVM 为 Java 25 或更高版本时，`settings.gradle.kts` 才会把 26.1/26.2 加入当前项目矩阵。这两个条件节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。
+仅当运行 Gradle 的 JVM 为 Java 25 或更高版本时，`settings.gradle.kts` 才会把 26.1-26.3 加入当前项目矩阵。这些条件节点采用 non-remap 的 Loom 构建分流（`net.fabricmc.fabric-loom`），旧版本继续使用 remap 链路。
+
+构建工具链：Loom `1.17.21` + Gradle `9.6.0`。该组合来自 [Fabric for Minecraft 26.3 公告](https://fabricmc.net/2026/09/15/263.html)（"Developers should use Loom 1.17 and Gradle 9.6.0"）；Loom 1.17.x 要求 Gradle plugin API `>=9.5.0`，故 wrapper 必须是 9.6.0 或更高。
 
 ## 常用 Gradle 命令
 
@@ -28,6 +31,7 @@
 # 仅在运行 Gradle 的 JVM 为 Java 25+ 时执行
 ./gradlew :26.1:build
 ./gradlew :26.2:build
+./gradlew :26.3:build
 ```
 
 **运行特定版本：**
@@ -57,14 +61,18 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 2. **通过命令行切换：**
    ```bash
-   ./gradlew setActiveVersion -Pversion=1.21.11
+   ./gradlew "Set active project to 1.21.11"
    ```
 
 3. **VCS 重置（提交前必须执行）：**
    ```bash
-   ./gradlew resetActiveVersion
+   ./gradlew "Reset active project"
    ```
    在提交代码到 Git 之前运行此命令，避免提交 Stonecutter 生成的临时代码。
+
+> **任务名说明**：Stonecutter 0.8.3 实际注册的任务名是 `Reset active project`、`Refresh active project`、`Set active project to <节点名>`（均在 `stonecutter` 任务组下），名字里带空格，命令行必须加引号。
+> 早期文档中出现的 `resetActiveVersion` / `setActiveVersion` / `stonecutterReset` 并不存在，执行会报 `Task not found`。
+> 其中 `<节点名>` 是 `settings.gradle.kts` 里的 `project` 名（如 `1.19`、`1.20.6`、`26.3`），不是实际编译的 Minecraft 版本。
 
 ## 项目结构说明
 
@@ -77,7 +85,8 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 │   ├── ...
 │   ├── 1.21.11/
 │   ├── 26.1/            # Java 25+ 条件节点: 实际构建版本 26.1.2
-│   └── 26.2/            # Java 25+ 条件节点: 实际构建版本 26.2
+│   ├── 26.2/            # Java 25+ 条件节点: 实际构建版本 26.2
+│   └── 26.3/            # Java 25+ 条件节点: 实际构建版本 26.3
 ├── build.gradle.kts        # 构建模板（应用于所有版本）
 ├── stonecutter.gradle.kts  # Stonecutter 控制器配置
 └── settings.gradle.kts     # 项目设置和版本定义
@@ -90,7 +99,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 - 在 `settings.gradle.kts` 中统一声明版本矩阵，并通过 `vcsVersion` 固定提交流程重置版本。
 - 保持单一共享 `build.gradle.kts`，将版本差异收敛到 `versions/<mc-version>/gradle.properties`。
-- 继续使用 `setActiveVersion` + `resetActiveVersion` 的开发与提交闭环，减少临时状态进入 Git。
+- 继续使用 `"Set active project to <节点名>"` + `"Reset active project"` 的开发与提交闭环，减少临时状态进入 Git。
 
 关于项目节点、编译目标与发布范围的说明：
 
@@ -104,7 +113,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 - 不要直接修改 `versions/` 目录下的文件，这些是由 Stonecutter 自动生成的
 - 所有代码修改应该在 `src/` 目录中进行
 - 使用条件注释 `/*? ... */` 来编写版本特定的代码
-- 提交前务必运行 `resetActiveVersion` 重置到 VCS 版本
+- 提交前务必运行 `"Reset active project"` 重置到 VCS 版本
 
 ## 推荐开发流程
 
@@ -112,7 +121,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 1. **切换到目标版本**
    ```bash
-   ./gradlew setActiveVersion -Pversion=1.21.11
+   ./gradlew "Set active project to 1.21.11"
    ```
    这将更新 `src/` 目录中的条件代码，使其匹配目标版本。
 
@@ -135,7 +144,7 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 4. **提交前检查**
    ```bash
    # 执行重置，避免提交临时代码
-   ./gradlew resetActiveVersion
+   ./gradlew "Reset active project"
    
    # 检查工作区状态
    git status
@@ -161,8 +170,8 @@ Stonecutter 使用"活动版本"机制来管理源代码：
 
 脚本将执行以下检查：
 1. 工作区状态检查
-2. 代表性版本构建验证（始终验证 1.19、1.20.6、1.21.11；Java 25+ 时再验证 26.1、26.2）
-3. resetActiveVersion 执行
+2. 代表性版本构建验证（始终验证 1.19、1.20.6、1.21.11；Java 25+ 时再验证 26.1、26.2、26.3）
+3. `"Reset active project"` 执行
 4. Stonecutter 状态验证
 
 ### 版本差异处理最佳实践

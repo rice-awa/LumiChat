@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-LumiChat 是一个 Fabric 模组，将 LLM/AI 对话能力集成到 Minecraft 游戏内。基于 Stonecutter 多版本构建，支持从 1.19.4 到 26.2 共 27 个 Minecraft 版本。模组 ID: `lumichat`，主包 `com.riceawa.llm`。
+LumiChat 是一个 Fabric 模组，将 LLM/AI 对话能力集成到 Minecraft 游戏内。基于 Stonecutter 多版本构建，支持从 1.19.4 到 26.3 共 25 个 Minecraft 版本。模组 ID: `lumichat`，主包 `com.riceawa.llm`。
 
 ## 项目结构
 
@@ -31,8 +31,9 @@ src/main/java/com/riceawa/llm/
 ```bash
 ./gradlew build                                    # 构建当前活跃版本
 ./gradlew buildAndCollect                          # 构建并收集重映射 jar
-./gradlew setActiveVersion -Pversion=1.21.11       # 切换活跃版本
-./gradlew stonecutterReset                         # 提交前重置 Stonecutter 状态
+./gradlew "Set active project to 1.21.11"          # 切换活跃版本（任务名带空格，须加引号）
+./gradlew "Reset active project"                   # 提交前重置 Stonecutter 状态
+./gradlew "Refresh active project"                 # 重跑注释处理，修复注释状态错乱
 ./gradlew :1.21.11:build                           # 构建单个版本节点验证兼容性
 ./gradlew test jacocoTestReport                    # 运行测试 + 覆盖率报告
 ```
@@ -195,9 +196,9 @@ docs(build): 更新构建说明
 ## Stonecutter 多版本关键点
 
 - 共享代码在 `src/`，版本元数据在 `versions/<mc-version>/`
-- 提交前**必须**执行 `./gradlew stonecutterReset`
+- 提交前**必须**执行 `./gradlew "Reset active project"`（注意：任务名带空格，需加引号；`resetActiveVersion` / `stonecutterReset` 等写法在 Stonecutter 0.8.3 中不存在）
 - 新增版本时验证代表性节点：`1.19`、`1.20.6`、`1.21.11`
-- 27 个版本节点来自 `settings.gradle.kts` 中的 `versions()` 声明，VCS 基准版本为 `1.21.11`
+- 版本节点来自 `settings.gradle.kts` 中的 `versions()` 声明：Java 25 环境下共 25 个（1.19.4–26.3），低 Java 环境下为 20 个（不含 26.x）；`stonecutter active` 固定为 `1.21.11`，`vcsVersion` 跟随 Java 条件分支（Java 25 下为 `26.3`）
 
 ## 安全
 

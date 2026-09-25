@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecraft 版本构建。模组提供 `/llmchat` 聊天命令、OpenAI 兼容 Provider、提示词模板、Tool Call、历史记录、日志、上下文压缩和游戏内广播等功能。
 
-当前构建矩阵在 `settings.gradle.kts` 中定义：历史版本组覆盖 1.19，独立节点覆盖 1.20-1.20.6、1.21-1.21.11；如果本机 Java 支持 25，也会启用 26.1/26.2 节点。`vcsVersion` 和默认 active 版本都是 `1.21.11`。
+当前构建矩阵在 `settings.gradle.kts` 中定义：历史版本组覆盖 1.19，独立节点覆盖 1.20-1.20.6、1.21-1.21.11；如果本机 Java 支持 25，也会启用 26.1-26.3 节点。`vcsVersion` 在 Java 25 环境下为最新节点（当前 `26.3`），否则回退到 `1.21.11`；`stonecutter active` 固定为 `1.21.11`，保证低 Java 环境也能加载项目。
 
 ## 常用命令
 
@@ -36,14 +36,23 @@ LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecr
 运行测试并生成覆盖率报告。
 
 ```bash
-./gradlew setActiveVersion -Pversion=1.21.11
+./gradlew "Set active project to 1.21.11"
 ```
-切换 IDE/源码可见的 active Minecraft 版本。
+切换 IDE/源码可见的 active Minecraft 版本。会就地改写 `src/` 中的条件注释，并更新 `stonecutter.gradle.kts` 的 `active "..."` 行。
 
 ```bash
-./gradlew resetActiveVersion
+./gradlew "Reset active project"
 ```
-提交前重置到 `settings.gradle.kts` 的 `vcsVersion`，避免提交 Stonecutter 临时状态。
+提交前把 `src/` 重置回 `settings.gradle.kts` 的 `vcsVersion` 形态，避免提交 Stonecutter 临时状态。会改写 `src/` 与 `stonecutter.gradle.kts`。
+
+```bash
+./gradlew "Refresh active project"
+```
+对当前 active 版本重跑注释处理，用于修复注释状态错乱（不切换版本）。
+
+> **任务名必须带引号。** Stonecutter 0.8.3 注册的是 `Reset active project`、`Refresh active project`、`Set active project to <节点名>`（`stonecutter` 任务组）。
+> 文档与脚本中曾出现过的 `resetActiveVersion`、`setActiveVersion`、`stonecutterReset` **都不存在**，执行会报 `Task not found`。
+> 节点名用 `settings.gradle.kts` 里的 `project` 名（如 `1.19`、`1.20.6`、`26.3`），不是实际编译版本。
 
 ```bash
 ./gradlew :1.19:build
@@ -62,7 +71,7 @@ LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecr
 ./scripts/check-before-commit.ps1
 ./scripts/check-before-commit.ps1 -SkipBuild
 ```
-在 PowerShell 中执行提交前检查；完整模式包含多版本构建、`resetActiveVersion` 和 Stonecutter 状态检查。
+在 PowerShell 中执行提交前检查；完整模式包含多版本构建、`"Reset active project"` 和 Stonecutter 状态检查（脚本内已使用正确的带引号任务名）。
 
 ## 文档优先工作流（Context7/MCP）
 
@@ -94,8 +103,10 @@ LumiChat 是一个 Fabric Minecraft 模组，使用 Stonecutter 管理多 Minecr
 
 - 共享代码修改放在 `src/`，版本节点元数据放在 `versions/<mc-version>/gradle.properties`。
 - 新增版本先改 `settings.gradle.kts` 的 Stonecutter 版本矩阵，再补对应 `versions/<mc-version>/gradle.properties`。
-- 开发某个版本差异前，先运行 `./gradlew setActiveVersion -Pversion=<version>` 切到目标版本。
-- 提交前运行 `./gradlew resetActiveVersion`，保持源码回到 `vcsVersion`。
+- 开发某个版本差异前，先运行 `./gradlew "Set active project to <version>"` 切到目标版本（`<version>` 是 `settings.gradle.kts` 里的 `project` 名）。
+- 提交前运行 `./gradlew "Reset active project"`，把 `src/` 重置回 `vcsVersion` 形态。
+- `vcsVersion` 必须是一个已注册的节点，否则 Stonecutter 在配置阶段直接报错（见 55b54dd）；因此它跟随 `supportsMc26` 条件分支。
+- **注意**：`vcsVersion` 在 Java 25 机器上是 `26.3`，而 `src/` 的提交形态是 `1.21.11`（`stonecutter active` 也为 `1.21.11`）。两者不一致时，"Reset active project" 会把 `src/` 改写成 26.3 形态并产生 diff，使 `check-before-commit.ps1` 第 4 步的 `git diff --exit-code` 门禁失败。
 - 版本差异优先使用 `llm/compat` 兼容层；无法抽象时使用 Stonecutter 条件注释。
 - 26.1 节点使用 non-remap Loom 分流；旧版本继续走 remap 链路。`build.gradle.kts` 通过是否存在 `deps.yarn_mappings` 判断使用 `fabric-loom` 还是 `fabric-loom-remap`。
 - Java 目标版本由 Minecraft 版本决定：26.1 使用 Java 25，1.20.5+ 使用 Java 21，1.18+ 使用 Java 17，1.17 使用 Java 16，更早版本使用 Java 8。
@@ -140,9 +151,9 @@ method(/*? if >=1.20 {*/ param /*?}*/);
 1. 查 Notable Minecraft changes 表，确认目标版本的破坏性变更范围。
 2. 评估现有 compat 层是否能覆盖；不能覆盖则先扩 compat 层再动业务代码。
 3. 在 `settings.gradle.kts` 增加版本节点，补 `versions/<mc-version>/gradle.properties`。
-4. 切到新版本：`./gradlew setActiveVersion -Pversion=<version>`。
+4. 切到新版本：`./gradlew "Set active project to <version>"`。
 5. 编译并修复：先 `:新版本:build`，再回归代表性节点 `:1.19:build`、`:1.20.6:build`、`:1.21.11:build`。
-6. 提交前 `./gradlew resetActiveVersion`。
+6. 提交前 `./gradlew "Reset active project"`。
 
 ### 常见版本升级引发 API 替换的应对
 
