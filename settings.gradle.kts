@@ -12,6 +12,11 @@ pluginManagement {
 
 plugins {
     id("dev.kikugie.stonecutter") version "0.8.3"
+    // 让 gradle.properties 的 org.gradle.java.installations.auto-download=true 真正生效：
+    // 没有 toolchain resolver 时 Gradle 只做本机 auto-detect，不会下载缺失的 JDK，
+    // 1.19 等需要 Java 17 的节点会直接报 "Toolchain download repositories have not been configured"。
+    // 注意插件本身是存在的，此前删除是因为版本号 1.0.1 不存在；当前 release 为 1.0.0。
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 stonecutter {
