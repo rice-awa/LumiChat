@@ -1,6 +1,7 @@
 name: Dev Build
 
-# 多版本矩阵并行构建（手动触发，可指定分支与额外参数）。
+# 多版本矩阵并行构建（手动触发，可指定分支、版本白名单与额外参数）。
+# versions 留空 = 全版本；填写时按 settings.gradle.kts 中检测到的节点名校验，未知节点直接失败。
 on:
   workflow_dispatch:
     inputs:
@@ -8,6 +9,11 @@ on:
         description: '要构建的分支 (默认：dev)'
         required: true
         default: 'dev'
+        type: string
+      versions:
+        description: '仅构建指定版本节点，逗号分隔（如 1.21.11,26.3）。留空 = 构建全部版本'
+        required: false
+        default: ''
         type: string
       additional_args:
         description: '额外的 Gradle 构建参数 (可选)'
@@ -35,10 +41,12 @@ jobs:
       - name: Detect Minecraft Versions and Mod Version
         id: versions
         shell: bash
+        env:
+          REQUESTED_VERSIONS: ${{ github.event.inputs.versions }}
         run: |
           set -euo pipefail
 
-          VERSIONS=$(
+          ALL_VERSIONS=$(
             (
               # version(project = "x", version = "y") -> capture project name
               grep -oE 'version\s*\([^)]*project\s*=\s*"[^"]+"' settings.gradle.kts \
@@ -57,7 +65,29 @@ jobs:
             ) | awk 'NF && !seen[$0]++' | paste -sd ',' -
           )
 
-          echo "Detected versions: $VERSIONS"
+          echo "Detected versions: $ALL_VERSIONS"
+
+          # 手动输入：逗号分隔的版本白名单；留空则构建全部检测到的版本。
+          REQUESTED=$(echo "${REQUESTED_VERSIONS:-}" | tr ',' ' ' | xargs)
+
+          if [ -n "$REQUESTED" ]; then
+            VERSIONS=""
+            for v in $REQUESTED; do
+              # 逗号包裹后精确匹配，避免 "1.21.1" 误命中 "1.21.11"
+              if ! echo ",$ALL_VERSIONS," | grep -qF ",$v,"; then
+                echo "::error::未知的 Minecraft 版本节点 '$v'。可用节点：$ALL_VERSIONS"
+                exit 1
+              fi
+              case ",$VERSIONS," in
+                *",$v,"*) continue ;;
+              esac
+              VERSIONS="${VERSIONS:+$VERSIONS,}$v"
+            done
+            echo "Manual selection: $VERSIONS"
+          else
+            VERSIONS="$ALL_VERSIONS"
+            echo "Building all versions"
+          fi
 
           VERSIONS_JSON=$(
             echo "$VERSIONS" \
@@ -154,6 +184,11 @@ jobs:
           echo "**Branch:** ${{ github.event.inputs.branch }}" >> "$GITHUB_STEP_SUMMARY"
           echo "**Build Time:** ${{ needs.detect-versions.outputs.build_timestamp }}" >> "$GITHUB_STEP_SUMMARY"
           echo "**Mod Version:** ${{ needs.detect-versions.outputs.mod_version }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ github.event.inputs.versions }}" ]; then
+            echo "**Requested Versions:** ${{ github.event.inputs.versions }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "**Requested Versions:** (all)" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| Minecraft Version | Status |" >> "$GITHUB_STEP_SUMMARY"
           echo "|-------------------|--------|" >> "$GITHUB_STEP_SUMMARY"
