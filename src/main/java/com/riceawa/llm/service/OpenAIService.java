@@ -95,12 +95,14 @@ public class OpenAIService implements LLMService {
     @Override
     public CompletableFuture<LLMResponse> chat(List<LLMMessage> messages, LLMConfig config, LLMContext context) {
         String requestId = UUID.randomUUID().toString().substring(0, 8);
+        // thinking 模式下 assistant 消息必须原样回传 reasoning_content，发送前统一整理消息形态
+        List<LLMMessage> requestMessages = ThinkingModeCompat.normalizeAssistantTurns(messages);
 
         return ConcurrencyManager.getInstance().submitRequest(() -> {
             ConcurrencySettings settings = LLMChatConfig.getInstance().getConcurrencySettings();
 
             try {
-                return executeRequestWithRetry(messages, config, settings, requestId, context);
+                return executeRequestWithRetry(requestMessages, config, settings, requestId, context);
             } catch (Exception e) {
                 LLMResponse errorResponse = new LLMResponse();
                 errorResponse.setError("Request failed: " + e.getMessage());

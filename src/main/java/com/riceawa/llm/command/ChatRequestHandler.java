@@ -214,9 +214,8 @@ public final class ChatRequestHandler {
         }
 
         if (hasToolCall) {
-            if (hasContent) {
-                chatContext.addAssistantMessage(content);
-            }
+            // content 与 tool_calls 由 ToolCallHandler 合并写入单条 assistant 消息，
+            // 避免 thinking 模式下 reasoning_content 与 tool_calls 被拆散
             ToolCallHandler.getInstance().handleToolCall(
                     message, player, chatContext, config);
         } else if (hasContent) {

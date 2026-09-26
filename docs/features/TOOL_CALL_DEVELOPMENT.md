@@ -246,6 +246,43 @@
 
 保持了对旧格式的兼容性支持，确保现有代码不会出现问题。
 
+## 2026-09-26 修正：thinking 模式下 reasoning_content 必须随 tool_calls 一起回传
+
+### 现象
+
+使用 DeepSeek 等 thinking 模式模型时，一次工具调用之后的后续请求持续返回：
+
+```text
+HTTP 400: The `reasoning_content` in the thinking mode must be passed back to the API.
+```
+
+### 原因
+
+DeepSeek 在 thinking 模式且请求带 `tools` 时要求：模型回复里的 `reasoning_content`
+必须原样回传，且**一次模型回复对应一条 assistant 消息**。旧实现把同一次回复拆成
+「`assistant(content)` + `assistant(tool_calls, reasoning_content)`」两条相邻消息，
+其中 content 那条丢掉了 `reasoning_content`；这两条相邻 assistant 消息会被判定为同一次
+回复而整体校验失败。缺失字段的消息一旦写入上下文/历史，之后的请求（即使只发纯文本）都会
+持续 400，即"中毒"会话。
+
+### 修正
+
+- `ToolCallHandler.appendToolExchange`：改为接收模型的完整 assistant 消息，把 `content`、
+  `reasoning_content` 与 `tool_calls` 一起写回**单条** assistant 消息；`ChatRequestHandler` /
+  `ToolCallHandler` 不再单独追加 content 消息。
+- 新增 `service/ThinkingModeCompat.normalizeAssistantTurns`：发送前把"纯文本 assistant 消息 +
+  紧随其后的无 content 的 tool_calls assistant 消息"合并成一条。这既统一了线上请求形态，也
+  自动修复旧版本落盘的历史会话（`/llmchat resume` 恢复后同样可用）。
+- legacy 工具调用路径（无 `tool_call_id`）保持原有两条消息的写入方式，仅补齐 assistant 文案。
+
+### 参考资料
+
+- DeepSeek API 文档：thinking 模式与 tool calls 的 `reasoning_content` 回传要求
+- [deepseek-harness #3857](https://github.com/deepseek-ai/deepseek-harness/discussions/3857)：
+  缺失字段的会话会持续 400，纯文本请求同样失败
+- [deepseek-harness-handbook: reasoning_content replay](https://raw.githubusercontent.com/sandbaseai/deepseek-harness-handbook/refs/heads/main/docs/en/troubleshooting/pi-ai-cross-provider-reasoning-replay.md)：
+  回传要求在 thinking 开启时生效；thinking 关闭时残留的 `reasoning_content` 同样会 400
+
 ## 结论
 
 LLMChatMod的Tool Call功能已经完善并符合最新的OpenAI API标准，现在支持：
