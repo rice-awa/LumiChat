@@ -361,7 +361,13 @@ public final class ToolCallHandler {
         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
         metadata.setToolCall(assistantMessage.getMetadata().getToolCall());
         toolCallMessage.setMetadata(metadata);
-        toolCallMessage.setReasoningContent(assistantMessage.getReasoningContent());
+        // 空串等价于「无 reasoning_content」：统一归一化为 null，避免把无意义的空字段
+        // 写进上下文与历史。下游（OpenAIService / ThinkingModeCompat）都按
+        // null-or-empty 判定是否回传，存空串不会改变线上请求，却会污染落盘历史。
+        String reasoningContent = assistantMessage.getReasoningContent();
+        if (reasoningContent != null && !reasoningContent.isEmpty()) {
+            toolCallMessage.setReasoningContent(reasoningContent);
+        }
         chatContext.addMessage(toolCallMessage);
 
         String resultContent = toolResultContent(functionName, result, config);
