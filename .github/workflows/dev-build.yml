@@ -156,10 +156,14 @@ jobs:
       - name: Build Version ${{ matrix.version }}
         run: |
           EXTRA_ARGS="${{ github.event.inputs.additional_args }}"
+          # 版本节点是独立的 Gradle 子项目，默认每次构建都会配置 settings.gradle.kts 里
+          # 的全部二十多个节点（各自 apply Loom 并解析自己的 Java toolchain）。
+          # 矩阵里每个作业只构建一个版本，--configure-on-demand 让 Gradle 只配置本次
+          # 请求的节点，避免为无关版本付出配置（和潜在的 toolchain 下载）开销。
           if [ -z "$EXTRA_ARGS" ]; then
-            ./gradlew :${{ matrix.version }}:build --stacktrace
+            ./gradlew :${{ matrix.version }}:build --stacktrace --configure-on-demand
           else
-            ./gradlew :${{ matrix.version }}:build --stacktrace $EXTRA_ARGS
+            ./gradlew :${{ matrix.version }}:build --stacktrace --configure-on-demand $EXTRA_ARGS
           fi
 
       - name: Upload Build Artifacts for ${{ matrix.version }}
