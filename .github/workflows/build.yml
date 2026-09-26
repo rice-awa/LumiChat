@@ -18,6 +18,9 @@ on:
     branches:
       - main
       - master
+      # dev 是所有功能/修复分支的合并目标，必须在这里列出：原先覆盖所有分支的
+      # pr-check.yml 已删除，若不加 dev，合并进 dev 的 PR 将完全没有 CI 覆盖。
+      - dev
     paths-ignore:
       - '**.md'
       - 'docs/**'
