@@ -57,11 +57,10 @@ public final class ToolCallHandler {
             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
                         if (toolCallId != null) {
-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config,
-                                    message.getReasoningContent());
+                            appendToolExchange(message, functionName, toolCallId, result, chatContext, config);
                             callLLMWithFunctionResult(player, chatContext, config, 1);
                         } else {
-                            handleLegacyToolCall(result, functionName, player, chatContext, config);
+                            handleLegacyToolCall(message, result, functionName, player, chatContext, config);
                         }
                     }))
                     .exceptionallyCompose(throwable -> ServerThreadCompat.execute(server,
@@ -181,9 +180,8 @@ public final class ToolCallHandler {
         }
 
         if (hasToolCall) {
-            if (hasContent) {
-                chatContext.addAssistantMessage(content);
-            }
+            // content 与 tool_calls 由 appendToolExchange 合并写入单条 assistant 消息，
+            // 避免 thinking 模式下 reasoning_content 与 tool_calls 被拆散
             handleToolCallWithRecursion(message, player,
                     chatContext, config, recursionDepth);
         } else if (hasContent) {
@@ -220,12 +218,11 @@ public final class ToolCallHandler {
             FunctionRegistry.getInstance().executeFunctionAsync(functionName, player, arguments)
                     .thenCompose(result -> ServerThreadCompat.execute(server, () -> {
                         if (toolCallId != null) {
-                            appendToolExchange(toolCall, functionName, toolCallId, result, chatContext, config,
-                                    message.getReasoningContent());
+                            appendToolExchange(message, functionName, toolCallId, result, chatContext, config);
                             callLLMWithFunctionResult(
                                     player, chatContext, config, recursionDepth + 1);
                         } else {
-                            handleLegacyToolCall(result, functionName, player, chatContext, config);
+                            handleLegacyToolCall(message, result, functionName, player, chatContext, config);
                         }
                     }))
                     .exceptionallyCompose(throwable -> ServerThreadCompat.execute(server,
@@ -308,15 +305,19 @@ public final class ToolCallHandler {
         }
     }
 
-    private void handleLegacyToolCall(LLMFunction.FunctionResult result, String functionName,
-                                      ServerPlayer player, ChatContext chatContext,
-                                      LLMChatConfig config) {
+    private void handleLegacyToolCall(LLMMessage assistantMessage, LLMFunction.FunctionResult result,
+                                      String functionName, ServerPlayer player,
+                                      ChatContext chatContext, LLMChatConfig config) {
         if (result.isSuccess()) {
             String resultMessage = result.getResult();
             String llmSafeResult = toolResultContent(functionName, result, config);
             MessageCompat.displayClientMessage(player,
                     Component.literal("[函数执行] " + resultMessage)
                             .withStyle(ChatFormatting.GREEN), false);
+            String assistantContent = assistantMessage.getContent();
+            if (assistantContent != null && !assistantContent.trim().isEmpty()) {
+                chatContext.addAssistantMessage(assistantContent);
+            }
             chatContext.addAssistantMessage("调用了函数 " + functionName + "，结果：" + llmSafeResult);
             if (config.isEnableHistory()) {
                 ChatHistory.getInstance().saveSession(chatContext);
@@ -344,17 +345,23 @@ public final class ToolCallHandler {
         }
     }
 
-    private void appendToolExchange(LLMMessage.ToolCall toolCall, String functionName,
+    /**
+     * 把一次工具调用写回上下文：模型回复的 content / reasoning_content 与 tool_calls
+     * 合并为单条 assistant 消息，再追加 tool 结果消息。
+     *
+     * <p>thinking 模式下 DeepSeek 要求带 tool_calls 的 assistant 消息原样回传
+     * reasoning_content；把一次模型回复拆成「content 消息 + tool_calls 消息」会让该校验
+     * 持续失败（HTTP 400: must be passed back to the API），因此这里始终只写一条消息。</p>
+     */
+    private void appendToolExchange(LLMMessage assistantMessage, String functionName,
                                     String toolCallId, LLMFunction.FunctionResult result,
-                                    ChatContext chatContext, LLMChatConfig config,
-                                    String reasoningContent) {
-        LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT, null);
+                                    ChatContext chatContext, LLMChatConfig config) {
+        LLMMessage toolCallMessage = new LLMMessage(LLMMessage.MessageRole.ASSISTANT,
+                assistantMessage.getContent());
         LLMMessage.MessageMetadata metadata = new LLMMessage.MessageMetadata();
-        metadata.setToolCall(toolCall);
+        metadata.setToolCall(assistantMessage.getMetadata().getToolCall());
         toolCallMessage.setMetadata(metadata);
-        if (reasoningContent != null && !reasoningContent.isEmpty()) {
-            toolCallMessage.setReasoningContent(reasoningContent);
-        }
+        toolCallMessage.setReasoningContent(assistantMessage.getReasoningContent());
         chatContext.addMessage(toolCallMessage);
 
         String resultContent = toolResultContent(functionName, result, config);
